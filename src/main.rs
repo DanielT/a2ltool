@@ -42,6 +42,7 @@ fn core() -> Result<(), String> {
 
     let strict = arg_matches.is_present("STRICT");
     let verbose = arg_matches.is_present("VERBOSE");
+    let debugprint = arg_matches.is_present("DEBUGPRINT");
 
     cond_print(verbose, "\nA2ltool v0.1.0\n\n");
 
@@ -56,13 +57,21 @@ fn core() -> Result<(), String> {
     }
     let mut a2l_file = a2lresult?;
     cond_print(verbose, &format!("Input \"{}\" loaded ({:?})\n", input_filename, elapsed));
+    if debugprint {
+        // why not cond_print? in that case the output string must always be
+        // formatted before cond_print can decide whether to print it. This can take longer than parsing the file.
+        println!("================\n{:#?}\n================\n", a2l_file)
+    }
 
     // 2) load elf
     let elf_info = if arg_matches.is_present("ELFFILE") {
         let now = Instant::now();
         let elffile = arg_matches.value_of("ELFFILE").unwrap();
         let elf_info = load_debuginfo(elffile)?;
-        cond_print(verbose, &format!("Variables and types loaded from \"{}\" in {:?}: {} variables available\n", elffile, now.elapsed(), elf_info.variables.len()));
+        cond_print(verbose, &format!("Variables and types loaded from \"{}\" ({:?}): {} variables available\n", elffile, now.elapsed(), elf_info.variables.len()));
+        if debugprint {
+            println!("================\n{:#?}\n================\n", elf_info);
+        }
         Some(elf_info)
     } else {
         None
@@ -104,11 +113,8 @@ fn core() -> Result<(), String> {
     if arg_matches.is_present("UPDATE") || arg_matches.is_present("SAFE_UPDATE") {
         let now = Instant::now();
 
-        let summary = if arg_matches.is_present("UPDATE") {
-            update::update_addresses(&mut a2l_file, &elf_info.as_ref().unwrap())
-        } else {
-            update::update_addresses_preserve(&mut a2l_file, &elf_info.as_ref().unwrap())
-        };
+        let preserve_unknown = arg_matches.is_present("SAFE_UPDATE");
+        let summary = update::update_addresses(&mut a2l_file, &elf_info.as_ref().unwrap(), preserve_unknown);
 
         let elapsed = now.elapsed();
         cond_print(verbose, &format!("Address update done ({:?})\nSummary:\n", elapsed));
@@ -214,6 +220,12 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .takes_value(false)
         .multiple(false)
         .requires("OUTPUT")
+    )
+    .arg(Arg::with_name("DEBUGPRINT")
+        .help("Display internal data for debugging")
+    .long("debug-print")
+        .takes_value(false)
+        .multiple(false)
     )
     .group(
         ArgGroup::with_name("UPDATE_GROUP")

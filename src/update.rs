@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::dwarf::{DebugData, TypeInfo};
 use super::ifdata;
 use a2lfile::*;
@@ -14,17 +16,27 @@ pub(crate) struct UpdateSumary {
 
 
 // perform a destructive address update: any object that cannot be updated will be discarded
-pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData) -> UpdateSumary {
+pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, preserve_unknown: bool) -> UpdateSumary {
     let mut summary = UpdateSumary::new();
     for module in &mut a2l_file.project.module {
+        let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
 
         let mut measurement_list = Vec::new();
         std::mem::swap(&mut module.measurement, &mut measurement_list);
         for mut measurement in measurement_list {
-            if let Some(_) = update_measurement_address(&mut measurement, elf_info) {
+            if let Some((_, typeinfo)) = update_measurement_address(&mut measurement, elf_info) {
+                if let TypeInfo::Enum{..} = typeinfo {
+                    enum_convlist.insert(measurement.conversion.clone(), typeinfo);
+                }
+
                 module.measurement.push(measurement);
                 summary.measurement_updated += 1;
             } else {
+                if preserve_unknown {
+                    measurement.ecu_address = None;
+                    zero_if_data(&mut measurement.if_data);
+                    module.measurement.push(measurement);
+                }
                 summary.measurement_not_updated += 1;
             }
         }
@@ -32,10 +44,19 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData) -> 
         let mut characteristic_list = Vec::new();
         std::mem::swap(&mut module.characteristic, &mut characteristic_list);
         for mut characteristic in characteristic_list {
-            if let Some(_) = update_characteristic_address(&mut characteristic, elf_info) {
+            if let Some((_, typeinfo)) = update_characteristic_address(&mut characteristic, elf_info) {
+                if let TypeInfo::Enum{..} = typeinfo {
+                    enum_convlist.insert(characteristic.conversion.clone(), typeinfo);
+                }
+
                 module.characteristic.push(characteristic);
                 summary.characteristic_updated += 1;
             } else {
+                if preserve_unknown {
+                    characteristic.address = 0;
+                    zero_if_data(&mut characteristic.if_data);
+                    module.characteristic.push(characteristic);
+                }
                 summary.characteristic_not_updated += 1;
             }
         }
@@ -43,50 +64,26 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData) -> 
         let mut axis_pts_list = Vec::new();
         std::mem::swap(&mut module.axis_pts, &mut axis_pts_list);
         for mut axis_pts in axis_pts_list {
-            if let Some(_) = update_axis_pts_address(&mut axis_pts, elf_info) {
+            if let Some((_, typeinfo)) = update_axis_pts_address(&mut axis_pts, elf_info) {
+                if let TypeInfo::Enum{..} = typeinfo {
+                    enum_convlist.insert(axis_pts.conversion.clone(), typeinfo);
+                }
+
                 module.axis_pts.push(axis_pts);
                 summary.axis_pts_updated += 1;
             } else {
+                if preserve_unknown {
+                    axis_pts.address = 0;
+                    zero_if_data(&mut axis_pts.if_data);
+                    module.axis_pts.push(axis_pts);
+                }
                 summary.axis_pts_not_updated += 1;
             }
         }
-    }
 
-    summary
-}
+        // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in MEASUREMENTs etc.
+        update_enum_compu_methods(module, &enum_convlist);
 
-
-// perform a non-destructive address update: any object that cannot be updated will have the address zero
-pub(crate) fn update_addresses_preserve(a2l_file: &mut A2lFile, elf_info: &DebugData) -> UpdateSumary {
-    let mut summary = UpdateSumary::new();
-    for module in &mut a2l_file.project.module {
-
-        for measurement in &mut module.measurement {
-            if let Some(_) = update_measurement_address(measurement, elf_info) {
-                summary.measurement_updated += 1;
-            } else {
-                measurement.ecu_address = None;
-                summary.measurement_not_updated += 1;
-            }
-        }
-
-        for characteristic in &mut module.characteristic {
-            if let Some(_) = update_characteristic_address(characteristic, elf_info) {
-                summary.characteristic_updated += 1;
-            } else {
-                characteristic.address = 0;
-                summary.characteristic_not_updated += 1;
-            }
-        }
-
-        for axis_pts in &mut module.axis_pts {
-            if let Some(_) = update_axis_pts_address(axis_pts, elf_info) {
-                summary.axis_pts_updated += 1;
-            } else {
-                axis_pts.address = 0;
-                summary.axis_pts_not_updated += 1;
-            }
-        }
     }
 
     summary
@@ -439,6 +436,89 @@ fn update_ifdata(ifdata_vec: &mut Vec<IfData>, symbol_name: String, datatype: &T
 
                     decoded_ifdata.store_to_ifdata(ifdata);
                 }
+            }
+        }
+    }
+}
+
+
+// zero out incorrect information in IF_DATA for MEASUREMENTs / CHARACTERISTICs / AXIS_PTS that were not found during update
+fn zero_if_data(ifdata_vec: &mut Vec<IfData>) {
+    for ifdata in ifdata_vec {
+        if let Some(mut decoded_ifdata) = ifdata::A2mlVector::load_from_ifdata(ifdata) {
+            if let Some(canape_ext) = &mut decoded_ifdata.canape_ext {
+                if let Some (link_map) = &mut canape_ext.link_map {
+                    // remove address and data type information, but keep the symbol name
+                    link_map.address = 0;
+                    link_map.datatype = 0;
+                    link_map.bit_offset = 0;
+                    link_map.datatype_valid = 0;
+
+                    decoded_ifdata.store_to_ifdata(ifdata);
+                }
+            }
+        }
+    }
+}
+
+
+// every MEASUREMENT, CHARACTERISTIC and AXIS_PTS object can reference a COMPU_METHOD which describes the conversion of values
+// in some cases the the COMPU_METHOS in turn references a COMPU_VTAB to provide number to string mapping and display named values
+// These COMPU_VTAB objects are typically based on an enum in the original software.
+// By following the chain from the MEASUREMENT (etc.), we know what type is associated with the COMPU_VTAB and can add or
+// remove enumerators to match the software
+fn update_enum_compu_methods(module: &mut Module, enum_convlist: &HashMap<String, &TypeInfo>) {
+    // enum_convlist: a table of COMPU_METHODS and the associated types (filtered to contain only enums)
+
+    // follow the chain of objects and build a list of COMPU_TAB_REF references with their associated enum types
+    let mut enum_compu_tab = HashMap::new();
+    for compu_method in &module.compu_method {
+        if let Some(typeinfo) = enum_convlist.get(&compu_method.name) {
+            if let Some(compu_tab) = &compu_method.compu_tab_ref {
+                enum_compu_tab.insert(compu_tab.conversion_table.clone(), *typeinfo);
+            }
+        }
+    }
+
+    // check all COMPU_VTABs in the module to see if we know of an associated enum type
+    for compu_vtab in &mut module.compu_vtab {
+        if let Some(TypeInfo::Enum{enumerators, ..}) = enum_compu_tab.get(&compu_vtab.name) {
+            // if compu_vtab has more entries than the enum, delete the extras
+            while compu_vtab.value_pairs.len() > enumerators.len() {
+                compu_vtab.value_pairs.pop();
+            }
+            // if compu_vtab has less entries than the enum, append some dummy entries
+            while compu_vtab.value_pairs.len() < enumerators.len() {
+                compu_vtab.value_pairs.push(ValuePairsStruct::new(0f64, "dummy".to_string()));
+            }
+            compu_vtab.number_value_pairs = enumerators.len() as u16;
+
+            // overwrite the current compu_vtab entries with the values from the enum
+            for (idx, (name, value)) in enumerators.iter().enumerate() {
+                compu_vtab.value_pairs[idx].in_val = *value as f64;
+                compu_vtab.value_pairs[idx].out_val = name.clone();
+            }
+        }
+    }
+
+    // do the same for COMPU_VTAB_RANGE, because the enum could also be stored as a COMPU_VTAB_RANGE where min = max for all entries
+    for compu_vtab_range in &mut module.compu_vtab_range {
+        if let Some(TypeInfo::Enum{enumerators, ..}) = enum_compu_tab.get(&compu_vtab_range.name) {
+            // if compu_vtab_range has more entries than the enum, delete the extras
+            while compu_vtab_range.value_triples.len() > enumerators.len() {
+                compu_vtab_range.value_triples.pop();
+            }
+            // if compu_vtab_range has less entries than the enum, append some dummy entries
+            while compu_vtab_range.value_triples.len() < enumerators.len() {
+                compu_vtab_range.value_triples.push(ValueTriplesStruct::new(0f64, 0f64, "dummy".to_string()));
+            }
+            compu_vtab_range.number_value_triples = enumerators.len() as u16;
+
+            // overwrite the current compu_vtab_range entries with the values from the enum
+            for (idx, (name, value)) in enumerators.iter().enumerate() {
+                compu_vtab_range.value_triples[idx].in_val_min = *value as f64;
+                compu_vtab_range.value_triples[idx].in_val_max = *value as f64;
+                compu_vtab_range.value_triples[idx].out_val = name.clone();
             }
         }
     }
