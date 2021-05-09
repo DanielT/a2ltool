@@ -234,7 +234,7 @@ impl<'a> Index<usize> for UnitList<'a> {
 
 
 impl TypeInfo {
-    fn get_size(&self) -> u64 {
+    pub(crate) fn get_size(&self) -> u64 {
         match self {
             TypeInfo::Uint8 => 1,
             TypeInfo::Uint16 => 2,

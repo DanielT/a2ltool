@@ -12,6 +12,10 @@ pub(crate) struct UpdateSumary {
     pub(crate) characteristic_not_updated: u32,
     pub(crate) axis_pts_updated: u32,
     pub(crate) axis_pts_not_updated: u32,
+    pub(crate) blob_updated: u32,
+    pub(crate) blob_not_updated: u32,
+    pub(crate) instance_updated: u32,
+    pub(crate) instance_not_updated: u32,
 }
 
 
@@ -21,10 +25,11 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
     for module in &mut a2l_file.project.module {
         let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
 
+        // update all MEASUREMENTs
         let mut measurement_list = Vec::new();
         std::mem::swap(&mut module.measurement, &mut measurement_list);
         for mut measurement in measurement_list {
-            if let Some((_, typeinfo)) = update_measurement_address(&mut measurement, elf_info) {
+            if let Some(typeinfo) = update_measurement_address(&mut measurement, elf_info) {
                 if let TypeInfo::Enum{..} = typeinfo {
                     enum_convlist.insert(measurement.conversion.clone(), typeinfo);
                 }
@@ -41,10 +46,11 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
             }
         }
 
+        // update all CHARACTERISTICs
         let mut characteristic_list = Vec::new();
         std::mem::swap(&mut module.characteristic, &mut characteristic_list);
         for mut characteristic in characteristic_list {
-            if let Some((_, typeinfo)) = update_characteristic_address(&mut characteristic, elf_info) {
+            if let Some(typeinfo) = update_characteristic_address(&mut characteristic, elf_info) {
                 if let TypeInfo::Enum{..} = typeinfo {
                     enum_convlist.insert(characteristic.conversion.clone(), typeinfo);
                 }
@@ -61,10 +67,11 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
             }
         }
 
+        // update all AXIS_PTS
         let mut axis_pts_list = Vec::new();
         std::mem::swap(&mut module.axis_pts, &mut axis_pts_list);
         for mut axis_pts in axis_pts_list {
-            if let Some((_, typeinfo)) = update_axis_pts_address(&mut axis_pts, elf_info) {
+            if let Some(typeinfo) = update_axis_pts_address(&mut axis_pts, elf_info) {
                 if let TypeInfo::Enum{..} = typeinfo {
                     enum_convlist.insert(axis_pts.conversion.clone(), typeinfo);
                 }
@@ -81,9 +88,46 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
             }
         }
 
+        // update all BLOBs
+        let mut blob_list = Vec::new();
+        std::mem::swap(&mut module.blob, &mut blob_list);
+        for mut blob in blob_list {
+            if let Some(typeinfo) = update_blob_address(&mut blob, elf_info) {
+                blob.size = typeinfo.get_size() as u32;
+                module.blob.push(blob);
+                summary.blob_updated += 1;
+            } else {
+                if preserve_unknown {
+                    blob.start_address = 0;
+                    zero_if_data(&mut blob.if_data);
+                    module.blob.push(blob);
+                }
+                summary.blob_not_updated += 1;
+            }
+        }
+
+        // update all INSTANCEs
+        let mut instance_list = Vec::new();
+        std::mem::swap(&mut module.instance, &mut instance_list);
+        for mut instance in instance_list {
+            if let Some((_typedef_ref, _typeinfo)) = update_instance_address(&mut instance, elf_info) {
+                // possible extension: validate the referenced TYPEDEF_x that this INSTANCE is based on by comparing it to typeinfo
+
+                module.instance.push(instance);
+                summary.instance_updated += 1;
+            } else {
+                if preserve_unknown {
+                    instance.start_address = 0;
+                    zero_if_data(&mut instance.if_data);
+                    module.instance.push(instance);
+                }
+                summary.instance_not_updated += 1;
+            }
+        }
+
+
         // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in MEASUREMENTs etc.
         update_enum_compu_methods(module, &enum_convlist);
-
     }
 
     summary
@@ -91,8 +135,8 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
 
 
 // update the address of a MEASUREMENT object
-fn update_measurement_address<'a>(measurement: &mut Measurement, elf_info: &'a DebugData) -> Option<(u64, &'a TypeInfo)> {
-    let (symbol_info, symbol_name) = 
+fn update_measurement_address<'a>(measurement: &mut Measurement, elf_info: &'a DebugData) -> Option<&'a TypeInfo> {
+    let (symbol_info, symbol_name) =
         get_symbol_info(&measurement.name, &measurement.symbol_link, &measurement.if_data, elf_info);
 
     if let Some((address, symbol_datatype)) = symbol_info {
@@ -102,15 +146,17 @@ fn update_measurement_address<'a>(measurement: &mut Measurement, elf_info: &'a D
         measurement.datatype = get_a2l_datatype(symbol_datatype);
         set_measurement_bitmask(&mut measurement.bit_mask, symbol_datatype);
         update_ifdata(&mut measurement.if_data, symbol_name, symbol_datatype, address);
-    }
 
-    symbol_info
+        Some(symbol_datatype)
+    } else {
+        None
+    }
 }
 
 
 // update the address of a CHARACTERISTIC
-fn update_characteristic_address<'a>(characteristic: &mut Characteristic, elf_info: &'a DebugData) -> Option<(u64, &'a TypeInfo)> {
-    let (symbol_info, symbol_name) = 
+fn update_characteristic_address<'a>(characteristic: &mut Characteristic, elf_info: &'a DebugData) -> Option<&'a TypeInfo> {
+    let (symbol_info, symbol_name) =
         get_symbol_info(&characteristic.name, &characteristic.symbol_link, &characteristic.if_data, elf_info);
 
     if let Some((address, symbol_datatype)) = symbol_info {
@@ -121,15 +167,17 @@ fn update_characteristic_address<'a>(characteristic: &mut Characteristic, elf_in
         update_ifdata(&mut characteristic.if_data, symbol_name, symbol_datatype, address);
 
         // todo? should probably modify characteristic.deposit if the data type changes
-    }
 
-    symbol_info
+        Some(symbol_datatype)
+    } else {
+        None
+    }
 }
 
 
 // update the address of an AXIS_PTS object
-fn update_axis_pts_address<'a>(axis_pts: &mut AxisPts, elf_info: &'a DebugData) -> Option<(u64, &'a TypeInfo)> {
-    let (symbol_info, symbol_name) = 
+fn update_axis_pts_address<'a>(axis_pts: &mut AxisPts, elf_info: &'a DebugData) -> Option<&'a TypeInfo> {
+    let (symbol_info, symbol_name) =
         get_symbol_info(&axis_pts.name, &axis_pts.symbol_link, &axis_pts.if_data, elf_info);
 
     if let Some((address, symbol_datatype)) = symbol_info {
@@ -139,9 +187,47 @@ fn update_axis_pts_address<'a>(axis_pts: &mut AxisPts, elf_info: &'a DebugData) 
         update_ifdata(&mut axis_pts.if_data, symbol_name, symbol_datatype, address);
 
         // todo? should probably modify axis_pts.deposit_record if the data type changes
-    }
 
-    symbol_info
+        Some(symbol_datatype)
+    } else {
+        None
+    }
+}
+
+
+// update the address of a BLOB object
+fn update_blob_address<'a>(blob: &mut Blob, elf_info: &'a DebugData) -> Option<&'a TypeInfo> {
+    let (symbol_info, symbol_name) =
+        get_symbol_info(&blob.name, &blob.symbol_link, &blob.if_data, elf_info);
+
+    if let Some((address, symbol_datatype)) = symbol_info {
+        // make sure a valid SYMBOL_LINK exists
+        set_symbol_link(&mut blob.symbol_link, symbol_name.clone());
+        blob.start_address = address as u32;
+        update_ifdata(&mut blob.if_data, symbol_name, symbol_datatype, address);
+
+        Some(symbol_datatype)
+    } else {
+        None
+    }
+}
+
+
+// update the address of an INSTANCE object
+fn update_instance_address<'a>(instance: &mut Instance, elf_info: &'a DebugData) -> Option<(String, &'a TypeInfo)> {
+    let (symbol_info, symbol_name) =
+        get_symbol_info(&instance.name, &instance.symbol_link, &instance.if_data, elf_info);
+
+    if let Some((address, symbol_datatype)) = symbol_info {
+        // make sure a valid SYMBOL_LINK exists
+        set_symbol_link(&mut instance.symbol_link, symbol_name.clone());
+        instance.start_address = address as u32;
+        update_ifdata(&mut instance.if_data, symbol_name, symbol_datatype, address);
+
+        Some((instance.type_ref.to_owned(), symbol_datatype))
+    } else {
+        None
+    }
 }
 
 
@@ -155,7 +241,7 @@ fn get_symbol_info<'a>(
     let mut symbol_info = None;
     let mut symbol_name = "".to_string();
 
-    // perferred: get symbol information from a SYMBOL_LINK attribute
+    // preferred: get symbol information from a SYMBOL_LINK attribute
     if let Some(symbol_link) = opt_symbol_link {
         symbol_name = symbol_link.symbol_name.clone();
         symbol_info = find_symbol(&symbol_name, elf_info);
@@ -531,10 +617,14 @@ impl UpdateSumary {
         Self {
             axis_pts_not_updated: 0,
             axis_pts_updated: 0,
+            blob_not_updated: 0,
+            blob_updated: 0,
             characteristic_not_updated: 0,
             characteristic_updated: 0,
             measurement_not_updated: 0,
-            measurement_updated: 0
+            measurement_updated: 0,
+            instance_not_updated: 0,
+            instance_updated: 0
         }
     }
 }

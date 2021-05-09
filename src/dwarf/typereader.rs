@@ -56,8 +56,8 @@ fn get_type(unit_list: &UnitList, current_unit: usize, entries_tree: EntriesTree
                         2 => TypeInfo::Sint16,
                         4 => TypeInfo::Sint32,
                         8 => TypeInfo::Sint64,
-                        val => {
-                            println!("signed integer base type of unusual size {} found - cannot represent in output", val);
+                        _val => {
+                            //println!("signed integer base type of unusual size {} found - cannot represent in output", val);
                             return None;
                         }
                     }
@@ -70,14 +70,14 @@ fn get_type(unit_list: &UnitList, current_unit: usize, entries_tree: EntriesTree
                         2 => TypeInfo::Uint16,
                         4 => TypeInfo::Uint32,
                         8 => TypeInfo::Uint64,
-                        val => {
-                            println!("unsigned integer base type of unusual size {} found - cannot represent in output", val);
+                        _val => {
+                            //println!("unsigned integer base type of unusual size {} found - cannot represent in output", val);
                             return None;
                         }
                     }
                 }
-                other => {
-                    println!("unknown base type encoding {:#?} found, using uint8", other);
+                _other => {
+                    //println!("unknown base type encoding {:#?} found, using uint8", other);
                     TypeInfo::Other(byte_size)
                 }
             })
@@ -87,9 +87,9 @@ fn get_type(unit_list: &UnitList, current_unit: usize, entries_tree: EntriesTree
             Some(TypeInfo::Pointer(unit.encoding().address_size as u64))
         }
         gimli::constants::DW_TAG_array_type => {
+            let size = get_byte_size_attribute(entry)?;
             let (new_cur_unit, mut new_entries_tree) = get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
             if let Some(arraytype) = get_type(unit_list, new_cur_unit, new_entries_tree.root().unwrap()) {
-                let size = get_byte_size_attribute(entry)?;
                 let mut dim = Vec::<u64>::new();
     
                 // If the stride of the array is different from the size of each element, then the stride must be given as an attribute
