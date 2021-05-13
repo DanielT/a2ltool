@@ -9,11 +9,11 @@ a2ml_specification! {
         uint t2;  /// T2 [ms]
         uint t3;  /// T3 [ms]
         uint t4;  /// T4 [ms]
-        uint t5;  /// T5 [ms] 
-        uint t6;  /// T6 [ms] 
-        uint t7;  /// T7 [ms] 
-        uchar max_cto;  /// MAX_CTO 
-        uint max_dto;  /// MAX_DTO 
+        uint t5;  /// T5 [ms]
+        uint t6;  /// T6 [ms]
+        uint t7;  /// T7 [ms]
+        uchar max_cto;  /// MAX_CTO
+        uint max_dto;  /// MAX_DTO
         enum {
             "BYTE_ORDER_MSB_LAST" = 0,
             "BYTE_ORDER_MSB_FIRST" = 1
@@ -83,14 +83,14 @@ a2ml_specification! {
                 "BLOCK" taggedstruct {
                     "SLAVE" ;
                     "MASTER" struct {
-                        uchar max_bs;  /// MAX_BS 
-                        uchar min_st;  /// MIN_ST 
+                        uchar max_bs;  /// MAX_BS
+                        uchar min_st;  /// MIN_ST
                     };
                 };
                 "INTERLEAVED" uchar;  /// QUEUE_SIZE 
             };
-            "SEED_AND_KEY_EXTERNAL_FUNCTION" char[256];  /// Name of the Seed&Key function 
-            "MAX_DTO_STIM" uint;  /// overrules MAX_DTO see above for STIM use case 
+            "SEED_AND_KEY_EXTERNAL_FUNCTION" char funcname[256];  /// Name of the Seed&Key function
+            "MAX_DTO_STIM" uint max_dto_stim;  /// overrules MAX_DTO see above for STIM use case
         };
     };
 
@@ -99,9 +99,9 @@ a2ml_specification! {
             "STATIC" = 0,
             "DYNAMIC" = 1
         };
-        uint max_daq;  /// MAX_DAQ 
-        uint max_event_channel;  /// MAX_EVENT_CHANNEL 
-        uchar min_daq;  /// MIN_DAQ 
+        uint max_daq;            /// MAX_DAQ
+        uint max_event_channel;  /// MAX_EVENT_CHANNEL
+        uchar min_daq;           /// MIN_DAQ
         enum OptimisationType {
             "OPTIMISATION_TYPE_DEFAULT" = 0,
             "OPTIMISATION_TYPE_ODT_TYPE_16" = 1,
@@ -127,7 +127,7 @@ a2ml_specification! {
             "GRANULARITY_ODT_ENTRY_SIZE_DAQ_DWORD" = 4,
             "GRANULARITY_ODT_ENTRY_SIZE_DAQ_DLONG" = 8
         };
-        uchar max_odt_entry_size_daq;  /// MAX_ODT_ENTRY_SIZE_DAQ 
+        uchar max_odt_entry_size_daq;  /// MAX_ODT_ENTRY_SIZE_DAQ
         enum OverloadIndication {
             "NO_OVERLOAD_INDICATION" = 0,
             "OVERLOAD_INDICATION_PID" = 1,
@@ -137,7 +137,7 @@ a2ml_specification! {
             "DAQ_ALTERNATING_SUPPORTED" uint;  ///This flag selects the alternating display mode.
             "PRESCALER_SUPPORTED" ;
             "RESUME_SUPPORTED" ;
-            "STORE_DAQ_SUPPORTED" ;  ///This flag indicates that the slave can store DAQ configurations. 
+            "STORE_DAQ_SUPPORTED" ;  ///This flag indicates that the slave can store DAQ configurations.
             block "STIM" struct {
                 enum GranularityOdtEntrySizeStim {
                     "GRANULARITY_ODT_ENTRY_SIZE_STIM_BYTE" = 1,
@@ -145,14 +145,14 @@ a2ml_specification! {
                     "GRANULARITY_ODT_ENTRY_SIZE_STIM_DWORD" = 4,
                     "GRANULARITY_ODT_ENTRY_SIZE_STIM_DLONG" = 8
                 };
-                uchar max_odt_entry_size_stim;  /// MAX_ODT_ENTRY_SIZE_STIM 
+                uchar max_odt_entry_size_stim;  /// MAX_ODT_ENTRY_SIZE_STIM
                 taggedstruct {
                     "BIT_STIM_SUPPORTED" ;
                     "MIN_ST_STIM" uchar;  ///Separation time between DTOs time in units of 100 microseconds
                 };
             };
             block "TIMESTAMP_SUPPORTED" struct {
-                uint timestamp_ticks;  /// TIMESTAMP_TICKS 
+                uint timestamp_ticks;  /// TIMESTAMP_TICKS
                 enum TimestampSize {
                     "NO_TIME_STAMP" = 0,
                     "SIZE_BYTE" = 1,
@@ -196,7 +196,7 @@ a2ml_specification! {
                 uint odt_stim_buffer_factor;  /// "ODT_STIM_BUFFER_FACTOR" : Nutzbytes * Faktor = Bytes für Empfangspuffer
             };
             (block "DAQ_LIST" struct {
-                uint daq_list_number;  /// DAQ_LIST_NUMBER 
+                uint daq_list_number;  /// DAQ_LIST_NUMBER
                 taggedstruct {
                     "DAQ_LIST_TYPE" enum {
                         "DAQ" = 1,
@@ -209,11 +209,11 @@ a2ml_specification! {
                     "EVENT_FIXED" uint;
                     block "PREDEFINED" taggedstruct {
                         (block "ODT" struct {
-                            uchar odt_number;  /// ODT number 
+                            uchar odt_number;  /// ODT number
                             taggedstruct {
                                 ("ODT_ENTRY" struct {
-                                    uchar odt_entry_number;  /// ODT_ENTRY number 
-                                    ulong element_address;  /// address of element 
+                                    uchar odt_entry_number;  /// ODT_ENTRY number
+                                    ulong element_address;  /// address of element
                                     uchar address_extension;  /// address extension of element
                                     uchar element_size;  /// size of element [AG]
                                     uchar bit_offset;  /// BIT_OFFSET
@@ -232,10 +232,10 @@ a2ml_specification! {
                     "STIM" = 2,
                     "DAQ_STIM" = 3
                 };
-                uchar max_daq_list;  /// MAX_DAQ_LIST 
-                uchar time_cycle;  /// TIME_CYCLE   
-                uchar time_unit;  /// TIME_UNIT    
-                uchar priority;  /// PRIORITY     
+                uchar max_daq_list;  /// MAX_DAQ_LIST
+                uchar time_cycle;  /// TIME_CYCLE
+                uchar time_unit;  /// TIME_UNIT
+                uchar priority;  /// PRIORITY
                 taggedstruct {
                     "COMPLEMENTARY_BYPASS_EVENT_CHANNEL_NUMBER" uint;  ///This keyword is used to make a combination of two event channels building a bypassing raster.
                     "CONSISTENCY" enum {
@@ -243,8 +243,8 @@ a2ml_specification! {
                         "EVENT" = 1
                     };  ///With this keyword, the slave can indicate what kind of data consistency exists when data are processed within this Event.
                     block "MIN_CYCLE_TIME" struct {
-                        uchar event_channel_time_cycle;  /// EVENT_CHANNEL_TIME_CYCLE 
-                        uchar event_channel_time_unit;  /// EVENT_CHANNEL_TIME_UNIT  
+                        uchar event_channel_time_cycle;  /// EVENT_CHANNEL_TIME_CYCLE
+                        uchar event_channel_time_unit;  /// EVENT_CHANNEL_TIME_UNIT
                     };
                     "CPU_LOAD_MAX" float;
                     block "CPU_LOAD_CONSUMPTION_DAQ" struct {
@@ -253,24 +253,24 @@ a2ml_specification! {
                         float odt_entry_factor;  /// "ODT_ENTRY_FACTOR" 
                         taggedstruct {
                             (block "ODT_ENTRY_SIZE_FACTOR_TABLE" struct {
-                                uint size;  ///"SIZE" 
-                                float size_factor;  /// "SIZE_FACTOR" 
+                                uint size;  /// "SIZE"
+                                float size_factor;  /// "SIZE_FACTOR"
                             })*;
                         };
                     };
                     block "CPU_LOAD_CONSUMPTION_STIM" struct {
                         float;  /// "DAQ_FACTOR"
                         float;  /// "ODT_FACTOR"
-                        float;  /// "ODT_ENTRY_FACTOR" 
+                        float;  /// "ODT_ENTRY_FACTOR"
                         taggedstruct {
                             (block "ODT_ENTRY_SIZE_FACTOR_TABLE" struct {
-                                uint size;  ///"SIZE" 
-                                float size_factor;  ///"SIZE_FACTOR" 
+                                uint size;  /// "SIZE"
+                                float size_factor;  /// "SIZE_FACTOR"
                             })*;
                         };
                     };
                     block "CPU_LOAD_CONSUMPTION_QUEUE" struct {
-                        float odt_factor;  /// "ODT_FACTOR" 
+                        float odt_factor;  /// "ODT_FACTOR"
                         float odt_length_factor;  /// "ODT_LENGTH_FACTOR", length in elements[AG]
                     };
                 };
@@ -293,7 +293,7 @@ a2ml_specification! {
     };
 
     struct Pag {
-        uchar max_segments;  /// MAX_SEGMENTS 
+        uchar max_segments;  /// MAX_SEGMENTS
         taggedstruct {
             "FREEZE_SUPPORTED" ;
         };
@@ -305,37 +305,37 @@ a2ml_specification! {
             "PGM_MODE_FUNCTIONAL" = 2,
             "PGM_MODE_ABSOLUTE_AND_FUNCTIONAL" = 3
         };
-        uchar max_sectors;  /// MAX_SECTORS 
-        uchar max_cto_pgm;  /// MAX_CTO_PGM 
+        uchar max_sectors;  /// MAX_SECTORS
+        uchar max_cto_pgm;  /// MAX_CTO_PGM
         taggedstruct {
             (block "SECTOR" struct {
-                char sector_name[101];  /// SECTOR_NAME 
-                uchar sector_number;  /// SECTOR_NUMBER 
-                ulong address;  /// Address 
-                ulong length;  /// Length  
-                uchar clear_sequence_number;  /// CLEAR_SEQUENCE_NUMBER 
-                uchar program_sequence_number;  /// PROGRAM_SEQUENCE_NUMBER 
-                uchar program_method;  /// PROGRAM_METHOD 
+                char sector_name[101];  /// SECTOR_NAME
+                uchar sector_number;  /// SECTOR_NUMBER
+                ulong address;  /// Address
+                ulong length;  /// Length
+                uchar clear_sequence_number;  /// CLEAR_SEQUENCE_NUMBER
+                uchar program_sequence_number;  /// PROGRAM_SEQUENCE_NUMBER
+                uchar program_method;  /// PROGRAM_METHOD
             })*;
             "COMMUNICATION_MODE_SUPPORTED" taggedunion {
                 "BLOCK" taggedstruct {
                     "SLAVE" ;
                     "MASTER" struct {
-                        uchar max_bs;  /// MAX_BS_PGM 
-                        uchar min_st;  /// MIN_ST_PGM 
+                        uchar max_bs;  /// MAX_BS_PGM
+                        uchar min_st;  /// MIN_ST_PGM
                     };
                 };
-                "INTERLEAVED" uchar;  /// QUEUE_SIZE_PGM 
+                "INTERLEAVED" uchar;  /// QUEUE_SIZE_PGM
             };
         };
     };
 
     struct Segment {
-        uchar segment_number;  /// SEGMENT_NUMBER 
-        uchar num_pages;  /// number of pages 
-        uchar address_extension;  /// ADDRESS_EXTENSION 
-        uchar compression_method;  /// COMPRESSION_METHOD 
-        uchar encryption_method;  /// ENCRYPTION_METHOD 
+        uchar segment_number;  /// SEGMENT_NUMBER
+        uchar num_pages;  /// number of pages
+        uchar address_extension;  /// ADDRESS_EXTENSION
+        uchar compression_method;  /// COMPRESSION_METHOD
+        uchar encryption_method;  /// ENCRYPTION_METHOD
         taggedstruct {
             block "CHECKSUM" struct {
                 enum XcpChecksumType {
@@ -352,7 +352,7 @@ a2ml_specification! {
                 };
                 taggedstruct {
                     "MAX_BLOCK_SIZE" ulong max_block_size;
-                    "EXTERNAL_FUNCTION" char dllname[256];  /// Name of the Checksum.DLL 
+                    "EXTERNAL_FUNCTION" char dllname[256];  /// Name of the Checksum.DLL
                 };
             };
             (block "PAGE" struct {
@@ -376,15 +376,15 @@ a2ml_specification! {
                     "XCP_WRITE_ACCESS_DONT_CARE" = 3
                 };
                 taggedstruct {
-                    "INIT_SEGMENT" uchar;  /// references segment that initialises this page 
+                    "INIT_SEGMENT" uchar;  /// references segment that initialises this page
                 };
             })*;
             (block "ADDRESS_MAPPING" struct {
-                ulong source_address;  /// source address 
-                ulong dest_address;  /// destination address 
-                ulong length;  /// length 
+                ulong source_address;  /// source address
+                ulong dest_address;  /// destination address
+                ulong length;  /// length
             })*;
-            "PGM_VERIFY" ulong;  /// verification value for PGM 
+            "PGM_VERIFY" ulong;  /// verification value for PGM
         };
     };
 
@@ -398,30 +398,30 @@ a2ml_specification! {
     };
 
     struct CAN_Parameters {
-        uint;  /// XCP on CAN version, currently 0x0100 
+        uint;  /// XCP on CAN version, currently 0x0100
         taggedstruct {
-            "CAN_ID_BROADCAST" ulong;  /// Auto-detection CAN-ID 
-            "CAN_ID_MASTER" ulong;  /// CMD/STIM CAN-ID 
+            "CAN_ID_BROADCAST" ulong;  /// Auto-detection CAN-ID
+            "CAN_ID_MASTER" ulong;  /// CMD/STIM CAN-ID
             "CAN_ID_MASTER_INCREMENTAL" ;  /// Master uses range of CAN-IDs. Start of range = CAN_ID_MASTER
-            "CAN_ID_SLAVE" ulong;  /// RES/ERR/EV/SERV/DAQ CAN-ID 
-            "BAUDRATE" ulong;  /// Baudrate in Hz 
-            "SAMPLE_POINT" uchar;  /// Sample point in % of bit time 
+            "CAN_ID_SLAVE" ulong;  /// RES/ERR/EV/SERV/DAQ CAN-ID
+            "BAUDRATE" ulong;  /// Baudrate in Hz
+            "SAMPLE_POINT" uchar;  /// Sample point in % of bit time
             "SAMPLE_RATE" enum {
                 "SINGLE" = 1,
                 "TRIPLE" = 3
             };
-            "BTL_CYCLES" uchar;  /// slots per bit time 
+            "BTL_CYCLES" uchar;  /// slots per bit time
             "SJW" uchar;
             "SYNC_EDGE" enum {
                 "SINGLE" = 1,
                 "DUAL" = 2
             };
-            "MAX_DLC_REQUIRED" ;  /// master to slave frames 
+            "MAX_DLC_REQUIRED" ;  /// master to slave frames
             (block "DAQ_LIST_CAN_ID" struct {
-                uint daq_list_ref;  /// reference to DAQ_LIST_NUMBER 
+                uint daq_list_ref;  /// reference to DAQ_LIST_NUMBER
                 taggedstruct {
                     "VARIABLE" ;
-                    "FIXED" ulong;  /// this DAQ_LIST always on this CAN_ID 
+                    "FIXED" ulong;  /// this DAQ_LIST always on this CAN_ID
                 };
             })*;
             (block "EVENT_CAN_ID_LIST" struct {
@@ -454,7 +454,7 @@ a2ml_specification! {
     };
 
     struct SxI_Parameters {
-        uint xcp_on_sxi_version;  /// XCP on SxI version, currently 0x0100 
+        uint xcp_on_sxi_version;  /// XCP on SxI version, currently 0x0100
         ulong baudrate;  /// BAUDRATE [Hz] 
         taggedstruct {
             "ASYNCH_FULL_DUPLEX_MODE" struct {
@@ -497,41 +497,41 @@ a2ml_specification! {
     };
 
     struct TCP_IP_Parameters {
-        uint;  /// XCP on TCP_IP version, currently 0x0100 
-        uint;  /// PORT 
+        uint version;  /// XCP on TCP_IP version, currently 0x0100
+        uint port;  /// PORT
         taggedunion {
-            "HOST_NAME" char[256];
-            "ADDRESS" char[15];
-            "IPV6" char[39];
+            "HOST_NAME" char hostname[256];
+            "ADDRESS" char address_v4[15];
+            "IPV6" char address_v6[39];
         };
         taggedstruct {
-            "MAX_BUS_LOAD" ulong;  /// maximum available bus load in percent 
+            "MAX_BUS_LOAD" ulong;  /// maximum available bus load in percent
             "MAX_BIT_RATE" ulong;  /// Network speed which is the base for MAX_BUS_LOAD in Mbit
         };
     };
 
     struct UDP_IP_Parameters {
-        uint;  /// XCP on UDP version, currently 0x0100 
-        uint;  /// PORT 
+        uint version;  /// XCP on UDP version, currently 0x0100
+        uint port;  /// PORT
         taggedunion {
-            "HOST_NAME" char[256];
-            "ADDRESS" char[15];
-            "IPV6" char[39];
+            "HOST_NAME" char hostname[256];
+            "ADDRESS" char address_v4[15];
+            "IPV6" char address_v6[39];
         };
         taggedstruct {
-            "MAX_BUS_LOAD" ulong;  /// maximum available bus load in percent 
+            "MAX_BUS_LOAD" ulong;  /// maximum available bus load in percent
             "MAX_BIT_RATE" ulong;  /// Network speed which is the base for MAX_BUS_LOAD in Mbit
         };
     };
 
     struct ep_parameters {
-        uchar;  /// ENDPOINT_NUMBER, not endpoint address 
+        uchar endpoint_number;  /// ENDPOINT_NUMBER, not endpoint address
         enum {
             "BULK_TRANSFER" = 2,
             "INTERRUPT_TRANSFER" = 3
         };
-        uint;  /// wMaxPacketSize: Maximum packet size of endpoint in bytes 
-        uchar;  /// bInterval: polling of endpoint  
+        uint wMaxPacketSize;  /// wMaxPacketSize: Maximum packet size of endpoint in bytes
+        uchar bInterval;  /// bInterval: polling of endpoint
         enum {
             "MESSAGE_PACKING_SINGLE" = 0,
             "MESSAGE_PACKING_MULTIPLE" = 1,
@@ -546,13 +546,13 @@ a2ml_specification! {
         taggedstruct {
             "RECOMMENDED_HOST_BUFSIZE" uint;  /// Recommended size for the host buffer size. The size is defined as multiple of wMaxPacketSize.  
         };
-    };  /// end of ep_parameters 
+    };  /// end of ep_parameters
 
     struct USB_Parameters {
-        uint;  /// XCP on USB version e.g. "1.0" = 0x0100 
-        uint;  /// Vendor ID  
-        uint;  /// Product ID 
-        uchar;  /// Number of interface 
+        uint version;  /// XCP on USB version e.g. "1.0" = 0x0100
+        uint vendor_id;  /// Vendor ID
+        uint product_id;  /// Product ID
+        uchar interface;  /// Number of interface
         enum {
             "HEADER_LEN_BYTE" = 0,
             "HEADER_LEN_CTR_BYTE" = 1,
@@ -568,19 +568,19 @@ a2ml_specification! {
             block "IN_EP_RESERR_DAQ_EVSERV" struct ep_parameters;
         };
         taggedstruct {
-            "ALTERNATE_SETTING_NO" uchar;  /// Number of alternate setting  
+            "ALTERNATE_SETTING_NO" uchar;  /// Number of alternate setting
             "INTERFACE_STRING_DESCRIPTOR" char[101];
             (block "OUT_EP_ONLY_STIM" struct ep_parameters)*;
             (block "IN_EP_ONLY_DAQ" struct ep_parameters)*;
             block "IN_EP_ONLY_EVSERV" struct ep_parameters;
             (block "DAQ_LIST_USB_ENDPOINT" struct {
-                uint;  /// reference to DAQ_LIST_NUMBER 
+                uint;  /// reference to DAQ_LIST_NUMBER
                 taggedstruct {
-                    "FIXED_IN" uchar;  /// this DAQ list always ENDPOINT_NUMBER, not endpoint address 
-                    "FIXED_OUT" uchar;  /// this STIM list always ENDPOINT_NUMBER, not endpoint address 
+                    "FIXED_IN" uchar;  /// this DAQ list always ENDPOINT_NUMBER, not endpoint address
+                    "FIXED_OUT" uchar;  /// this STIM list always ENDPOINT_NUMBER, not endpoint address
                 };
-            })*;  /// end of DAQ_LIST_USB_ENDPOINT 
-        };  /// end of optional 
+            })*;  /// end of DAQ_LIST_USB_ENDPOINT
+        };  /// end of optional
     };
 
     enum PacketAssignmentType {
@@ -588,34 +588,34 @@ a2ml_specification! {
         "FIXED" = 1,
         "VARIABLE_INITIALISED" = 2,
         "VARIABLE" = 3
-    };  /// end of PacketAssignmentType 
+    };  /// end of PacketAssignmentType
 
     struct buffer {
-        uchar;  /// FLX_BUF 
+        uchar flx_buf;  /// FLX_BUF
         taggedstruct {
             "MAX_FLX_LEN_BUF" taggedunion {
-                "FIXED" uchar;  /// constant value 
-                "VARIABLE" uchar;  /// initial value 
-            };  /// end of MAX_FLX_LEN_BUF 
+                "FIXED" uchar length;  /// constant value
+                "VARIABLE" uchar length;  /// initial value
+            };  /// end of MAX_FLX_LEN_BUF
             block "LPDU_ID" taggedstruct {
                 "FLX_SLOT_ID" taggedunion {
                     "FIXED" uint;
                     "VARIABLE" taggedstruct {
                         "INITIAL_VALUE" uint;
                     };
-                };  /// end of FLX_SLOT_ID 
+                };  /// end of FLX_SLOT_ID
                 "OFFSET" taggedunion {
                     "FIXED" uchar;
                     "VARIABLE" taggedstruct {
                         "INITIAL_VALUE" uchar;
                     };
-                };  /// end of OFFSET 
+                };  /// end of OFFSET
                 "CYCLE_REPETITION" taggedunion {
                     "FIXED" uchar;
                     "VARIABLE" taggedstruct {
                         "INITIAL_VALUE" uchar;
                     };
-                };  /// end of CYCLE_REPETITION 
+                };  /// end of CYCLE_REPETITION
                 "CHANNEL" taggedunion {
                     "FIXED" enum {
                         "A" = 0,
@@ -627,24 +627,24 @@ a2ml_specification! {
                             "B" = 1
                         };
                     };
-                };  /// end of CHANNEL 
-            };  /// end of LPDU_ID 
+                };  /// end of CHANNEL
+            };  /// end of LPDU_ID
             block "XCP_PACKET" taggedstruct {
-                "CMD" enum PacketAssignmentType;  /// end of CMD     
-                "RES_ERR" enum PacketAssignmentType;  /// end of RES_ERR 
-                "EV_SERV" enum PacketAssignmentType;  /// end of EV_SERV 
-                "DAQ" enum PacketAssignmentType;  /// end of DAQ     
-                "STIM" enum PacketAssignmentType;  /// end of STIM    
-            };  /// end of XCP_PACKET 
+                "CMD" enum PacketAssignmentType;  /// end of CMD
+                "RES_ERR" enum PacketAssignmentType;  /// end of RES_ERR
+                "EV_SERV" enum PacketAssignmentType;  /// end of EV_SERV
+                "DAQ" enum PacketAssignmentType;  /// end of DAQ
+                "STIM" enum PacketAssignmentType;  /// end of STIM
+            };  /// end of XCP_PACKET
         };
-    };  /// end of buffer 
+    };  /// end of buffer
 
     struct FLX_Parameters {
-        uint;  /// XCP on FlexRay version e.g. "1.0" = 0x0100 
-        uint;  /// T1_FLX [ms] 
-        char[256];  /// FIBEX-file including CHI information including extension, without path 
-        char[256];  /// Cluster-ID 
-        uchar;  /// NAX 
+        uint version;  /// XCP on FlexRay version e.g. "1.0" = 0x0100
+        uint t1;  /// T1_FLX [ms]
+        char fibex_file[256];  /// FIBEX-file including CHI information including extension, without path
+        char cluster_id[256];  /// Cluster-ID
+        uchar nax;  /// NAX
         enum {
             "HEADER_NAX" = 0,
             "HEADER_NAX_FILL" = 1,
@@ -675,105 +675,120 @@ a2ml_specification! {
     block "IF_DATA" taggedunion if_data {
 
         "CANAPE_EXT" struct {
-            int;             /// version number 
+            int;             /// version number
             taggedstruct {
                 "LINK_MAP" struct {
-                    char symbol_name[256];   /// symbol name 
-                    long address;            /// base address of the segment 
-                    uint address_ext;        /// address extension of the segment 
-                    uint ds_relative;        /// flag: address is relative to DS 
-                    long segment_offset;     /// offset of the segment address 
-                    uint datatype_valid;     /// datatypValid 
-                    uint datatype;           /// enum datatyp 
-                    uint bit_offset;         /// bit offset of the data (bitfield) 
+                    char symbol_name[256];   /// symbol name
+                    long address;            /// base address of the segment
+                    uint address_ext;        /// address extension of the segment
+                    uint ds_relative;        /// flag: address is relative to DS
+                    long segment_offset;     /// offset of the segment address
+                    uint datatype_valid;     /// datatypValid
+                    uint datatype;           /// enum datatyp
+                    uint bit_offset;         /// bit offset of the data (bitfield)
                 };
                 "DISPLAY" struct {
-                    long color;              /// display color 
+                    long color;              /// display color
                     double display_min;      /// minimal display value (phys)
                     double display_max;      /// maximal display value (phys)
                 };
                 "VIRTUAL_CONVERSION" struct {
-                    char conversion_name[256];   /// name of the conversion formula 
+                    char conversion_name[256];   /// name of the conversion formula
                 };
             };
         };
         "CANAPE_MODULE" struct {
             taggedstruct {
                 ("RECORD_LAYOUT_STEPSIZE" struct {
-                    char[256];   /// name of record layout
-                    uint;        /// stepsize for FNC_VALUES 
-                    uint;        /// stepsize for AXIS_PTS_X 
-                    uint;        /// stepsize for AXIS_PTS_Y 
-                    uint;        /// stepsize for AXIS_PTS_Z 
-                    uint;        /// stepsize for AXIS_PTS_4 
-                    uint;        /// stepsize for AXIS_PTS_5 
+                    char record_layout[256];   /// name of record layout
+                    uint fnc_values_step;      /// stepsize for FNC_VALUES
+                    uint axis_pts_x_step;      /// stepsize for AXIS_PTS_X
+                    uint axis_pts_y_step;      /// stepsize for AXIS_PTS_Y
+                    uint axis_pts_z_step;      /// stepsize for AXIS_PTS_Z
+                    uint axis_pts_4_step;      /// stepsize for AXIS_PTS_4
+                    uint axis_pts_5_step;      /// stepsize for AXIS_PTS_5
                 })*;
             };
         };
         "CANAPE_ADDRESS_UPDATE" taggedstruct {
             ("EPK_ADDRESS" struct {
-                char epk_sym[1024];         /// name of the corresponding symbol in MAP file 
-                long offset;               /// optional address offset 
+                char epk_sym[1024];         /// name of the corresponding symbol in MAP file
+                long offset;               /// optional address offset
             })*;
             "ECU_CALIBRATION_OFFSET" struct {
-                char sym[1024];         /// name of the corresponding symbol in MAP file 
-                long offset;               /// optional address offset 
+                char sym[1024];         /// name of the corresponding symbol in MAP file
+                long offset;               /// optional address offset
             };
             (block "CALIBRATION_METHOD" taggedunion {
                 "AUTOSAR_SINGLE_POINTERED" struct {
-                    char pointer_tbl[1024];         /// MAP symbol name for pointer table in RAM 
-                    long offset;               /// optional address offset 
+                    char pointer_tbl[1024];         /// MAP symbol name for pointer table in RAM
+                    long offset;               /// optional address offset
                     taggedstruct {
                         "ORIGINAL_POINTER_TABLE" struct {
-                            char[1024];    /// MAP symbol name for pointer table in FLASH 
-                            long;          /// optional address offset 
+                            char[1024];    /// MAP symbol name for pointer table in FLASH
+                            long;          /// optional address offset
                         };
                     };
                 };
                 "InCircuit2" struct {
-                    char[1024];         /// MAP symbol name for pointer table in RAM 
-                    long;               /// optional address offset 
+                    char[1024];         /// MAP symbol name for pointer table in RAM
+                    long;               /// optional address offset
                     taggedstruct {
                         "ORIGINAL_POINTER_TABLE" struct {
-                            char[1024];    /// MAP symbol name for pointer table in FLASH 
-                            long;          /// optional address offset 
+                            char[1024];    /// MAP symbol name for pointer table in FLASH
+                            long;          /// optional address offset
                         };
                         "FLASH_SECTION" struct {
-                            ulong;       /// start address of flash section 
-                            ulong;       /// length of flash section 
+                            ulong;       /// start address of flash section
+                            ulong;       /// length of flash section
                         };
                     };
                 };
             })*;
             block "MAP_SYMBOL" taggedstruct {
                 "FIRST" struct {
-                    char[1024];  /// symbol name of the corresponding segment in MAP file 
-                    long;        /// offset 
+                    char[1024];  /// symbol name of the corresponding segment in MAP file
+                    long;        /// offset
                 };
                 "LAST" struct {
-                    char[1024];  /// symbol name of the corresponding segment in MAP file 
-                    long;        /// offset 
+                    char[1024];  /// symbol name of the corresponding segment in MAP file
+                    long;        /// offset
                 };
                 ("ADDRESS_MAPPING_XCP" struct {
-                    char[1024];  /// symbol name of source range in MAP file 
-                    char[1024];  /// symbol name of destination range in MAP file 
+                    char[1024];  /// symbol name of source range in MAP file
+                    char[1024];  /// symbol name of destination range in MAP file
                 })*;
             };
             (block "MEMORY_SEGMENT" struct {
-                char[1024];         /// name of the memory segment 
+                char[1024];         /// name of the memory segment
                 taggedstruct {
                     "FIRST" struct {
-                        char[1024];  /// symbol name of the corresponding segment in MAP file 
-                        long;        /// offset 
+                        char[1024];  /// symbol name of the corresponding segment in MAP file
+                        long;        /// offset
                     };
                     "LAST" struct {
-                        char[1024];  /// symbol name of the corresponding segment in MAP file 
-                        long;        /// offset 
+                        char[1024];  /// symbol name of the corresponding segment in MAP file
+                        long;        /// offset
                     };
                     ("ADDRESS_MAPPING_XCP" struct {
-                        char[1024];  /// symbol name of source range in MAP file 
-                        char[1024];  /// symbol name of destination range in MAP file 
+                        char[1024];  /// symbol name of source range in MAP file
+                        char[1024];  /// symbol name of destination range in MAP file
                     })*;
+                };
+            })*;
+        };
+        "CANAPE_CAL_METHOD" taggedstruct {
+            (block "CAL_PARAM_GROUP" taggedstruct {
+                "NAME" char name[1024];
+                "ADDRESS" ulong address;
+                "SIZE" ulong size;
+                "COMMENT" char comment[1024];
+                "LINK_MAP" struct {
+                    char symbol_name[256];   /// symbol name
+                    ulong base_address;      /// base address of the symbol
+                    uint address_extension;  /// address extension of the symbol
+                    uint rel_address;        /// flag: address is relative to DS
+                    long symbol_offset;      /// offset of the symbol address
                 };
             })*;
         };
@@ -782,31 +797,31 @@ a2ml_specification! {
         };
 
         "XCP" struct {
-            taggedstruct Common_Parameters;  /// default parameters 
+            taggedstruct Common_Parameters;  /// default parameters
             taggedstruct {
                 block "XCP_ON_CAN" struct {
-                    struct CAN_Parameters;  /// specific for CAN 
-                    taggedstruct Common_Parameters;  /// overruling of default 
+                    struct CAN_Parameters;  /// specific for CAN
+                    taggedstruct Common_Parameters;  /// overruling of default
                 };
                 block "XCP_ON_SxI" struct {
-                    struct SxI_Parameters;  /// specific for SxI 
-                    taggedstruct Common_Parameters;  /// overruling of default 
+                    struct SxI_Parameters;  /// specific for SxI
+                    taggedstruct Common_Parameters;  /// overruling of default
                 };
                 block "XCP_ON_TCP_IP" struct {
-                    struct TCP_IP_Parameters;  /// specific for TCP_IP 
-                    taggedstruct Common_Parameters;  /// overruling of default 
+                    struct TCP_IP_Parameters;  /// specific for TCP_IP
+                    taggedstruct Common_Parameters;  /// overruling of default
                 };
                 block "XCP_ON_UDP_IP" struct {
-                    struct UDP_IP_Parameters;  /// specific for UDP 
-                    taggedstruct Common_Parameters;  /// overruling of default 
+                    struct UDP_IP_Parameters;  /// specific for UDP
+                    taggedstruct Common_Parameters;  /// overruling of default
                 };
                 block "XCP_ON_USB" struct {
-                    struct USB_Parameters;  /// specific for USB      
-                    taggedstruct Common_Parameters;  /// overruling of default 
+                    struct USB_Parameters;  /// specific for USB
+                    taggedstruct Common_Parameters;  /// overruling of default
                 };
                 block "XCP_ON_FLX" struct {
-                    struct FLX_Parameters;  /// specific for FlexRay  
-                    taggedstruct Common_Parameters;  /// overruling of default 
+                    struct FLX_Parameters;  /// specific for FlexRay
+                    taggedstruct Common_Parameters;  /// overruling of default
                 };
             };
         };
