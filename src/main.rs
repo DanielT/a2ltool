@@ -30,12 +30,13 @@ fn main() {
 // Implement all the operations supported by a2ltool
 // They will always be performed in this order:
 //  1) load input
-//  2) load elf
-//  3) merge at the module level
-//  4) merge at the project level
-//  5) merge includes (flatten)
-//  6) update addresses
-//  7) output
+//  2) additional consistency checks
+//  3) load elf
+//  4) merge at the module level
+//  5) merge at the project level
+//  6) merge includes (flatten)
+//  7) update addresses
+//  8) output
 fn core() -> Result<(), String> {
     let arg_matches = get_args();
     let mut data_modified = false;
@@ -46,7 +47,7 @@ fn core() -> Result<(), String> {
 
     cond_print(verbose, "\nA2ltool v0.1.0\n\n");
 
-    // 1) load input
+    // load input
     let input_filename = arg_matches.value_of("INPUT").unwrap();
     let now = Instant::now();
     let mut logger = A2lLogger { log: Vec::new() };
@@ -63,7 +64,24 @@ fn core() -> Result<(), String> {
         println!("================\n{:#?}\n================\n", a2l_file)
     }
 
-    // 2) load elf
+
+    // additional consistency checks
+    if arg_matches.is_present("CHECK") {
+        println!("Performing consistency check for {}.", input_filename);
+        let mut logger = A2lLogger { log: Vec::new() };
+        a2lfile::check(&a2l_file, &mut logger);
+        if logger.log.len() == 0 {
+            println!("Check complete. No problems found.");
+        } else {
+            for  msg in &logger.log {
+                println!("    {}", msg);
+            }
+            println!("Check complete. {} problems reported.", logger.log.len());
+        }
+    }
+
+
+    // load elf
     let elf_info = if arg_matches.is_present("ELFFILE") {
         let now = Instant::now();
         let elffile = arg_matches.value_of("ELFFILE").unwrap();
@@ -77,7 +95,8 @@ fn core() -> Result<(), String> {
         None
     };
 
-    // 3) merge at the module level
+
+    // merge at the module level
     if let Some(merge_modules) = arg_matches.values_of("MERGEMODULE") {
         for mergemodule in merge_modules {
             let mut merge_logger = A2lLogger { log: Vec::new() };
@@ -89,7 +108,8 @@ fn core() -> Result<(), String> {
         data_modified = true;
     }
 
-    // 4) merge at the project level
+
+    // merge at the project level
     if let Some(merge_projects) = arg_matches.values_of("MERGEPROJECT") {
         for mergeproject in merge_projects {
             let mut merge_logger = A2lLogger { log: Vec::new() };
@@ -101,7 +121,8 @@ fn core() -> Result<(), String> {
         data_modified = true;
     }
 
-    // 5) merge includes
+
+    // merge includes
     if arg_matches.is_present("MERGEINCLUDES") {
         a2lfile::merge_includes(&mut a2l_file);
         cond_print(verbose, &format!("Include directives have been merged\n"));
@@ -109,7 +130,7 @@ fn core() -> Result<(), String> {
     }
 
 
-    // 6) update addresses
+    // update addresses
     if arg_matches.is_present("UPDATE") || arg_matches.is_present("SAFE_UPDATE") {
         let now = Instant::now();
 
@@ -121,10 +142,12 @@ fn core() -> Result<(), String> {
         cond_print(verbose, &format!("   characteristic: {} updated, {} not found\n", summary.characteristic_updated, summary.characteristic_not_updated));
         cond_print(verbose, &format!("   measurement: {} updated, {} not found\n", summary.measurement_updated, summary.measurement_not_updated));
         cond_print(verbose, &format!("   axis_pts: {} updated, {} not found\n", summary.axis_pts_updated, summary.axis_pts_not_updated));
+        cond_print(verbose, &format!("   blob: {} updated, {} not found\n", summary.blob_updated, summary.blob_not_updated));
+        cond_print(verbose, &format!("   instance: {} updated, {} not found\n", summary.instance_updated, summary.instance_not_updated));
     }
 
 
-    // 7) output
+    // output
     if arg_matches.is_present("OUTPUT") {
         let now = Instant::now();
         let out_filename = arg_matches.value_of("OUTPUT").unwrap();
@@ -157,6 +180,12 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .long("elffile")
         .takes_value(true)
         .value_name("ELFFILE")
+    )
+    .arg(Arg::with_name("CHECK")
+        .help("Perform additional consistency checks")
+        .long("check")
+        .takes_value(false)
+        .multiple(false)
     )
     .arg(Arg::with_name("MERGEMODULE")
         .help("Merge another a2l file on the MODULE level.\nThe input file and the merge file must each contain exactly one MODULE.\nThe contents will be merged so that there is one merged MODULE in the output.")

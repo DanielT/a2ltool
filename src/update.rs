@@ -21,9 +21,51 @@ pub(crate) struct UpdateSumary {
 
 // perform a destructive address update: any object that cannot be updated will be discarded
 pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, preserve_unknown: bool) -> UpdateSumary {
+    let use_new_matrix_dim = check_version_1_70(a2l_file);
+
     let mut summary = UpdateSumary::new();
     for module in &mut a2l_file.project.module {
         let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
+        let mut axis_pts_dim = HashMap::<String, u16>::new();
+
+        // update all AXIS_PTS
+        let mut axis_pts_list = Vec::new();
+        std::mem::swap(&mut module.axis_pts, &mut axis_pts_list);
+        for mut axis_pts in axis_pts_list {
+            if let Some(typeinfo) = update_axis_pts_address(&mut axis_pts, elf_info) {
+                // usually the variable used for the axis should be a 1-dimensional array, because only that makes sense
+                match typeinfo {
+                    TypeInfo::Array{dim, arraytype, ..} => {
+                        // update max_axis_points to match the size of the array
+                        if dim.len() >= 1 {
+                            axis_pts.max_axis_points = dim[0] as u16;
+                        }
+                        if let TypeInfo::Enum{..} = **arraytype {
+                            // an array of enums? it could be done...
+                            enum_convlist.insert(axis_pts.conversion.clone(), arraytype);
+                        }
+                    }
+                    TypeInfo::Enum{..} => {
+                        // likely not useful, because what purpose would an axis consisting of a single enum value serve?
+                        enum_convlist.insert(axis_pts.conversion.clone(), typeinfo);
+                    }
+                    _ => {}
+                }
+
+                // store the max_axis_points of each AXIS_PTS, so that the AXIS_DESCRs inside of CHARACTERISTICS can be updated to match
+                axis_pts_dim.insert(axis_pts.name.to_owned(), axis_pts.max_axis_points);
+                // put the updated AXIS_PTS back on the module's list
+                module.axis_pts.push(axis_pts);
+                summary.axis_pts_updated += 1;
+            } else {
+                if preserve_unknown {
+                    axis_pts.address = 0;
+                    zero_if_data(&mut axis_pts.if_data);
+                    module.axis_pts.push(axis_pts);
+                }
+                summary.axis_pts_not_updated += 1;
+            }
+        }
 
         // update all MEASUREMENTs
         let mut measurement_list = Vec::new();
@@ -33,6 +75,8 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                 if let TypeInfo::Enum{..} = typeinfo {
                     enum_convlist.insert(measurement.conversion.clone(), typeinfo);
                 }
+
+                update_matrix_dim(&mut measurement.matrix_dim, typeinfo, use_new_matrix_dim);
 
                 module.measurement.push(measurement);
                 summary.measurement_updated += 1;
@@ -55,6 +99,15 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                     enum_convlist.insert(characteristic.conversion.clone(), typeinfo);
                 }
 
+                // update the max_axis_points of axis descriptions
+                for axis_descr in &mut characteristic.axis_descr {
+                    if let Some(axis_pts_ref) = &axis_descr.axis_pts_ref {
+                        if let Some(max_axis_pts) = axis_pts_dim.get(&axis_pts_ref.axis_points) {
+                            axis_descr.max_axis_points = *max_axis_pts;
+                        }
+                    }
+                }
+
                 module.characteristic.push(characteristic);
                 summary.characteristic_updated += 1;
             } else {
@@ -64,27 +117,6 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                     module.characteristic.push(characteristic);
                 }
                 summary.characteristic_not_updated += 1;
-            }
-        }
-
-        // update all AXIS_PTS
-        let mut axis_pts_list = Vec::new();
-        std::mem::swap(&mut module.axis_pts, &mut axis_pts_list);
-        for mut axis_pts in axis_pts_list {
-            if let Some(typeinfo) = update_axis_pts_address(&mut axis_pts, elf_info) {
-                if let TypeInfo::Enum{..} = typeinfo {
-                    enum_convlist.insert(axis_pts.conversion.clone(), typeinfo);
-                }
-
-                module.axis_pts.push(axis_pts);
-                summary.axis_pts_updated += 1;
-            } else {
-                if preserve_unknown {
-                    axis_pts.address = 0;
-                    zero_if_data(&mut axis_pts.if_data);
-                    module.axis_pts.push(axis_pts);
-                }
-                summary.axis_pts_not_updated += 1;
             }
         }
 
@@ -134,6 +166,16 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
 }
 
 
+// check if the file version is >= 1.70
+fn check_version_1_70(a2l_file: &A2lFile) -> bool {
+    if let Some(ver) = &a2l_file.asap2_version {
+        ver.version_no > 1 || (ver.version_no == 1 && ver.upgrade_no >= 70)
+    } else {
+        false
+    }
+}
+
+
 // update the address of a MEASUREMENT object
 fn update_measurement_address<'a>(measurement: &mut Measurement, elf_info: &'a DebugData) -> Option<&'a TypeInfo> {
     let (symbol_info, symbol_name) =
@@ -150,6 +192,37 @@ fn update_measurement_address<'a>(measurement: &mut Measurement, elf_info: &'a D
         Some(symbol_datatype)
     } else {
         None
+    }
+}
+
+
+// update the MATRIX_DIM of a MEASUREMENT
+fn update_matrix_dim(opt_matrix_dim: &mut Option<MatrixDim>, typeinfo: &TypeInfo, new_format: bool) {
+    let mut matrix_dim_values = Vec::new();
+    let mut cur_typeinfo = typeinfo;
+    // compilers can represent multi-dimensional arrays in two different ways:
+    // either as nested arrays, each with one dimension, or as one array with multiple dimensions
+    while let TypeInfo::Array{dim, arraytype, ..} = cur_typeinfo {
+        for val in dim {
+            matrix_dim_values.push(*val as u16);
+        }
+        cur_typeinfo = &**arraytype;
+    }
+
+    if matrix_dim_values.len() == 0 {
+        // current type is not an array, so delete the MATRIX_DIM
+        *opt_matrix_dim = None;
+    } else {
+        if !new_format {
+            // in the file versions before 1.70, MATRIX:DIM must have exactly 3 values
+            // after that any nonzero number of values is permitted
+            while matrix_dim_values.len() < 3 {
+                matrix_dim_values.push(1);
+            }
+            matrix_dim_values.truncate(3);
+        }
+        let mut matrix_dim = opt_matrix_dim.get_or_insert(MatrixDim::new());
+        matrix_dim.dim_list = matrix_dim_values;
     }
 }
 
