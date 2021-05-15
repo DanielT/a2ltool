@@ -99,11 +99,12 @@ fn core() -> Result<(), String> {
     // merge at the module level
     if let Some(merge_modules) = arg_matches.values_of("MERGEMODULE") {
         for mergemodule in merge_modules {
+            let now = Instant::now();
             let mut merge_logger = A2lLogger { log: Vec::new() };
-            let merge_a2l= a2lfile::load(mergemodule, None, &mut merge_logger, strict)?;
+            let mut merge_a2l= a2lfile::load(mergemodule, None, &mut merge_logger, strict)?;
             
-            a2lfile::merge_modules(&mut a2l_file, merge_a2l);
-            cond_print(verbose, &format!("Merged A2l objects from \"{}\".\n", mergemodule));
+            a2lfile::merge_modules(&mut a2l_file, &mut merge_a2l);
+            cond_print(verbose, &format!("Merged A2l objects from \"{}\" ({:?})\n", mergemodule, now.elapsed()));
         }
         data_modified = true;
     }
