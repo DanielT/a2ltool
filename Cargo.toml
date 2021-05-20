@@ -1,6 +1,6 @@
 [package]
 name = "a2ltool"
-version = "0.1.0"
+version = "0.8.0"
 authors = ["Daniel Thaler <daniel@dthaler.de>"]
 edition = "2018"
 
@@ -14,3 +14,6 @@ object = "0.23"
 gimli = "0.23"
 memmap = "0.7"
 clap = "~2.33.0"
+
+[build-dependencies]
+vergen = { version = "5", default-features = false, features = ["build", "git"] }

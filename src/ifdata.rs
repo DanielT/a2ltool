@@ -1,4 +1,5 @@
 use a2lfile::a2ml_specification;
+use a2lfile::BlockInfo;
 
 a2ml_specification! {
     <A2mlVector>

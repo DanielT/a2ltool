@@ -45,7 +45,7 @@ fn core() -> Result<(), String> {
     let verbose = arg_matches.is_present("VERBOSE");
     let debugprint = arg_matches.is_present("DEBUGPRINT");
 
-    cond_print(verbose, "\nA2ltool v0.1.0\n\n");
+    cond_print(verbose, &format!("\na2ltool {} ({})\n\n", env!("VERGEN_BUILD_SEMVER"), env!("VERGEN_GIT_SHA_SHORT")));
 
     // load input
     let input_filename = arg_matches.value_of("INPUT").unwrap();
@@ -152,7 +152,8 @@ fn core() -> Result<(), String> {
     if arg_matches.is_present("OUTPUT") {
         let now = Instant::now();
         let out_filename = arg_matches.value_of("OUTPUT").unwrap();
-        a2lfile::write(&a2l_file, out_filename)?;
+        let banner = &*format!("a2ltool {} ({})", env!("VERGEN_GIT_SEMVER"), env!("VERGEN_GIT_SHA_SHORT"));
+        a2lfile::write(&a2l_file, out_filename, Some(banner))?;
         cond_print(verbose, &format!("Output written to \"{}\" ({:?})\n", out_filename, now.elapsed()));
     } else if data_modified {
         // data was modified, e.g. by --merge or --update, but no output filename was given: dump to terminal
@@ -169,7 +170,9 @@ fn core() -> Result<(), String> {
 // set up the entire command line handling.
 // fortunately clap makes this painless
 fn get_args<'a>() -> ArgMatches<'a> {
-    App::new("A2L tool")
+    App::new("a2ltool")
+    .version(&*format!("{} ({})", env!("VERGEN_GIT_SEMVER"), env!("VERGEN_GIT_SHA_SHORT")))
+    .about("Reads, writes and modifies A2L files")
     .arg(Arg::with_name("INPUT")
         .help("Input A2L file")
         .required(true)
