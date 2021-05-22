@@ -39,7 +39,6 @@ fn main() {
 //  8) output
 fn core() -> Result<(), String> {
     let arg_matches = get_args();
-    let mut data_modified = false;
 
     let strict = arg_matches.is_present("STRICT");
     let verbose = arg_matches.is_present("VERBOSE");
@@ -106,7 +105,6 @@ fn core() -> Result<(), String> {
             a2lfile::merge_modules(&mut a2l_file, &mut merge_a2l);
             cond_print(verbose, &format!("Merged A2l objects from \"{}\" ({:?})\n", mergemodule, now.elapsed()));
         }
-        data_modified = true;
     }
 
 
@@ -119,7 +117,6 @@ fn core() -> Result<(), String> {
             a2l_file.project.module.extend(merge_a2l.project.module);
             cond_print(verbose, &format!("Project level merge with \"{}\". There are now {} modules.\n", mergeproject, a2l_file.project.module.len()));
         }
-        data_modified = true;
     }
 
 
@@ -127,7 +124,6 @@ fn core() -> Result<(), String> {
     if arg_matches.is_present("MERGEINCLUDES") {
         a2lfile::merge_includes(&mut a2l_file);
         cond_print(verbose, &format!("Include directives have been merged\n"));
-        data_modified = true;
     }
 
 
@@ -148,17 +144,19 @@ fn core() -> Result<(), String> {
     }
 
 
+    if arg_matches.is_present("SORT") {
+        a2lfile::sort(&mut a2l_file);
+    }
+
+
     // output
     if arg_matches.is_present("OUTPUT") {
         let now = Instant::now();
+        a2lfile::sort_new_items(&mut a2l_file);
         let out_filename = arg_matches.value_of("OUTPUT").unwrap();
         let banner = &*format!("a2ltool {} ({})", env!("VERGEN_GIT_SEMVER"), env!("VERGEN_GIT_SHA_SHORT"));
         a2lfile::write(&a2l_file, out_filename, Some(banner))?;
         cond_print(verbose, &format!("Output written to \"{}\" ({:?})\n", out_filename, now.elapsed()));
-    } else if data_modified {
-        // data was modified, e.g. by --merge or --update, but no output filename was given: dump to terminal
-        let a2lstring = a2lfile::write_to_string(&a2l_file);
-        println!("{}", a2lstring);
     }
 
     cond_print(verbose, &format!("\nRun complete. Have a nice day!\n\n"));
@@ -252,11 +250,16 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .long("verbose")
         .takes_value(false)
         .multiple(false)
-        .requires("OUTPUT")
     )
     .arg(Arg::with_name("DEBUGPRINT")
         .help("Display internal data for debugging")
-    .long("debug-print")
+        .long("debug-print")
+        .takes_value(false)
+        .multiple(false)
+    )
+    .arg(Arg::with_name("SORT")
+        .help("Sort all the elements in the file")
+        .long("sort")
         .takes_value(false)
         .multiple(false)
     )
