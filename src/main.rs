@@ -68,7 +68,7 @@ fn core() -> Result<(), String> {
     if arg_matches.is_present("CHECK") {
         println!("Performing consistency check for {}.", input_filename);
         let mut logger = A2lLogger { log: Vec::new() };
-        a2lfile::check(&a2l_file, &mut logger);
+        a2l_file.check(&mut logger);
         if logger.log.len() == 0 {
             println!("Check complete. No problems found.");
         } else {
@@ -102,7 +102,7 @@ fn core() -> Result<(), String> {
             let mut merge_logger = A2lLogger { log: Vec::new() };
             let mut merge_a2l= a2lfile::load(mergemodule, None, &mut merge_logger, strict)?;
             
-            a2lfile::merge_modules(&mut a2l_file, &mut merge_a2l);
+            a2l_file.merge_modules(&mut merge_a2l);
             cond_print(verbose, &format!("Merged A2l objects from \"{}\" ({:?})\n", mergemodule, now.elapsed()));
         }
     }
@@ -122,7 +122,7 @@ fn core() -> Result<(), String> {
 
     // merge includes
     if arg_matches.is_present("MERGEINCLUDES") {
-        a2lfile::merge_includes(&mut a2l_file);
+        a2l_file.merge_includes();
         cond_print(verbose, &format!("Include directives have been merged\n"));
     }
 
@@ -144,18 +144,25 @@ fn core() -> Result<(), String> {
     }
 
 
+    // sort all elements in the file
     if arg_matches.is_present("SORT") {
-        a2lfile::sort(&mut a2l_file);
+        a2l_file.sort();
+    }
+
+
+    // remove unknown IF_DATA
+    if arg_matches.is_present("IFDATA_CLEANUP") {
+        a2l_file.ifdata_cleanup();
     }
 
 
     // output
     if arg_matches.is_present("OUTPUT") {
         let now = Instant::now();
-        a2lfile::sort_new_items(&mut a2l_file);
+        a2l_file.sort_new_items();
         let out_filename = arg_matches.value_of("OUTPUT").unwrap();
         let banner = &*format!("a2ltool {} ({})", env!("VERGEN_GIT_SEMVER"), env!("VERGEN_GIT_SHA_SHORT"));
-        a2lfile::write(&a2l_file, out_filename, Some(banner))?;
+        a2l_file.write(out_filename, Some(banner))?;
         cond_print(verbose, &format!("Output written to \"{}\" ({:?})\n", out_filename, now.elapsed()));
     }
 
@@ -230,7 +237,7 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .requires("ELFFILE")
     )
     .arg(Arg::with_name("OUTPUT")
-        .help("Set the output filename. If data is modified and no output filename is given, the output will be written to stdout")
+        .help("Write to the given output file. If this flag is not present, no output will be written.")
         .short("o")
         .long("output")
         .takes_value(true)
@@ -260,6 +267,12 @@ fn get_args<'a>() -> ArgMatches<'a> {
     .arg(Arg::with_name("SORT")
         .help("Sort all the elements in the file")
         .long("sort")
+        .takes_value(false)
+        .multiple(false)
+    )
+    .arg(Arg::with_name("IFDATA_CLEANUP")
+        .help("Remove all IF_DATA blocks that cannot be parsed according to A2ML")
+        .long("ifdata-cleanup")
         .takes_value(false)
         .multiple(false)
     )
