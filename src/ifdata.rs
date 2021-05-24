@@ -400,18 +400,18 @@ a2ml_specification! {
     struct CAN_Parameters {
         uint;  /// XCP on CAN version, currently 0x0100
         taggedstruct {
-            "CAN_ID_BROADCAST" ulong;  /// Auto-detection CAN-ID
-            "CAN_ID_MASTER" ulong;  /// CMD/STIM CAN-ID
+            "CAN_ID_BROADCAST" ulong value;  /// Auto-detection CAN-ID
+            "CAN_ID_MASTER" ulong value;  /// CMD/STIM CAN-ID
             "CAN_ID_MASTER_INCREMENTAL" ;  /// Master uses range of CAN-IDs. Start of range = CAN_ID_MASTER
-            "CAN_ID_SLAVE" ulong;  /// RES/ERR/EV/SERV/DAQ CAN-ID
-            "BAUDRATE" ulong;  /// Baudrate in Hz
-            "SAMPLE_POINT" uchar;  /// Sample point in % of bit time
+            "CAN_ID_SLAVE" ulong value;  /// RES/ERR/EV/SERV/DAQ CAN-ID
+            "BAUDRATE" ulong value;  /// Baudrate in Hz
+            "SAMPLE_POINT" uchar value;  /// Sample point in % of bit time
             "SAMPLE_RATE" enum {
                 "SINGLE" = 1,
                 "TRIPLE" = 3
             };
-            "BTL_CYCLES" uchar;  /// slots per bit time
-            "SJW" uchar;
+            "BTL_CYCLES" uchar value;  /// slots per bit time
+            "SJW" uchar value; /// sync jump width
             "SYNC_EDGE" enum {
                 "SINGLE" = 1,
                 "DUAL" = 2
@@ -421,29 +421,29 @@ a2ml_specification! {
                 uint daq_list_ref;  /// reference to DAQ_LIST_NUMBER
                 taggedstruct {
                     "VARIABLE" ;
-                    "FIXED" ulong;  /// this DAQ_LIST always on this CAN_ID
+                    "FIXED" ulong id;  /// this DAQ_LIST always on this CAN_ID
                 };
             })*;
             (block "EVENT_CAN_ID_LIST" struct {
                 uint event_ref;  /// reference to EVENT_NUMBER
                 taggedstruct {
-                    ("FIXED" ulong)*;  /// this Event always on this IDs
+                    ("FIXED" ulong id)*;  /// this Event always on this IDs
                 };
             })*;
             "MAX_BUS_LOAD" ulong;  /// maximum available bus in bit/s
             block "CAN_FD" struct {
                 taggedstruct {
-                    "MAX_DLC" uint;  /// 8, 12, 16, 20, 24, 32, 48 or 64
-                    "CAN_FD_DATA_TRANSFER_BAUDRATE" ulong baudrate;  /// BAUDRATE [Hz]
-                    "SAMPLE_POINT" uchar;  /// sample point receiver [% complete bit time]
-                    "BTL_CYCLES" uchar;  /// BTL_CYCLES [slots per bit time]
-                    "SJW" uchar;  /// length synchr. segment [BTL_CYCLES]
+                    "MAX_DLC" uint value;  /// 8, 12, 16, 20, 24, 32, 48 or 64
+                    "CAN_FD_DATA_TRANSFER_BAUDRATE" ulong value;  /// BAUDRATE [Hz]
+                    "SAMPLE_POINT" uchar value;  /// sample point receiver [% complete bit time]
+                    "BTL_CYCLES" uchar value;  /// BTL_CYCLES [slots per bit time]
+                    "SJW" uchar value;  /// length synchr. segment [BTL_CYCLES]
                     "SYNC_EDGE" enum {
                         "SINGLE" = 1,
                         "DUAL" = 2
                     };
                     "MAX_DLC_REQUIRED" ;  /// master to slave frames always to have DLC = MAX_DLC_for CAN-FD
-                    "SECONDARY_SAMPLE_POINT" uchar;  /// sender sample point [% complete bit time]
+                    "SECONDARY_SAMPLE_POINT" uchar value;  /// sender sample point [% complete bit time]
                     "TRANSCEIVER_DELAY_COMPENSATION" enum {
                         "OFF" = 0,
                         "ON" = 1
@@ -590,7 +590,7 @@ a2ml_specification! {
         "VARIABLE" = 3
     };  /// end of PacketAssignmentType
 
-    struct buffer {
+    struct Buffer {
         uchar flx_buf;  /// FLX_BUF
         taggedstruct {
             "MAX_FLX_LEN_BUF" taggedunion {
@@ -599,33 +599,33 @@ a2ml_specification! {
             };  /// end of MAX_FLX_LEN_BUF
             block "LPDU_ID" taggedstruct {
                 "FLX_SLOT_ID" taggedunion {
-                    "FIXED" uint;
+                    "FIXED" uint slot_id;
                     "VARIABLE" taggedstruct {
-                        "INITIAL_VALUE" uint;
+                        "INITIAL_VALUE" uint slot_id;
                     };
                 };  /// end of FLX_SLOT_ID
                 "OFFSET" taggedunion {
-                    "FIXED" uchar;
+                    "FIXED" uchar offset;
                     "VARIABLE" taggedstruct {
-                        "INITIAL_VALUE" uchar;
+                        "INITIAL_VALUE" uchar offset;
                     };
                 };  /// end of OFFSET
                 "CYCLE_REPETITION" taggedunion {
-                    "FIXED" uchar;
+                    "FIXED" uchar cycle;
                     "VARIABLE" taggedstruct {
-                        "INITIAL_VALUE" uchar;
+                        "INITIAL_VALUE" uchar cycle;
                     };
                 };  /// end of CYCLE_REPETITION
                 "CHANNEL" taggedunion {
                     "FIXED" enum {
                         "A" = 0,
                         "B" = 1
-                    };
+                    } channel;
                     "VARIABLE" taggedstruct {
                         "INITIAL_VALUE" enum {
                             "A" = 0,
                             "B" = 1
-                        };
+                        } channel;
                     };
                 };  /// end of CHANNEL
             };  /// end of LPDU_ID
@@ -637,7 +637,7 @@ a2ml_specification! {
                 "STIM" enum PacketAssignmentType;  /// end of STIM
             };  /// end of XCP_PACKET
         };
-    };  /// end of buffer
+    };  /// end of Buffer
 
     struct FLX_Parameters {
         uint version;  /// XCP on FlexRay version e.g. "1.0" = 0x0100
@@ -662,13 +662,13 @@ a2ml_specification! {
             "PACKET_ALIGNMENT_32" = 2
         };
         taggedunion {
-            block "INITIAL_CMD_BUFFER" struct buffer;
+            block "INITIAL_CMD_BUFFER" struct Buffer;
         };
         taggedunion {
-            block "INITIAL_RES_ERR_BUFFER" struct buffer;
+            block "INITIAL_RES_ERR_BUFFER" struct Buffer;
         };
         taggedstruct {
-            (block "POOL_BUFFER" struct buffer)*;
+            (block "POOL_BUFFER" struct Buffer)*;
         };
     };
 

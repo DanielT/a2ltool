@@ -7,6 +7,7 @@ use std::time::Instant;
 mod ifdata;
 mod dwarf;
 mod update;
+mod xcp;
 
 
 struct A2lLogger {
@@ -61,6 +62,12 @@ fn core() -> Result<(), String> {
         // why not cond_print? in that case the output string must always be
         // formatted before cond_print can decide whether to print it. This can take longer than parsing the file.
         println!("================\n{:#?}\n================\n", a2l_file)
+    }
+
+
+    // show XCP settings
+    if arg_matches.is_present("SHOW_XCP") {
+        xcp::show_settings(&a2l_file, input_filename);
     }
 
 
@@ -165,6 +172,7 @@ fn core() -> Result<(), String> {
         a2l_file.write(out_filename, Some(banner))?;
         cond_print(verbose, &format!("Output written to \"{}\" ({:?})\n", out_filename, now.elapsed()));
     }
+
 
     cond_print(verbose, &format!("\nRun complete. Have a nice day!\n\n"));
 
@@ -273,6 +281,12 @@ fn get_args<'a>() -> ArgMatches<'a> {
     .arg(Arg::with_name("IFDATA_CLEANUP")
         .help("Remove all IF_DATA blocks that cannot be parsed according to A2ML")
         .long("ifdata-cleanup")
+        .takes_value(false)
+        .multiple(false)
+    )
+    .arg(Arg::with_name("SHOW_XCP")
+        .help("Display the XCP settings in the a2l file, if they exist")
+        .long("show-xcp")
         .takes_value(false)
         .multiple(false)
     )
