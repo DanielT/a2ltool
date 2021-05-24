@@ -41,6 +41,7 @@ pub(crate) enum TypeInfo {
     Pointer(u64),
     Other(u64),
     Struct {
+        typename: String,
         size: u64,
         members: HashMap<String, (TypeInfo, u64)>
     },
@@ -49,6 +50,7 @@ pub(crate) enum TypeInfo {
         members: HashMap<String, (TypeInfo, u64)>
     },
     Enum {
+        typename: String,
         size: u64,
         enumerators: Vec<(String, i64)>
     },

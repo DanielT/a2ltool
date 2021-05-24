@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::dwarf::{DebugData, TypeInfo};
 use super::ifdata;
@@ -19,7 +19,9 @@ pub(crate) struct UpdateSumary {
 }
 
 
-// perform a destructive address update: any object that cannot be updated will be discarded
+// perform an address update.
+// This update can be destructive (any object that cannot be updated will be discarded)
+// or non-destructive (addresses of invalid objects will be set to zero).
 pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, preserve_unknown: bool) -> UpdateSumary {
     let use_new_matrix_dim = check_version_1_70(a2l_file);
 
@@ -27,6 +29,7 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
     for module in &mut a2l_file.project.module {
         let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
         let mut axis_pts_dim = HashMap::<String, u16>::new();
+        let mut removed_items = HashSet::<String>::new();
 
         // update all AXIS_PTS
         let mut axis_pts_list = Vec::new();
@@ -40,8 +43,12 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                         if dim.len() >= 1 {
                             axis_pts.max_axis_points = dim[0] as u16;
                         }
-                        if let TypeInfo::Enum{..} = **arraytype {
+                        if let TypeInfo::Enum{typename, ..} = &**arraytype {
                             // an array of enums? it could be done...
+                            if axis_pts.conversion == "NO_COMPU_METHOD" {
+                                axis_pts.conversion = typename.to_owned();
+                            }
+                            cond_create_enum_conversion(module, &axis_pts.conversion);
                             enum_convlist.insert(axis_pts.conversion.clone(), arraytype);
                         }
                     }
@@ -51,6 +58,10 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                     }
                     _ => {}
                 }
+
+                let (ll, ul) = adjust_limits(typeinfo, axis_pts.lower_limit, axis_pts.upper_limit);
+                axis_pts.lower_limit = ll;
+                axis_pts.upper_limit = ul;
 
                 // store the max_axis_points of each AXIS_PTS, so that the AXIS_DESCRs inside of CHARACTERISTICS can be updated to match
                 axis_pts_dim.insert(axis_pts.name.to_owned(), axis_pts.max_axis_points);
@@ -62,6 +73,9 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                     axis_pts.address = 0;
                     zero_if_data(&mut axis_pts.if_data);
                     module.axis_pts.push(axis_pts);
+                } else {
+                    // item is removed implicitly, because it is not added back to the list
+                    removed_items.insert(axis_pts.name.to_owned());
                 }
                 summary.axis_pts_not_updated += 1;
             }
@@ -72,10 +86,17 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
         std::mem::swap(&mut module.measurement, &mut measurement_list);
         for mut measurement in measurement_list {
             if let Some(typeinfo) = update_measurement_address(&mut measurement, elf_info) {
-                if let TypeInfo::Enum{..} = typeinfo {
+                if let TypeInfo::Enum{typename, ..} = typeinfo {
+                    if measurement.conversion == "NO_COMPU_METHOD" {
+                        measurement.conversion = typename.to_owned();
+                    }
+                    cond_create_enum_conversion(module, &measurement.conversion);
                     enum_convlist.insert(measurement.conversion.clone(), typeinfo);
                 }
 
+                let (ll, ul) = adjust_limits(typeinfo, measurement.lower_limit, measurement.upper_limit);
+                measurement.lower_limit = ll;
+                measurement.upper_limit = ul;
                 update_matrix_dim(&mut measurement.matrix_dim, typeinfo, use_new_matrix_dim);
 
                 module.measurement.push(measurement);
@@ -85,6 +106,9 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                     measurement.ecu_address = None;
                     zero_if_data(&mut measurement.if_data);
                     module.measurement.push(measurement);
+                } else {
+                    // item is removed implicitly, because it is not added back to the list
+                    removed_items.insert(measurement.name.to_owned());
                 }
                 summary.measurement_not_updated += 1;
             }
@@ -95,7 +119,11 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
         std::mem::swap(&mut module.characteristic, &mut characteristic_list);
         for mut characteristic in characteristic_list {
             if let Some(typeinfo) = update_characteristic_address(&mut characteristic, elf_info) {
-                if let TypeInfo::Enum{..} = typeinfo {
+                if let TypeInfo::Enum{typename, ..} = typeinfo {
+                    if characteristic.conversion == "NO_COMPU_METHOD" {
+                        characteristic.conversion = typename.to_owned();
+                    }
+                    cond_create_enum_conversion(module, &characteristic.conversion);
                     enum_convlist.insert(characteristic.conversion.clone(), typeinfo);
                 }
 
@@ -108,6 +136,10 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                     }
                 }
 
+                let (ll, ul) = adjust_limits(typeinfo, characteristic.lower_limit, characteristic.upper_limit);
+                characteristic.lower_limit = ll;
+                characteristic.upper_limit = ul;
+
                 module.characteristic.push(characteristic);
                 summary.characteristic_updated += 1;
             } else {
@@ -115,6 +147,9 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                     characteristic.address = 0;
                     zero_if_data(&mut characteristic.if_data);
                     module.characteristic.push(characteristic);
+                } else {
+                    // item is removed implicitly, because it is not added back to the list
+                    removed_items.insert(characteristic.name.to_owned());
                 }
                 summary.characteristic_not_updated += 1;
             }
@@ -133,6 +168,9 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                     blob.start_address = 0;
                     zero_if_data(&mut blob.if_data);
                     module.blob.push(blob);
+                } else {
+                    // item is removed implicitly, because it is not added back to the list
+                    removed_items.insert(blob.name.to_owned());
                 }
                 summary.blob_not_updated += 1;
             }
@@ -152,14 +190,18 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, elf_info: &DebugData, pre
                     instance.start_address = 0;
                     zero_if_data(&mut instance.if_data);
                     module.instance.push(instance);
+                } else {
+                    // item is removed implicitly, because it is not added back to the list
+                    removed_items.insert(instance.name.to_owned());
                 }
                 summary.instance_not_updated += 1;
             }
         }
 
-
         // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in MEASUREMENTs etc.
         update_enum_compu_methods(module, &enum_convlist);
+
+        cleanup_removed_items(module, removed_items);
     }
 
     summary
@@ -214,8 +256,8 @@ fn update_matrix_dim(opt_matrix_dim: &mut Option<MatrixDim>, typeinfo: &TypeInfo
         *opt_matrix_dim = None;
     } else {
         if !new_format {
-            // in the file versions before 1.70, MATRIX:DIM must have exactly 3 values
-            // after that any nonzero number of values is permitted
+            // in the file versions before 1.70, MATRIX_DIM must have exactly 3 values
+            // starting with 1.70 any nonzero number of values is permitted
             while matrix_dim_values.len() < 3 {
                 matrix_dim_values.push(1);
             }
@@ -504,6 +546,59 @@ fn get_a2l_datatype(datatype: &TypeInfo) -> DataType {
 }
 
 
+// generate adjuste min and max limits based on the datatype.
+// since the updater code has no knowledge how the data is handled in the application it
+// is only possible to shrink existing limits, but not expand them
+fn adjust_limits(typeinfo: &TypeInfo, old_lower_limit: f64, old_upper_limit: f64) -> (f64, f64) {
+    let (mut new_lower_limit, mut new_upper_limit) = match typeinfo {
+        TypeInfo::Array {arraytype,..} => adjust_limits(arraytype, old_lower_limit, old_upper_limit),
+        TypeInfo::Bitfield {bit_size, basetype, ..} => {
+            let raw_range: u64 = 1 << bit_size;
+            match &**basetype {
+                TypeInfo::Sint8 |
+                TypeInfo::Sint16 |
+                TypeInfo::Sint32 |
+                TypeInfo::Sint64 => {
+                    let lower = -((raw_range / 2) as f64);
+                    let upper = (raw_range / 2) as f64;
+                    (lower, upper)
+                }
+                _ => (0f64, raw_range as f64)
+            }
+        }
+        TypeInfo::Double => (f64::MIN, f64::MAX),
+        TypeInfo::Float => (f32::MIN as f64, f32::MAX as f64),
+        TypeInfo::Uint8 => (u8::MIN as f64, u8::MAX as f64),
+        TypeInfo::Uint16 => (u16::MIN as f64, u16::MAX as f64),
+        TypeInfo::Uint32 => (u32::MIN as f64, u32::MAX as f64),
+        TypeInfo::Uint64 => (u64::MIN as f64, u64::MAX as f64),
+        TypeInfo::Sint8 => (i8::MIN as f64, i8::MAX as f64),
+        TypeInfo::Sint16 => (i16::MIN as f64, i16::MAX as f64),
+        TypeInfo::Sint32 => (i32::MIN as f64, i32::MAX as f64),
+        TypeInfo::Sint64 => (i64::MIN as f64, i64::MAX as f64),
+        TypeInfo::Enum {enumerators, ..} => {
+            let lower = enumerators.iter().map(|val| val.1).min().unwrap_or_else(|| 0) as f64;
+            let upper = enumerators.iter().map(|val| val.1).max().unwrap_or_else(|| 0) as f64;
+            (lower, upper)
+        }
+        _ => (old_lower_limit, old_upper_limit)
+    };
+
+    // if non-zero limits exist, then the limits can only shrink, but not grow
+    // if the limits are both zero, then the maximum range allowed by the datatype is used
+    if old_lower_limit != 0f64 || old_upper_limit != 0f64 {
+        if new_lower_limit < old_lower_limit {
+            new_lower_limit = old_lower_limit;
+        }
+        if new_upper_limit > old_upper_limit {
+            new_upper_limit = old_upper_limit;
+        }
+    }
+
+    (new_lower_limit, new_upper_limit)
+}
+
+
 // check if there is a CANAPE_EXT in the IF_DATA vec and update it if it exists
 fn update_ifdata(ifdata_vec: &mut Vec<IfData>, symbol_name: String, datatype: &TypeInfo, address: u64) {
     for ifdata in ifdata_vec {
@@ -621,6 +716,35 @@ fn zero_if_data(ifdata_vec: &mut Vec<IfData>) {
 }
 
 
+// create a COMPU_METHOD and a COMPU_VTAB for the typename of an enum
+fn cond_create_enum_conversion(module: &mut Module, typename: &str) {
+    let compu_method_find = module.compu_method.iter().find(|item| item.name == typename);
+    if compu_method_find.is_none() {
+        let mut new_compu_method = CompuMethod::new(
+            typename.to_string(),
+            format!("Conversion table for enum {}", typename),
+            ConversionType::TabVerb,
+            "%.4".to_string(),
+            "".to_string()
+        );
+        new_compu_method.compu_tab_ref = Some(CompuTabRef::new(typename.to_string()));
+        module.compu_method.push(new_compu_method);
+
+        let compu_vtab_find = module.compu_vtab.iter().find(|item| item.name == typename);
+        let compu_vtab_range_find = module.compu_vtab_range.iter().find(|item| item.name == typename);
+
+        if compu_vtab_find.is_none() && compu_vtab_range_find.is_none() {
+            module.compu_vtab.push(CompuVtab::new(
+                typename.to_string(),
+                format!("Conversion table for enum {}", typename),
+                ConversionType::TabVerb,
+                0 // will be updated by update_enum_compu_methods, which will also add the actual enum values
+            ));
+        }
+    }
+}
+
+
 // every MEASUREMENT, CHARACTERISTIC and AXIS_PTS object can reference a COMPU_METHOD which describes the conversion of values
 // in some cases the the COMPU_METHOS in turn references a COMPU_VTAB to provide number to string mapping and display named values
 // These COMPU_VTAB objects are typically based on an enum in the original software.
@@ -642,6 +766,9 @@ fn update_enum_compu_methods(module: &mut Module, enum_convlist: &HashMap<String
     // check all COMPU_VTABs in the module to see if we know of an associated enum type
     for compu_vtab in &mut module.compu_vtab {
         if let Some(TypeInfo::Enum{enumerators, ..}) = enum_compu_tab.get(&compu_vtab.name) {
+            // TabVerb is the only permitted conversion type for a compu_vtab
+            compu_vtab.conversion_type = ConversionType::TabVerb;
+
             // if compu_vtab has more entries than the enum, delete the extras
             while compu_vtab.value_pairs.len() > enumerators.len() {
                 compu_vtab.value_pairs.pop();
@@ -683,6 +810,74 @@ fn update_enum_compu_methods(module: &mut Module, enum_convlist: &HashMap<String
     }
 }
 
+
+// when update runs without preserve, CHARACTERISTICs, MEASUREMENTs, etc could be removed from the module
+// these items should also be removed from the identifier lists in GROUPs and FUNCTIONs
+fn cleanup_removed_items(module: &mut Module, removed_items: HashSet<String>) {
+    if removed_items.len() == 0 {
+        return;
+    }
+
+    for group in &mut module.group {
+        if let Some(ref_characteristic) = &mut group.ref_characteristic {
+            cleanup_item_list(&mut ref_characteristic.identifier_list, &removed_items);
+            if ref_characteristic.identifier_list.len() == 0 {
+                group.ref_characteristic = None;
+            }
+        }
+        if let Some(ref_measurement) = &mut group.ref_measurement {
+            cleanup_item_list(&mut ref_measurement.identifier_list, &removed_items);
+            if ref_measurement.identifier_list.len() == 0 {
+                group.ref_measurement = None;
+            }
+        }
+    }
+
+    for function in &mut module.function {
+        if let Some(in_measurement) = &mut function.in_measurement {
+            cleanup_item_list(&mut in_measurement.identifier_list, &removed_items);
+            if in_measurement.identifier_list.len() == 0 {
+                function.in_measurement = None;
+            }
+        }
+        if let Some(loc_measurement) = &mut function.loc_measurement {
+            cleanup_item_list(&mut loc_measurement.identifier_list, &removed_items);
+            if loc_measurement.identifier_list.len() == 0 {
+                function.loc_measurement = None;
+            }
+        }
+        if let Some(out_measurement) = &mut function.out_measurement {
+            cleanup_item_list(&mut out_measurement.identifier_list, &removed_items);
+            if out_measurement.identifier_list.len() == 0 {
+                function.out_measurement = None;
+            }
+        }
+        if let Some(def_characteristic) = &mut function.def_characteristic {
+            cleanup_item_list(&mut def_characteristic.identifier_list, &removed_items);
+            if def_characteristic.identifier_list.len() == 0 {
+                function.def_characteristic = None;
+            }
+        }
+        if let Some(ref_characteristic) = &mut function.ref_characteristic {
+            cleanup_item_list(&mut ref_characteristic.identifier_list, &removed_items);
+            if ref_characteristic.identifier_list.len() == 0 {
+                function.ref_characteristic = None;
+            }
+        }
+    }
+}
+
+
+fn cleanup_item_list(item_list: &mut Vec<String>, removed_items: &HashSet<String>) {
+    let mut new_list = Vec::<String>::new();
+    std::mem::swap(item_list, &mut new_list);
+
+    for item in new_list {
+        if removed_items.get(&item).is_none() {
+            item_list.push(item);
+        }
+    }
+}
 
 
 impl UpdateSumary {

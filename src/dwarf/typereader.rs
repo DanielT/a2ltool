@@ -19,7 +19,7 @@ pub (crate) fn load_types(variables: &HashMap<String, VarInfo>, units: UnitList)
                 let mut entries_tree = unit.entries_tree(&abbrev, Some(unit_offset)).unwrap();
 
                 // load one type and add it to the collection (always succeeds for correctly structured DWARF debug info)
-                if let Some(vartype) = get_type(&units, unit_idx, entries_tree.root().unwrap()) {
+                if let Some(vartype) = get_type(&units, unit_idx, entries_tree.root().unwrap(), None) {
                     types.insert(*typeref, vartype);
                 }
             }
@@ -31,7 +31,12 @@ pub (crate) fn load_types(variables: &HashMap<String, VarInfo>, units: UnitList)
 
 
 // get one type from the debug info
-fn get_type(unit_list: &UnitList, current_unit: usize, entries_tree: EntriesTreeNode<EndianSlice<RunTimeEndian>>) -> Option<TypeInfo> {
+fn get_type(
+    unit_list: &UnitList,
+    current_unit: usize,
+    entries_tree: EntriesTreeNode<EndianSlice<RunTimeEndian>>,
+    typedef_name: Option<String>
+) -> Option<TypeInfo> {
     let entry = entries_tree.entry();
     match entry.tag() {
         gimli::constants::DW_TAG_base_type => {
@@ -89,7 +94,7 @@ fn get_type(unit_list: &UnitList, current_unit: usize, entries_tree: EntriesTree
         gimli::constants::DW_TAG_array_type => {
             let size = get_byte_size_attribute(entry)?;
             let (new_cur_unit, mut new_entries_tree) = get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
-            if let Some(arraytype) = get_type(unit_list, new_cur_unit, new_entries_tree.root().unwrap()) {
+            if let Some(arraytype) = get_type(unit_list, new_cur_unit, new_entries_tree.root().unwrap(), None) {
                 let mut dim = Vec::<u64>::new();
     
                 // If the stride of the array is different from the size of each element, then the stride must be given as an attribute
@@ -117,6 +122,11 @@ fn get_type(unit_list: &UnitList, current_unit: usize, entries_tree: EntriesTree
         gimli::constants::DW_TAG_enumeration_type => {
             let size = get_byte_size_attribute(entry)?;
             let mut enumerators = Vec::new();
+            let typename = if let Some(name) = typedef_name {
+                name
+            } else {
+                get_name_attribute(entry)?
+            };
             let mut iter = entries_tree.children();
             // get all the enumerators
             while let Ok(Some(child_node)) = iter.next() {
@@ -127,23 +137,32 @@ fn get_type(unit_list: &UnitList, current_unit: usize, entries_tree: EntriesTree
                     enumerators.push((name, value));
                 }
             }
-            Some(TypeInfo::Enum { size, enumerators })
+            Some(TypeInfo::Enum { typename, size, enumerators })
         }
         gimli::constants::DW_TAG_structure_type => {
             let size = get_byte_size_attribute(entry)?;
+            let typename = if let Some(name) = typedef_name {
+                name
+            } else {
+                get_name_attribute(entry)?
+            };
             let members = get_struct_or_union_members(entries_tree, unit_list, current_unit)?;
-            Some(TypeInfo::Struct {size, members})
+            Some(TypeInfo::Struct {typename, size, members})
         }
         gimli::constants::DW_TAG_union_type => {
             let size = get_byte_size_attribute(entry)?;
             let members = get_struct_or_union_members(entries_tree, unit_list, current_unit)?;
             Some(TypeInfo::Union {size, members})
         }
-        gimli::constants::DW_TAG_typedef |
+        gimli::constants::DW_TAG_typedef => {
+            let name = get_name_attribute(entry)?;
+            let (new_cur_unit, mut new_entries_tree) = get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
+            get_type(unit_list, new_cur_unit, new_entries_tree.root().unwrap(), Some(name))
+        }
         gimli::constants::DW_TAG_const_type |
         gimli::constants::DW_TAG_volatile_type => {
             let (new_cur_unit, mut new_entries_tree) = get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
-            get_type(unit_list, new_cur_unit, new_entries_tree.root().unwrap())
+            get_type(unit_list, new_cur_unit, new_entries_tree.root().unwrap(), typedef_name)
         }
         other_tag => {
             panic!("unexpected DWARF tag {} in type definition", other_tag);
@@ -169,7 +188,7 @@ fn get_struct_or_union_members(
             let bitsize = get_bit_size_attribute(child_entry);
             let bitoffset = get_bit_offset_attribute(child_entry);
             let (new_cur_unit, mut new_entries_tree) = get_entries_tree_from_attribute(child_entry, unit_list, current_unit)?;
-            let mut membertype = get_type(unit_list, new_cur_unit, new_entries_tree.root().unwrap())?;
+            let mut membertype = get_type(unit_list, new_cur_unit, new_entries_tree.root().unwrap(), None)?;
 
             // wrap bitfield members in a TypeInfo::Bitfield to store bit_size and bit_offset
             if let Some(bit_size) = bitsize {
