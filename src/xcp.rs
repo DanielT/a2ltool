@@ -5,7 +5,7 @@ use crate::ifdata::*;
 pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &str) {
     let multi_module = a2l_file.project.module.len() > 1;
 
-    println!("\n\nXCP settings in {}:", filename);
+    println!("XCP settings in {}:", filename);
 
     for module in &a2l_file.project.module {
         if multi_module {
