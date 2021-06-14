@@ -8,7 +8,7 @@ use super::attributes::*;
 pub (crate) fn load_types(variables: &HashMap<String, VarInfo>, units: UnitList) -> HashMap<usize, TypeInfo> {
     let mut types = HashMap::<usize, TypeInfo>::new();
     // for each variable
-    for (_, VarInfo {typeref, ..}) in variables {
+    for (_name, VarInfo {typeref, ..}) in variables {
         // check if the type was already loaded
         if types.get(typeref).is_none() {
             if let Some(unit_idx) = units.get_unit(*typeref) {
@@ -62,7 +62,7 @@ fn get_type(
                         4 => TypeInfo::Sint32,
                         8 => TypeInfo::Sint64,
                         _val => {
-                            //println!("signed integer base type of unusual size {} found - cannot represent in output", val);
+                            // println!("signed integer base type of unusual size {} found - cannot represent in output", _val);
                             return None;
                         }
                     }
@@ -76,7 +76,7 @@ fn get_type(
                         4 => TypeInfo::Uint32,
                         8 => TypeInfo::Uint64,
                         _val => {
-                            //println!("unsigned integer base type of unusual size {} found - cannot represent in output", val);
+                            // println!("unsigned integer base type of unusual size {} found - cannot represent in output", _val);
                             return None;
                         }
                     }
@@ -125,7 +125,12 @@ fn get_type(
             let typename = if let Some(name) = typedef_name {
                 name
             } else {
-                get_name_attribute(entry)?
+                if let Some(name_from_attr) = get_name_attribute(entry) {
+                    name_from_attr
+                } else {
+                    let (unit, _) = &unit_list[current_unit];
+                    format!("anonymous_enum_{}", entry.offset().to_debug_info_offset(unit).unwrap().0)
+                }
             };
             let mut iter = entries_tree.children();
             // get all the enumerators
@@ -144,7 +149,12 @@ fn get_type(
             let typename = if let Some(name) = typedef_name {
                 name
             } else {
-                get_name_attribute(entry)?
+                if let Some(name_from_attr) = get_name_attribute(entry) {
+                    name_from_attr
+                } else {
+                    let (unit, _) = &unit_list[current_unit];
+                    format!("anonymous_struct_{}", entry.offset().to_debug_info_offset(unit).unwrap().0)
+                }
             };
             let members = get_struct_or_union_members(entries_tree, unit_list, current_unit)?;
             Some(TypeInfo::Struct {typename, size, members})
