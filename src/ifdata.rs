@@ -825,5 +825,13 @@ a2ml_specification! {
                 };
             };
         };
+
+        "ASAP1B_CCP" taggedstruct {
+            "DP_BLOB" struct {
+                uint address_extension;  /// Address extension of the calibration data
+                ulong base_address;  /// Base address of the calibration data
+                ulong size;  /// Number of Bytes belonging to the calibration data
+            };  /// address information for calibration objects and memory segments
+        };
     };
 }

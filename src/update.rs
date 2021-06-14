@@ -871,7 +871,35 @@ fn update_ifdata(ifdata_vec: &mut Vec<IfData>, symbol_name: String, datatype: &T
 
                     decoded_ifdata.store_to_ifdata(ifdata);
                 }
+            } else if let Some(asap1b_ccp) = &mut decoded_ifdata.asap1b_ccp {
+                if let Some(dp_blob) = &mut asap1b_ccp.dp_blob {
+                    dp_blob.address_extension = 0;
+                    dp_blob.base_address = address as u32;
+
+                    match datatype {
+                        TypeInfo::Uint8 |
+                        TypeInfo::Sint8 => dp_blob.size = 1,
+                        TypeInfo::Uint16 |
+                        TypeInfo::Sint16 => dp_blob.size = 2,
+                        TypeInfo::Float |
+                        TypeInfo::Uint32 |
+                        TypeInfo::Sint32 => dp_blob.size = 4,
+                        TypeInfo::Double |
+                        TypeInfo::Uint64 |
+                        TypeInfo::Sint64 => dp_blob.size = 8,
+                        TypeInfo::Enum {size, ..} => dp_blob.size = *size as u32,
+                        _ => {
+                            // size is not set because we don't know
+                            // for example if the datatype is Struct, then the record_layout must be taken into the calculation
+                            // rather than do that, the size is left unchanged, since it will most often already be correct
+                        }
+                    }
+
+                    decoded_ifdata.store_to_ifdata(ifdata);
+                }
             }
+        } else {
+            println!("failed to decode ifdata: {:#?}", ifdata);
         }
     }
 }
@@ -890,6 +918,11 @@ fn zero_if_data(ifdata_vec: &mut Vec<IfData>) {
                     link_map.datatype_valid = 0;
 
                     decoded_ifdata.store_to_ifdata(ifdata);
+                }
+            } else if let Some(asap1b_ccp) = &mut decoded_ifdata.asap1b_ccp {
+                if let Some(dp_blob) = &mut asap1b_ccp.dp_blob {
+                    dp_blob.address_extension = 0;
+                    dp_blob.base_address = 0;
                 }
             }
         }
