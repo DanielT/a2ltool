@@ -45,6 +45,11 @@ pub(crate) enum TypeInfo {
         size: u64,
         members: HashMap<String, (TypeInfo, u64)>
     },
+    Class {
+        typename: String,
+        size: u64,
+        members: HashMap<String, (TypeInfo, u64)>
+    },
     Union {
         size: u64,
         members: HashMap<String, (TypeInfo, u64)>
@@ -153,7 +158,7 @@ fn get_endian(elffile: &object::read::File) -> RunTimeEndian {
 // read the debug information entries in the DWAF data to get all the global variables and their types
 fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>) -> DebugData {
     let (variables, units) = load_variables(dwarf);
-    let types = load_types(&variables, units);
+    let types = load_types(&variables, units, dwarf);
 
     DebugData {
         variables,
@@ -176,9 +181,9 @@ fn load_variables<'a>(dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>) -> (
         // static variable in functions are hidden further down inside of DW_TAG_subprogram[/DW_TAG_lexical_block]*
         // we can easily find all of them by using depth-first traversal of the tree
         let mut entries_cursor = unit.entries(&abbreviations);
-        while let Ok(Some((_, entry))) = entries_cursor.next_dfs() {
+        while let Ok(Some((_depth_delta, entry))) = entries_cursor.next_dfs() {
             if entry.tag() == gimli::constants::DW_TAG_variable {
-                if let Some((name, typeref, address)) = get_global_variable(entry, &unit) {
+                if let Some((name, typeref, address)) = get_global_variable(entry, &unit, &&abbreviations, dwarf) {
                     variables.insert(name, VarInfo{address, typeref});
                 }
             }
@@ -193,12 +198,26 @@ fn load_variables<'a>(dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>) -> (
 
 // an entry of the type DW_TAG_variable only describes a global variable if there is a name, a type and an address
 // this function tries to get all three and returns them
-fn get_global_variable(entry: &DebuggingInformationEntry<SliceType, usize>, unit: &UnitHeader<SliceType>) -> Option<(String, usize, u64)> {
+fn get_global_variable(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+    unit: &UnitHeader<SliceType>,
+    abbrev: &gimli::Abbreviations,
+    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>
+) -> Option<(String, usize, u64)> {
     let address = get_location_attribute(entry, unit.encoding())?;
-    let name = get_name_attribute(entry)?;
-    let typeref = get_typeref_attribute(entry, &unit)?;
+    if let Some(specification_entry) = get_specification_attribute(entry, unit, abbrev) {
+        // the entry refers to a specification, which contains the name and type reference
+        let name = get_name_attribute(&specification_entry, dwarf)?;
+        let typeref = get_typeref_attribute(&specification_entry, &unit)?;
 
-    Some((name, typeref, address))
+        Some((name, typeref, address))
+    } else {
+        // there is no specification and all info is part of this entry
+        let name = get_name_attribute(entry, dwarf)?;
+        let typeref = get_typeref_attribute(entry, &unit)?;
+
+        Some((name, typeref, address))
+    }
 }
 
 
@@ -252,6 +271,7 @@ impl TypeInfo {
             TypeInfo::Pointer(size) |
             TypeInfo::Other(size) |
             TypeInfo::Struct { size, .. } |
+            TypeInfo::Class { size, .. } |
             TypeInfo::Union { size, .. } |
             TypeInfo::Enum { size, .. } |
             TypeInfo::Array { size, .. } => *size

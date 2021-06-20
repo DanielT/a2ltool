@@ -15,17 +15,27 @@ pub(crate) fn get_attr_value<'abbrev, 'unit>(entry: &DebuggingInformationEntry<'
 
 
 // get a name as a String from a DW_AT_name attribute
-pub(crate) fn get_name_attribute(entry: &DebuggingInformationEntry<SliceType, usize>) -> Option<String> {
+pub(crate) fn get_name_attribute(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>
+) -> Option<String> {
     let name_attr = get_attr_value(&entry, gimli::constants::DW_AT_name)?;
-    if let gimli::AttributeValue::String(stringval) = name_attr {
-        if let Ok(utf8string) = stringval.to_string() {
-            Some(utf8string.to_owned())
-        } else {
-            None
+    match name_attr {
+        gimli::AttributeValue::String(stringval) => {
+            if let Ok(utf8string) = stringval.to_string() {
+                return Some(utf8string.to_owned());
+            }
         }
-    } else {
-        None
+        gimli::AttributeValue::DebugStrRef(str_offset) => {
+            if let Ok(stringslice) = dwarf.debug_str.get_str(str_offset) {
+                if let Ok(utf8string) = stringslice.to_string() {
+                    return Some(utf8string.to_owned());
+                }
+            }
+        }
+        _ => {}
     }
+    None
 }
 
 
@@ -70,10 +80,17 @@ pub(crate) fn get_location_attribute(entry: &DebuggingInformationEntry<SliceType
 // get the address offset of a struct member from a DW_AT_data_member_location attribute
 pub(crate) fn get_data_member_location_attribute(entry: &DebuggingInformationEntry<SliceType, usize>, encoding: gimli::Encoding) -> Option<u64> {
     let loc_attr = get_attr_value(entry, gimli::constants::DW_AT_data_member_location)?;
-    if let gimli::AttributeValue::Exprloc(expression) = loc_attr {
-        evaluate_exprloc(expression, encoding)
-    } else {
-        None
+    match loc_attr {
+        gimli::AttributeValue::Exprloc(expression) => {
+            evaluate_exprloc(expression, encoding)
+        }
+        gimli::AttributeValue::Udata(val) => {
+            Some(val)
+        }
+        _other => {
+            println!("unexpected data_member_location attribute: {:?}", _other);
+            None
+        }
     }
 }
 
@@ -158,6 +175,33 @@ pub(crate) fn get_bit_offset_attribute(entry: &DebuggingInformationEntry<SliceTy
 }
 
 
+pub(crate) fn get_specification_attribute<'data, 'abbrev, 'unit, 'b>(
+    entry: &'data DebuggingInformationEntry<SliceType, usize>,
+    unit: &'unit UnitHeader<EndianSlice<'data, RunTimeEndian>>,
+    abbrev: &'abbrev gimli::Abbreviations
+) -> Option<DebuggingInformationEntry<'abbrev, 'unit, EndianSlice<'data, RunTimeEndian>, usize>> {
+    let specification_attr = get_attr_value(entry, gimli::constants::DW_AT_specification)?;
+    match specification_attr {
+        gimli::AttributeValue::UnitRef(unitoffset) => {
+            if let Ok(specification_entry) = unit.entry(&abbrev, unitoffset) {
+                Some(specification_entry)
+            } else {
+                None
+            }
+        }
+        gimli::AttributeValue::DebugInfoRef(_) => {
+            // presumably, a debugger could also generate a DebugInfo ref instead on a UnitRef
+            // parsing this would take info that we don't have here, e.g. the unit headers and abbreviations of all units
+            // fortunately I have not seen a compiler generate this variation yet
+            None
+        }
+        _ => {
+            None
+        }
+    }
+}
+
+
 // evaluate an exprloc expression to get a variable address or struct member offset
 fn evaluate_exprloc(expression: gimli::Expression<EndianSlice<RunTimeEndian>>, encoding: gimli::Encoding) -> Option<u64> {
     let mut evaluation = expression.evaluation(encoding);
@@ -172,9 +216,13 @@ fn evaluate_exprloc(expression: gimli::Expression<EndianSlice<RunTimeEndian>>, e
                 // this would be a bad bet on PC, but on embedded controllers where A2l files are used this is the standard
                 eval_result = evaluation.resume_with_relocated_address(address).unwrap();
             },
+            gimli::EvaluationResult::RequiresFrameBase => {
+                // a variable in the stack frame of a function. Not useful in the conext of A2l files, where we only care about global values
+                return None;
+            }
             other => {
-                panic!("eval result is unhandled: {:#?}", other);
-                //return None
+                println!("evaluate_exprloc eval result is unhandled: {:#?}", other);
+                return None;
             }
         };
     }
