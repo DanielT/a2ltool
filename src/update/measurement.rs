@@ -17,44 +17,62 @@ pub(crate) fn update_module_measurements(module: &mut Module, debug_data: &Debug
 
     std::mem::swap(&mut module.measurement, &mut measurement_list);
     for mut measurement in measurement_list {
-        if let Some(typeinfo) = update_measurement_address(&mut measurement, debug_data) {
-            if let TypeInfo::Enum{typename, ..} = typeinfo {
-                if measurement.conversion == "NO_COMPU_METHOD" {
-                    measurement.conversion = typename.to_owned();
-                }
-                cond_create_enum_conversion(module, &measurement.conversion);
-                enum_convlist.insert(measurement.conversion.clone(), typeinfo);
-            }
+        if measurement.var_virtual.is_none() {
+            // only MEASUREMENTS that are not VIRTUAL can be updated
+            if let Some(typeinfo) = update_measurement_address(&mut measurement, debug_data) {
+                // update all the information instide a MEASUREMENT
+                update_measurement_information(module, &mut measurement, typeinfo, &mut enum_convlist, use_new_matrix_dim);
 
-            let (ll, ul) = adjust_limits(typeinfo, measurement.lower_limit, measurement.upper_limit);
-            measurement.lower_limit = ll;
-            measurement.upper_limit = ul;
-            update_matrix_dim(&mut measurement.matrix_dim, typeinfo, use_new_matrix_dim);
-
-            // ARRAY_SIZE is replaced by MATRIX_DIM
-            measurement.array_size = None;
-
-            module.measurement.push(measurement);
-            measurement_updated += 1;
-        } else {
-            if preserve_unknown {
-                measurement.ecu_address = None;
-                zero_if_data(&mut measurement.if_data);
                 module.measurement.push(measurement);
+                measurement_updated += 1;
             } else {
-                // item is removed implicitly, because it is not added back to the list
-                removed_items.insert(measurement.name.to_owned());
+                if preserve_unknown {
+                    measurement.ecu_address = None;
+                    zero_if_data(&mut measurement.if_data);
+                    module.measurement.push(measurement);
+                } else {
+                    // item is removed implicitly, because it is not added back to the list
+                    // but we need to track the name of the removed item so that references to it can be deleted
+                    removed_items.insert(measurement.name.to_owned());
+                }
+                measurement_not_updated += 1;
             }
-            measurement_not_updated += 1;
+        } else {
+            // VIRTUAL MEASUREMENTS don't need an address
+            module.measurement.push(measurement);
         }
     }
 
-
-    // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in MEASUREMENTs etc.
+    // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in MEASUREMENTs
     update_enum_compu_methods(module, &enum_convlist);
     cleanup_removed_measurements(module, &removed_items);
 
     (measurement_updated, measurement_not_updated)
+}
+
+
+// update datatype, limits and dimension of a MEASURMENT
+fn update_measurement_information<'enumlist, 'typeinfo : 'enumlist>(
+    module: &mut Module, measurement:
+    &mut Measurement,
+    typeinfo: &'typeinfo TypeInfo,
+    enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
+    use_new_matrix_dim: bool
+) {
+    if let TypeInfo::Enum{typename, ..} = typeinfo {
+        if measurement.conversion == "NO_COMPU_METHOD" {
+            measurement.conversion = typename.to_owned();
+        }
+        cond_create_enum_conversion(module, &measurement.conversion);
+        enum_convlist.insert(measurement.conversion.clone(), typeinfo);
+    }
+
+    let (ll, ul) = adjust_limits(typeinfo, measurement.lower_limit, measurement.upper_limit);
+    measurement.lower_limit = ll;
+    measurement.upper_limit = ul;
+
+    update_matrix_dim(&mut measurement.matrix_dim, typeinfo, use_new_matrix_dim);
+    measurement.array_size = None;
 }
 
 

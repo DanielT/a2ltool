@@ -183,7 +183,7 @@ fn load_variables<'a>(dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>) -> (
         let mut entries_cursor = unit.entries(&abbreviations);
         while let Ok(Some((_depth_delta, entry))) = entries_cursor.next_dfs() {
             if entry.tag() == gimli::constants::DW_TAG_variable {
-                if let Some((name, typeref, address)) = get_global_variable(entry, &unit, &&abbreviations, dwarf) {
+                if let Some((name, typeref, address)) = get_global_variable(entry, &unit, &abbreviations, dwarf) {
                     variables.insert(name, VarInfo{address, typeref});
                 }
             }

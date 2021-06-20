@@ -20,53 +20,69 @@ pub(crate) fn update_module_characteristics(module: &mut Module, debug_data: &De
 
     std::mem::swap(&mut module.characteristic, &mut characteristic_list);
     for mut characteristic in characteristic_list {
-        if let Some(typeinfo) = update_characteristic_address(&mut characteristic, debug_data) {
+        if characteristic.virtual_characteristic.is_none() {
+            // only update the address if the CHARACTERISTIC is not a VIRTUAL_CHARACTERISTIC
+            if let Some(typeinfo) = update_characteristic_address(&mut characteristic, debug_data) {
+                // update as much as possible of the information inside the CHARACTERISTIC
+                update_characteristic_information(module, recordlayout_info, &mut characteristic, typeinfo, &mut enum_convlist, &axis_pts_dim);
 
-            let member_id = get_fnc_values_memberid(module, recordlayout_info, &characteristic.deposit);
-            if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
-                if let TypeInfo::Enum{typename, ..} = inner_typeinfo {
-                    if characteristic.conversion == "NO_COMPU_METHOD" {
-                        characteristic.conversion = typename.to_owned();
-                    }
-                    cond_create_enum_conversion(module, &characteristic.conversion);
-                    enum_convlist.insert(characteristic.conversion.clone(), typeinfo);
-                }
-
-                let (ll, ul) = adjust_limits(inner_typeinfo, characteristic.lower_limit, characteristic.upper_limit);
-                characteristic.lower_limit = ll;
-                characteristic.upper_limit = ul;
-            }
-
-            let record_layout = if let Some(idx) = recordlayout_info.idxmap.get(&characteristic.deposit) {
-                Some(&module.record_layout[*idx])
-            } else {
-                None
-            };
-            update_characteristic_axis(&mut characteristic.axis_descr, record_layout, &axis_pts_dim, typeinfo);
-
-            // update the data type in the referenced RECORD_LAYOUT
-            characteristic.deposit = update_record_layout(module, recordlayout_info, &characteristic.deposit, typeinfo);
-
-            module.characteristic.push(characteristic);
-            characteristic_updated += 1;
-        } else {
-            if preserve_unknown {
-                characteristic.address = 0;
-                zero_if_data(&mut characteristic.if_data);
                 module.characteristic.push(characteristic);
+                characteristic_updated += 1;
             } else {
-                // item is removed implicitly, because it is not added back to the list
-                removed_items.insert(characteristic.name.to_owned());
+                if preserve_unknown {
+                    characteristic.address = 0;
+                    zero_if_data(&mut characteristic.if_data);
+                    module.characteristic.push(characteristic);
+                } else {
+                    // item is removed implicitly, because it is not added back to the list
+                    removed_items.insert(characteristic.name.to_owned());
+                }
+                characteristic_not_updated += 1;
             }
-            characteristic_not_updated += 1;
+        } else {
+            // computed CHARACTERISTICS with a VIRTUAL_CHARACTERISTIC block shouldn't have an address and don't need to be updated
+            module.characteristic.push(characteristic);
         }
     }
 
-    // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in MEASUREMENTs etc.
+    // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in CHARACTERISTICs
     update_enum_compu_methods(module, &enum_convlist);
     cleanup_removed_characteristics(module, &removed_items);
 
     (characteristic_updated, characteristic_not_updated)
+}
+
+
+// update as much as possible of the information inside the CHARACTERISTIC
+fn update_characteristic_information<'enumlist, 'typeinfo : 'enumlist>(
+    module: &mut Module,
+    recordlayout_info: &mut RecordLayoutInfo,
+    characteristic: &mut Characteristic,
+    typeinfo: &'typeinfo TypeInfo,
+    enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
+    axis_pts_dim: &HashMap<String, u16>
+) {
+    let member_id = get_fnc_values_memberid(module, recordlayout_info, &characteristic.deposit);
+    if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
+        if let TypeInfo::Enum{typename, ..} = inner_typeinfo {
+            if characteristic.conversion == "NO_COMPU_METHOD" {
+                characteristic.conversion = typename.to_owned();
+            }
+            cond_create_enum_conversion(module, &characteristic.conversion);
+            enum_convlist.insert(characteristic.conversion.clone(), typeinfo);
+        }
+
+        let (ll, ul) = adjust_limits(inner_typeinfo, characteristic.lower_limit, characteristic.upper_limit);
+        characteristic.lower_limit = ll;
+        characteristic.upper_limit = ul;
+    }
+    let record_layout = if let Some(idx) = recordlayout_info.idxmap.get(&characteristic.deposit) {
+        Some(&module.record_layout[*idx])
+    } else {
+        None
+    };
+    update_characteristic_axis(&mut characteristic.axis_descr, record_layout, &axis_pts_dim, typeinfo);
+    characteristic.deposit = update_record_layout(module, recordlayout_info, &characteristic.deposit, typeinfo);
 }
 
 
