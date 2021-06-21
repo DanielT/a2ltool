@@ -21,14 +21,33 @@ pub(crate) fn get_name_attribute(
 ) -> Option<String> {
     let name_attr = get_attr_value(&entry, gimli::constants::DW_AT_name)?;
     match name_attr {
-        gimli::AttributeValue::String(stringval) => {
-            if let Ok(utf8string) = stringval.to_string() {
+        gimli::AttributeValue::String(slice) => {
+            // try to demangle a c++ symbol
+            // In theory we could look at the DW_AT_language attribute of the translation
+            // unit and only attempt this if the language is c++
+            // In practice this doesn't work, e.g. the Tasking compiler compiles C++ by
+            // translating it to C. Then it puts language = C in the DW_AT_language
+            // attribute. The names are still mangled though and should be demangled.
+            if let Ok(sym) = cpp_demangle::Symbol::new(&*slice) {
+                if let Ok(demangled) = sym.demangle(&cpp_demangle::DemangleOptions::default()) {
+                    return Some(demangled);
+                }
+            }
+            if let Ok(utf8string) = slice.to_string() {
+                // could not demangle, but successfully converted the slice to utf8
                 return Some(utf8string.to_owned());
             }
         }
         gimli::AttributeValue::DebugStrRef(str_offset) => {
-            if let Ok(stringslice) = dwarf.debug_str.get_str(str_offset) {
-                if let Ok(utf8string) = stringslice.to_string() {
+            if let Ok(slice) = dwarf.debug_str.get_str(str_offset) {
+                // try to demangle a c++ symbol
+                if let Ok(sym) = cpp_demangle::Symbol::new(&*slice) {
+                    if let Ok(demangled) = sym.demangle(&cpp_demangle::DemangleOptions::default()) {
+                        return Some(demangled);
+                    }
+                }
+                if let Ok(utf8string) = slice.to_string() {
+                    // could not demangle, but successfully converted the slice to utf8
                     return Some(utf8string.to_owned());
                 }
             }
@@ -218,6 +237,11 @@ fn evaluate_exprloc(expression: gimli::Expression<EndianSlice<RunTimeEndian>>, e
             },
             gimli::EvaluationResult::RequiresFrameBase => {
                 // a variable in the stack frame of a function. Not useful in the conext of A2l files, where we only care about global values
+                return None;
+            }
+            gimli::EvaluationResult::RequiresRegister {..} => {
+                // the value is relative to a register (e.g. the stack base)
+                // this means it cannot be referenced at a unique global address and is not suitable for use in a2l
                 return None;
             }
             other => {
