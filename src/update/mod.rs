@@ -1,24 +1,24 @@
-use std::collections::HashSet;
 use super::dwarf::{DebugData, TypeInfo};
 use super::ifdata;
 use a2lfile::*;
+use std::collections::HashSet;
 
 mod axis_pts;
-mod characteristic;
-mod measurement;
 mod blob;
-mod instance;
+mod characteristic;
 pub mod enums;
-mod record_layout;
 mod ifdata_update;
+mod instance;
+mod measurement;
+mod record_layout;
 
-use axis_pts::*;
-use characteristic::*;
-use measurement::*;
-use blob::*;
-use instance::*;
-use record_layout::*;
 use crate::datatype::*;
+use axis_pts::*;
+use blob::*;
+use characteristic::*;
+use instance::*;
+use measurement::*;
+use record_layout::*;
 
 pub(crate) struct UpdateSumary {
     pub(crate) measurement_updated: u32,
@@ -34,11 +34,14 @@ pub(crate) struct UpdateSumary {
 }
 
 
-
 // perform an address update.
 // This update can be destructive (any object that cannot be updated will be discarded)
 // or non-destructive (addresses of invalid objects will be set to zero).
-pub(crate) fn update_addresses(a2l_file: &mut A2lFile, debug_data: &DebugData, preserve_unknown: bool) -> UpdateSumary {
+pub(crate) fn update_addresses(
+    a2l_file: &mut A2lFile,
+    debug_data: &DebugData,
+    preserve_unknown: bool
+) -> UpdateSumary {
     let use_new_matrix_dim = check_version_1_70(a2l_file);
 
     let mut summary = UpdateSumary::new();
@@ -46,27 +49,50 @@ pub(crate) fn update_addresses(a2l_file: &mut A2lFile, debug_data: &DebugData, p
         let mut reclayout_info = RecordLayoutInfo::build(module);
 
         // update all AXIS_PTS
-        let (updated, not_updated) = update_module_axis_pts(module, debug_data, preserve_unknown, &mut reclayout_info);
+        let (updated, not_updated) = update_module_axis_pts(
+            module,
+            debug_data,
+            preserve_unknown,
+            &mut reclayout_info
+        );
         summary.measurement_updated += updated;
         summary.measurement_not_updated += not_updated;
 
         // update all MEASUREMENTs
-        let (updated, not_updated) = update_module_measurements(module, debug_data, preserve_unknown, use_new_matrix_dim);
+        let (updated, not_updated) = update_module_measurements(
+            module,
+            debug_data,
+            preserve_unknown,
+            use_new_matrix_dim
+        );
         summary.measurement_updated += updated;
         summary.measurement_not_updated += not_updated;
 
         // update all CHARACTERISTICs
-        let (updated, not_updated) = update_module_characteristics(module, debug_data, preserve_unknown, &mut reclayout_info);
+        let (updated, not_updated) = update_module_characteristics(
+            module,
+            debug_data,
+            preserve_unknown,
+            &mut reclayout_info
+        );
         summary.characteristic_updated += updated;
         summary.characteristic_not_updated += not_updated;
 
         // update all BLOBs
-        let (updated, not_updated) = update_module_blobs(module, debug_data, preserve_unknown);
+        let (updated, not_updated) = update_module_blobs(
+            module,
+            debug_data,
+            preserve_unknown
+        );
         summary.blob_updated += updated;
         summary.blob_not_updated += not_updated;
 
         // update all INSTANCEs
-        let (updated, not_updated) = update_module_instances(module, debug_data, preserve_unknown);
+        let (updated, not_updated) = update_module_instances(
+            module,
+            debug_data,
+            preserve_unknown
+        );
         summary.blob_updated += updated;
         summary.blob_not_updated += not_updated;
     }
@@ -200,7 +226,12 @@ fn find_symbol<'a>(varname: &str, debug_data: &'a DebugData) -> Option<(u64, &'a
 
 
 // find the address and type of the current component of a symbol name
-fn find_membertype<'a>(typeinfo: &'a TypeInfo, components: Vec<&str>, component_index: usize, address: u64) -> Option<(u64, &'a TypeInfo)> {
+fn find_membertype<'a>(
+    typeinfo: &'a TypeInfo,
+    components: Vec<&str>,
+    component_index: usize,
+    address: u64
+) -> Option<(u64, &'a TypeInfo)> {
     if component_index >= components.len() {
         Some((address, typeinfo))
     } else {
@@ -208,7 +239,12 @@ fn find_membertype<'a>(typeinfo: &'a TypeInfo, components: Vec<&str>, component_
             TypeInfo::Struct { members, .. } |
             TypeInfo::Union { members, .. } => {
                 if let Some((membertype, offset)) = members.get(components[component_index]) {
-                    find_membertype(membertype, components, component_index + 1, address + offset)
+                    find_membertype(
+                        membertype,
+                        components,
+                        component_index + 1,
+                        address + offset
+                    )
                 } else {
                     None
                 }
@@ -221,7 +257,12 @@ fn find_membertype<'a>(typeinfo: &'a TypeInfo, components: Vec<&str>, component_
                 }
 
                 let elementaddr = address + (multi_index as u64 * stride);
-                find_membertype(arraytype, components, component_index + dim.len(), elementaddr)
+                find_membertype(
+                    arraytype,
+                    components,
+                    component_index + dim.len(),
+                    elementaddr
+                )
             }
             _ => Some((address, typeinfo))
         }

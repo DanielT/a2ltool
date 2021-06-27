@@ -6,7 +6,11 @@ use super::ifdata_update::*;
 use super::*;
 
 
-pub(crate) fn update_module_instances(module: &mut Module, debug_data: &DebugData, preserve_unknown: bool) -> (u32, u32) {
+pub(crate) fn update_module_instances(
+    module: &mut Module,
+    debug_data: &DebugData,
+    preserve_unknown: bool
+) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
     let mut instance_list = Vec::new();
     let mut instance_updated: u32 = 0;
@@ -37,9 +41,16 @@ pub(crate) fn update_module_instances(module: &mut Module, debug_data: &DebugDat
 
 
 // update the address of an INSTANCE object
-fn update_instance_address<'a>(instance: &mut Instance, debug_data: &'a DebugData) -> Option<(String, &'a TypeInfo)> {
-    let (symbol_info, symbol_name) =
-        get_symbol_info(&instance.name, &instance.symbol_link, &instance.if_data, debug_data);
+fn update_instance_address<'a>(
+    instance: &mut Instance,
+    debug_data: &'a DebugData
+) -> Option<(String, &'a TypeInfo)> {
+    let (symbol_info, symbol_name) = get_symbol_info(
+        &instance.name,
+        &instance.symbol_link,
+        &instance.if_data,
+        debug_data
+    );
 
     if let Some((address, symbol_datatype)) = symbol_info {
         // make sure a valid SYMBOL_LINK exists

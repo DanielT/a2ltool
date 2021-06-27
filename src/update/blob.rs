@@ -6,7 +6,11 @@ use super::ifdata_update::*;
 use super::*;
 
 
-pub(crate) fn update_module_blobs(module: &mut Module, debug_data: &DebugData, preserve_unknown: bool) -> (u32, u32) {
+pub(crate) fn update_module_blobs(
+    module: &mut Module,
+    debug_data: &DebugData,
+    preserve_unknown: bool
+) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
     let mut blob_list = Vec::new();
     let mut blob_updated: u32 = 0;

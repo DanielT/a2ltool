@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use a2lfile::*;
-use crate::dwarf::TypeInfo;
 use super::get_a2l_datatype;
+use crate::dwarf::TypeInfo;
+use a2lfile::*;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub(crate) struct RecordLayoutInfo {
@@ -10,7 +10,11 @@ pub(crate) struct RecordLayoutInfo {
 }
 
 
-pub(crate) fn get_axis_pts_x_memberid(module: &Module, recordlayout_info: &RecordLayoutInfo, recordlayout_name: &str) -> u16 {
+pub(crate) fn get_axis_pts_x_memberid(
+    module: &Module,
+    recordlayout_info: &RecordLayoutInfo,
+    recordlayout_name: &str
+) -> u16 {
     let mut memberid = 1;
     if let Some(rl_idx) = recordlayout_info.idxmap.get(recordlayout_name) {
         if let Some(axis_pts_x) = &module.record_layout[*rl_idx].axis_pts_x {
@@ -21,7 +25,11 @@ pub(crate) fn get_axis_pts_x_memberid(module: &Module, recordlayout_info: &Recor
 }
 
 
-pub(crate) fn get_fnc_values_memberid(module: &Module, recordlayout_info: &RecordLayoutInfo, recordlayout_name: &str) -> u16 {
+pub(crate) fn get_fnc_values_memberid(
+    module: &Module,
+    recordlayout_info: &RecordLayoutInfo,
+    recordlayout_name: &str
+) -> u16 {
     let mut memberid = 1;
     if let Some(rl_idx) = recordlayout_info.idxmap.get(recordlayout_name) {
         if let Some(fnc_values) = &module.record_layout[*rl_idx].fnc_values {
@@ -42,7 +50,10 @@ pub(crate) fn get_inner_type(typeinfo: &TypeInfo, memberid: u16) -> Option<&Type
 
     match typeinfo {
         TypeInfo::Struct { members, ..} => {
-            let mut membervec: Vec<(&TypeInfo, u64)> = members.values().map(|(membertype, offset)| (membertype, *offset)). collect();
+            let mut membervec: Vec<(&TypeInfo, u64)> = members
+                .values()
+                .map(|(membertype, offset)| (membertype, *offset))
+                .collect();
             membervec.sort_by(|(_, offset_a), (_, offset_b)| offset_a.cmp(offset_b));
             if id < membervec.len() {
                 Some(membervec[id].0)
@@ -61,7 +72,12 @@ pub(crate) fn get_inner_type(typeinfo: &TypeInfo, memberid: u16) -> Option<&Type
 }
 
 
-pub(crate) fn update_record_layout(module: &mut Module, recordlayout_info: &mut RecordLayoutInfo, name: &str, typeinfo: &TypeInfo) -> String {
+pub(crate) fn update_record_layout(
+    module: &mut Module,
+    recordlayout_info: &mut RecordLayoutInfo,
+    name: &str,
+    typeinfo: &TypeInfo
+) -> String {
     if let Some(idx_ref) = recordlayout_info.idxmap.get(name) {
         let idx = *idx_ref;
         let mut new_reclayout = module.record_layout[idx].clone();
@@ -72,7 +88,11 @@ pub(crate) fn update_record_layout(module: &mut Module, recordlayout_info: &mut 
                 let new_datatype = get_a2l_datatype(itemtype);
                 if new_datatype != fnc_values.datatype {
                     // try to update the name based on the datatype, e.g. __UBYTE_S to __ULONG_S
-                    new_reclayout.name = new_reclayout.name.replacen(&fnc_values.datatype.to_string(), &new_datatype.to_string(), 1);
+                    new_reclayout.name = new_reclayout.name.replacen(
+                        &fnc_values.datatype.to_string(),
+                        &new_datatype.to_string(),
+                        1
+                    );
                     fnc_values.datatype = new_datatype;
                 }
             }
@@ -82,7 +102,7 @@ pub(crate) fn update_record_layout(module: &mut Module, recordlayout_info: &mut 
         if let Some(axis_pts_x) = &mut new_reclayout.axis_pts_x {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_x.position) {
                 axis_pts_x.datatype = get_a2l_datatype(itemtype);
-                if let TypeInfo::Array {dim, ..} = itemtype {
+                if let TypeInfo::Array { dim, .. } = itemtype {
                     // FIX_NO_AXIS_PTS_X
                     if let Some(fix_no_axis_pts_x) = &mut new_reclayout.fix_no_axis_pts_x {
                         fix_no_axis_pts_x.number_of_axis_points = dim[0] as u16;
@@ -101,7 +121,7 @@ pub(crate) fn update_record_layout(module: &mut Module, recordlayout_info: &mut 
         if let Some(axis_pts_y) = &mut new_reclayout.axis_pts_y {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_y.position) {
                 axis_pts_y.datatype = get_a2l_datatype(itemtype);
-                if let TypeInfo::Array {dim, ..} = itemtype {
+                if let TypeInfo::Array { dim, .. } = itemtype {
                     // FIX_NO_AXIS_PTS_Y
                     if let Some(fix_no_axis_pts_y) = &mut new_reclayout.fix_no_axis_pts_y {
                         fix_no_axis_pts_y.number_of_axis_points = dim[0] as u16;
@@ -120,7 +140,7 @@ pub(crate) fn update_record_layout(module: &mut Module, recordlayout_info: &mut 
         if let Some(axis_pts_z) = &mut new_reclayout.axis_pts_z {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_z.position) {
                 axis_pts_z.datatype = get_a2l_datatype(itemtype);
-                if let TypeInfo::Array {dim, ..} = itemtype {
+                if let TypeInfo::Array { dim, .. } = itemtype {
                     // FIX_NO_AXIS_PTS_Z
                     if let Some(fix_no_axis_pts_z) = &mut new_reclayout.fix_no_axis_pts_z {
                         fix_no_axis_pts_z.number_of_axis_points = dim[0] as u16;
@@ -139,7 +159,7 @@ pub(crate) fn update_record_layout(module: &mut Module, recordlayout_info: &mut 
         if let Some(axis_pts_4) = &mut new_reclayout.axis_pts_4 {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_4.position) {
                 axis_pts_4.datatype = get_a2l_datatype(itemtype);
-                if let TypeInfo::Array {dim, ..} = itemtype {
+                if let TypeInfo::Array { dim, .. } = itemtype {
                     // FIX_NO_AXIS_PTS_4
                     if let Some(fix_no_axis_pts_4) = &mut new_reclayout.fix_no_axis_pts_4 {
                         fix_no_axis_pts_4.number_of_axis_points = dim[0] as u16;
@@ -158,7 +178,7 @@ pub(crate) fn update_record_layout(module: &mut Module, recordlayout_info: &mut 
         if let Some(axis_pts_5) = &mut new_reclayout.axis_pts_5 {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_5.position) {
                 axis_pts_5.datatype = get_a2l_datatype(itemtype);
-                if let TypeInfo::Array {dim, ..} = itemtype {
+                if let TypeInfo::Array { dim, .. } = itemtype {
                     // FIX_NO_AXIS_PTS_5
                     if let Some(fix_no_axis_pts_5) = &mut new_reclayout.fix_no_axis_pts_5 {
                         fix_no_axis_pts_5.number_of_axis_points = dim[0] as u16;
@@ -190,17 +210,25 @@ pub(crate) fn update_record_layout(module: &mut Module, recordlayout_info: &mut 
                     // the original record layout only has one reference; that means we can simply overwrite it with the modified data
                     if module.record_layout[idx].name != new_reclayout.name {
                         // the name has changed, so idxmap needs to be fixed
-                        recordlayout_info.idxmap.remove(&module.record_layout[idx].name);
-                        recordlayout_info.idxmap.insert(new_reclayout.name.to_owned(), idx);
+                        recordlayout_info
+                            .idxmap
+                            .remove(&module.record_layout[idx].name);
+                        recordlayout_info
+                            .idxmap
+                            .insert(new_reclayout.name.to_owned(), idx);
                     }
                     module.record_layout[idx] = new_reclayout;
                     module.record_layout[idx].name.to_owned()
                 } else {
-                    // the original record layout has multiple users, so it's reference count decreases by one and the new record layout is added to the list
+                    // the original record layout has multiple users, so it's reference count
+                    // decreases by one and the new record layout is added to the list
                     recordlayout_info.refcount[idx] -= 1;
-                    new_reclayout.name = make_unique_reclayout_name(new_reclayout.name, recordlayout_info);
+                    new_reclayout.name =
+                        make_unique_reclayout_name(new_reclayout.name, recordlayout_info);
                     recordlayout_info.refcount.push(1);
-                    recordlayout_info.idxmap.insert(new_reclayout.name.to_owned(), module.record_layout.len());
+                    recordlayout_info
+                        .idxmap
+                        .insert(new_reclayout.name.to_owned(), module.record_layout.len());
                     module.record_layout.push(new_reclayout);
                     module.record_layout.last().unwrap().name.to_owned()
                 }
@@ -214,14 +242,16 @@ pub(crate) fn update_record_layout(module: &mut Module, recordlayout_info: &mut 
 }
 
 
-fn make_unique_reclayout_name(initial_name: String, recordlayout_info: &RecordLayoutInfo) -> String {
+fn make_unique_reclayout_name(
+    initial_name: String,
+    recordlayout_info: &RecordLayoutInfo
+) -> String {
     if recordlayout_info.idxmap.get(&initial_name).is_some() {
         // the record layout name already exists. Now we want to extend the name to make it unique
         // e.g. BASIC_RECORD_LAYOUT to BASIC_RECORD_LAYOUT_UPDATED
         // if there are multiple BASIC_RECORD_LAYOUT_UPDATED we want to continue with BASIC_RECORD_LAYOUT_UPDATED.2, .3 , etc
         // instead of BASIC_RECORD_LAYOUT_UPDATED_UPDATED
-        let basename =
-        if let Some(pos) = initial_name.find("_UPDATED") {
+        let basename = if let Some(pos) = initial_name.find("_UPDATED") {
             let end_of_updated = pos + "_UPDATED".len();
             if end_of_updated == initial_name.len() || initial_name[end_of_updated..].starts_with(".") {
                 initial_name[..end_of_updated].to_string()
@@ -314,7 +344,8 @@ fn compare_rl_content(a: &RecordLayout, b: &RecordLayout) -> bool {
 
 impl RecordLayoutInfo {
     pub(crate) fn build(module: &Module) -> Self {
-        let idxmap: HashMap<String, usize> = module.record_layout.iter()
+        let idxmap: HashMap<String, usize> = module.record_layout
+            .iter()
             .enumerate()
             .map(|(idx, rl)| (rl.name.to_owned(), idx))
             .collect();

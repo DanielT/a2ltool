@@ -4,7 +4,12 @@ use a2lfile::*;
 
 
 // check if there is a CANAPE_EXT in the IF_DATA vec and update it if it exists
-pub(crate) fn update_ifdata(ifdata_vec: &mut Vec<IfData>, symbol_name: String, datatype: &TypeInfo, address: u64) {
+pub(crate) fn update_ifdata(
+    ifdata_vec: &mut Vec<IfData>,
+    symbol_name: String,
+    datatype: &TypeInfo,
+    address: u64
+) {
     for ifdata in ifdata_vec {
         if let Some(mut decoded_ifdata) = ifdata::A2mlVector::load_from_ifdata(ifdata) {
             if let Some(canape_ext) = &mut decoded_ifdata.canape_ext {
@@ -19,8 +24,13 @@ pub(crate) fn update_ifdata(ifdata_vec: &mut Vec<IfData>, symbol_name: String, d
 }
 
 
-fn update_ifdata_canape_ext(canape_ext: &mut ifdata::CanapeExt, address: u64, symbol_name: &String, datatype: &TypeInfo) {
-    if let Some (link_map) = &mut canape_ext.link_map {
+fn update_ifdata_canape_ext(
+    canape_ext: &mut ifdata::CanapeExt,
+    address: u64,
+    symbol_name: &String,
+    datatype: &TypeInfo
+) {
+    if let Some(link_map) = &mut canape_ext.link_map {
         link_map.address = address as i32;
         link_map.symbol_name = symbol_name.clone();
         match datatype {

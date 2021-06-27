@@ -41,7 +41,11 @@ pub(crate) fn get_a2l_datatype(datatype: &TypeInfo) -> DataType {
 }
 
 
-pub(crate) fn get_type_limits(typeinfo: &TypeInfo, default_lower: f64, default_upper: f64) -> (f64, f64) {
+pub(crate) fn get_type_limits(
+    typeinfo: &TypeInfo,
+    default_lower: f64,
+    default_upper: f64
+) -> (f64, f64) {
     let (new_lower_limit, new_upper_limit) = match typeinfo {
         TypeInfo::Array {arraytype,..} => get_type_limits(arraytype, default_lower, default_upper),
         TypeInfo::Bitfield {bit_size, basetype, ..} => {

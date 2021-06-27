@@ -83,7 +83,7 @@ pub(crate) fn load_debuginfo(filename: &str) -> Result<DebugData, String> {
     let filedata = load_filedata(filename)?;
     let elffile = load_elf_file(filename, &*filedata)?;
     let dwarf = load_dwarf(&elffile)?;
-    
+
     Ok(read_debug_info_entries(&dwarf))
 }
 
@@ -105,7 +105,10 @@ fn load_filedata(filename: &str) -> Result<memmap::Mmap, String> {
 
 
 // read the headers and sections of an elf/object file
-fn load_elf_file<'data>(filename: &str, filedata: &'data [u8]) -> Result<object::read::File<'data>, String> {
+fn load_elf_file<'data>(
+    filename: &str,
+    filedata: &'data [u8]
+) -> Result<object::read::File<'data>, String> {
     match object::File::parse(&*filedata) {
         Ok(file) => Ok(file),
         Err(err) => {
@@ -116,7 +119,9 @@ fn load_elf_file<'data>(filename: &str, filedata: &'data [u8]) -> Result<object:
 
 
 // load the SWARF debug info from the .debug_<xyz> sections
-fn load_dwarf<'data>(elffile: &object::read::File<'data>) -> Result<gimli::Dwarf<SliceType<'data>>, String> {
+fn load_dwarf<'data>(
+    elffile: &object::read::File<'data>
+) -> Result<gimli::Dwarf<SliceType<'data>>, String> {
     // Dwarf::load takes two closures / functions and uses them to load all the required debug sections
     let loader = |section: gimli::SectionId| { get_file_section_reader(elffile, section.name()) };
     let sup_loader = |section: gimli::SectionId| { get_sup_file_section_reader(elffile, section.name()) };
@@ -126,7 +131,10 @@ fn load_dwarf<'data>(elffile: &object::read::File<'data>) -> Result<gimli::Dwarf
 
 // get a section from the elf file.
 // returns a slice referencing the section data if it exists, or an empty slice otherwise
-fn get_file_section_reader<'data>(elffile: &object::read::File<'data>, section_name: &str) -> Result<SliceType<'data>, String> {
+fn get_file_section_reader<'data>(
+    elffile: &object::read::File<'data>,
+    section_name: &str
+) -> Result<SliceType<'data>, String> {
     if let Some(dbginfo) = elffile.section_by_name(section_name) {
         match dbginfo.data() {
             Ok(val) => Ok(EndianSlice::new(val, get_endian(elffile))),
@@ -140,7 +148,10 @@ fn get_file_section_reader<'data>(elffile: &object::read::File<'data>, section_n
 
 // required by Dwarf::load: get a section from a supplementary file.
 // Supplementary files are not supported, so the function always returns an empty slice
-fn get_sup_file_section_reader<'data>(elffile: &object::read::File<'data>, _section_name: &str) -> Result<SliceType<'data>, String> {
+fn get_sup_file_section_reader<'data>(
+    elffile: &object::read::File<'data>,
+    _section_name: &str
+) -> Result<SliceType<'data>, String> {
     Ok(EndianSlice::new(&[], get_endian(elffile)))
 }
 
@@ -168,7 +179,9 @@ fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>) -> DebugData {
 
 
 // load all global variables from the dwarf data
-fn load_variables<'a>(dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>) -> (HashMap<String, VarInfo>, UnitList<'a>) {
+fn load_variables<'a>(
+    dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>
+) -> (HashMap<String, VarInfo>, UnitList<'a>) {
     let mut variables = HashMap::<String, VarInfo>::new();
     let mut unit_list = UnitList::new();
 
@@ -183,7 +196,12 @@ fn load_variables<'a>(dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>) -> (
         let mut entries_cursor = unit.entries(&abbreviations);
         while let Ok(Some((_depth_delta, entry))) = entries_cursor.next_dfs() {
             if entry.tag() == gimli::constants::DW_TAG_variable {
-                if let Some((name, typeref, address)) = get_global_variable(entry, &unit, &abbreviations, dwarf) {
+                if let Some((name, typeref, address)) = get_global_variable(
+                    entry,
+                    &unit,
+                    &abbreviations,
+                    dwarf
+                ) {
                     variables.insert(name, VarInfo{address, typeref});
                 }
             }

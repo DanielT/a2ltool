@@ -8,7 +8,12 @@ use super::ifdata_update::*;
 use super::*;
 
 
-pub(crate) fn update_module_axis_pts(module: &mut Module, debug_data: &DebugData, preserve_unknown: bool, recordlayout_info: &mut RecordLayoutInfo) -> (u32, u32) {
+pub(crate) fn update_module_axis_pts(
+    module: &mut Module,
+    debug_data: &DebugData,
+    preserve_unknown: bool,
+    recordlayout_info: &mut RecordLayoutInfo
+) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
     let mut removed_items = HashSet::<String>::new();
     let mut axis_pts_list = Vec::new();
@@ -45,13 +50,22 @@ pub(crate) fn update_module_axis_pts(module: &mut Module, debug_data: &DebugData
                     _ => {}
                 }
 
-                let (ll, ul) = adjust_limits(inner_typeinfo, axis_pts.lower_limit, axis_pts.upper_limit);
+                let (ll, ul) = adjust_limits(
+                    inner_typeinfo,
+                    axis_pts.lower_limit,
+                    axis_pts.upper_limit
+                );
                 axis_pts.lower_limit = ll;
                 axis_pts.upper_limit = ul;
             }
 
             // update the data type in the referenced RECORD_LAYOUT
-            axis_pts.deposit_record = update_record_layout(module, recordlayout_info, &axis_pts.deposit_record, typeinfo);
+            axis_pts.deposit_record = update_record_layout(
+                module,
+                recordlayout_info,
+                &axis_pts.deposit_record,
+                typeinfo
+            );
 
             // put the updated AXIS_PTS back on the module's list
             module.axis_pts.push(axis_pts);
@@ -78,9 +92,15 @@ pub(crate) fn update_module_axis_pts(module: &mut Module, debug_data: &DebugData
 
 
 // update the address of an AXIS_PTS object
-fn update_axis_pts_address<'a>(axis_pts: &mut AxisPts, debug_data: &'a DebugData) -> Option<&'a TypeInfo> {
-    let (symbol_info, symbol_name) =
-        get_symbol_info(&axis_pts.name, &axis_pts.symbol_link, &axis_pts.if_data, debug_data);
+fn update_axis_pts_address<'a>(
+    axis_pts: &mut AxisPts,
+    debug_data: &'a DebugData
+) -> Option<&'a TypeInfo> {
+    let (symbol_info, symbol_name) = get_symbol_info(
+        &axis_pts.name,
+        &axis_pts.symbol_link,
+        &axis_pts.if_data, debug_data
+    );
 
     if let Some((address, symbol_datatype)) = symbol_info {
         // make sure a valid SYMBOL_LINK exists

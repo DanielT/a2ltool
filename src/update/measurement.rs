@@ -8,7 +8,12 @@ use super::ifdata_update::*;
 use super::*;
 
 
-pub(crate) fn update_module_measurements(module: &mut Module, debug_data: &DebugData, preserve_unknown: bool, use_new_matrix_dim: bool) -> (u32, u32) {
+pub(crate) fn update_module_measurements(
+    module: &mut Module,
+    debug_data: &DebugData,
+    preserve_unknown: bool,
+    use_new_matrix_dim: bool
+) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
     let mut measurement_list = Vec::new();
@@ -52,9 +57,9 @@ pub(crate) fn update_module_measurements(module: &mut Module, debug_data: &Debug
 
 
 // update datatype, limits and dimension of a MEASURMENT
-fn update_measurement_information<'enumlist, 'typeinfo : 'enumlist>(
-    module: &mut Module, measurement:
-    &mut Measurement,
+fn update_measurement_information<'enumlist, 'typeinfo: 'enumlist>(
+    module: &mut Module,
+    measurement: &mut Measurement,
     typeinfo: &'typeinfo TypeInfo,
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
     use_new_matrix_dim: bool
@@ -77,9 +82,16 @@ fn update_measurement_information<'enumlist, 'typeinfo : 'enumlist>(
 
 
 // update the address of a MEASUREMENT object
-fn update_measurement_address<'a>(measurement: &mut Measurement, debug_data: &'a DebugData) -> Option<&'a TypeInfo> {
-    let (symbol_info, symbol_name) =
-        get_symbol_info(&measurement.name, &measurement.symbol_link, &measurement.if_data, debug_data);
+fn update_measurement_address<'a>(
+    measurement: &mut Measurement,
+    debug_data: &'a DebugData
+) -> Option<&'a TypeInfo> {
+    let (symbol_info, symbol_name) = get_symbol_info(
+        &measurement.name,
+        &measurement.symbol_link,
+        &measurement.if_data,
+        debug_data
+    );
 
     if let Some((address, symbol_datatype)) = symbol_info {
         // make sure a valid SYMBOL_LINK exists
@@ -97,12 +109,16 @@ fn update_measurement_address<'a>(measurement: &mut Measurement, debug_data: &'a
 
 
 // update the MATRIX_DIM of a MEASUREMENT
-fn update_matrix_dim(opt_matrix_dim: &mut Option<MatrixDim>, typeinfo: &TypeInfo, new_format: bool) {
+fn update_matrix_dim(
+    opt_matrix_dim: &mut Option<MatrixDim>,
+    typeinfo: &TypeInfo,
+    new_format: bool
+) {
     let mut matrix_dim_values = Vec::new();
     let mut cur_typeinfo = typeinfo;
     // compilers can represent multi-dimensional arrays in two different ways:
     // either as nested arrays, each with one dimension, or as one array with multiple dimensions
-    while let TypeInfo::Array{dim, arraytype, ..} = cur_typeinfo {
+    while let TypeInfo::Array{ dim, arraytype, .. } = cur_typeinfo {
         for val in dim {
             matrix_dim_values.push(*val as u16);
         }

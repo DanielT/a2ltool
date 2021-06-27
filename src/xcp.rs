@@ -1,5 +1,5 @@
-use a2lfile::*;
 use crate::ifdata::*;
+use a2lfile::*;
 
 
 pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &str) {
@@ -79,26 +79,49 @@ fn print_xcp_on_flx(xcp_on_flx: &XcpOnFlx) {
     }
 
     if let Some(buffer) = &xcp_on_flx.flx_parameters.initial_cmd_buffer {
-        let InitialCmdBuffer { flx_buf, max_flx_len_buf, lpdu_id, xcp_packet, .. } = buffer;
+        let InitialCmdBuffer {
+            flx_buf,
+            max_flx_len_buf,
+            lpdu_id,
+            xcp_packet,
+            ..
+        } = buffer;
         println!("    Initial cmd buffer:");
         print_xcp_on_flx_buffer(*flx_buf, max_flx_len_buf, lpdu_id, xcp_packet);
     }
 
     if let Some(buffer) = &xcp_on_flx.flx_parameters.initial_res_err_buffer {
-        let InitialResErrBuffer { flx_buf, max_flx_len_buf, lpdu_id, xcp_packet, .. } = buffer;
+        let InitialResErrBuffer {
+            flx_buf,
+            max_flx_len_buf,
+            lpdu_id,
+            xcp_packet,
+            ..
+        } = buffer;
         println!("    Initial res / err buffer:");
         print_xcp_on_flx_buffer(*flx_buf, max_flx_len_buf, lpdu_id, xcp_packet);
     }
 
     for buffer in &xcp_on_flx.flx_parameters.pool_buffer {
-        let PoolBuffer { flx_buf, max_flx_len_buf, lpdu_id, xcp_packet, .. } = buffer;
+        let PoolBuffer {
+            flx_buf,
+            max_flx_len_buf,
+            lpdu_id,
+            xcp_packet,
+            ..
+        } = buffer;
         println!("    pool buffer:");
         print_xcp_on_flx_buffer(*flx_buf, max_flx_len_buf, lpdu_id, xcp_packet);
     }
 }
 
 
-fn print_xcp_on_flx_buffer(flx_buf_id: u8, max_flx_len_buf: &Option<MaxFlxLenBuf>, lpdu_id: &Option<LpduId>, xcp_packet: &Option<XcpPacket>) {
+fn print_xcp_on_flx_buffer(
+    flx_buf_id: u8,
+    max_flx_len_buf: &Option<MaxFlxLenBuf>,
+    lpdu_id: &Option<LpduId>,
+    xcp_packet: &Option<XcpPacket>
+) {
     println!("      buffer id: {}", flx_buf_id);
 
     if let Some(MaxFlxLenBuf { fixed, variable, .. }) = &max_flx_len_buf {
@@ -167,7 +190,14 @@ fn print_xcp_on_flx_buffer(flx_buf_id: u8, max_flx_len_buf: &Option<MaxFlxLenBuf
         println!("");
     }
 
-    if let Some(XcpPacket { cmd, res_err, ev_serv, daq, stim, .. }) = xcp_packet {
+    if let Some(XcpPacket {
+        cmd,
+        res_err,
+        ev_serv,
+        daq,
+        stim,
+        ..
+    }) = xcp_packet {
         println!("      packet types: ");
         if let Some(Cmd { packet_assignment_type, .. }) = cmd {
             println!("        Cmd: {:?}", packet_assignment_type)
@@ -190,8 +220,15 @@ fn print_xcp_on_flx_buffer(flx_buf_id: u8, max_flx_len_buf: &Option<MaxFlxLenBuf
 
 fn print_xcp_on_tcp_ip(xcp_on_tcp_ip: &XcpOnTcpIp) {
     let XcpOnTcpIp {
-        tcp_ip_parameters: TCP_IP_Parameters { host_name, address, ipv6, port, .. }
-        , ..
+        tcp_ip_parameters:
+            TCP_IP_Parameters {
+                host_name,
+                address,
+                ipv6,
+                port,
+                ..
+            },
+        ..
     } = xcp_on_tcp_ip;
     println!("  XCP on TCP/IP");
     print_xcp_on_ip_common(host_name, address, ipv6, *port);
@@ -200,15 +237,27 @@ fn print_xcp_on_tcp_ip(xcp_on_tcp_ip: &XcpOnTcpIp) {
 
 fn print_xcp_on_udp_ip(xcp_on_udp_ip: &XcpOnUdpIp) {
     let XcpOnUdpIp {
-        udp_ip_parameters: UDP_IP_Parameters { host_name, address, ipv6, port, .. }
-        , ..
+        udp_ip_parameters:
+            UDP_IP_Parameters {
+                host_name,
+                address,
+                ipv6,
+                port,
+                ..
+            },
+        ..
     } = xcp_on_udp_ip;
     println!("  XCP on UDP/IP");
     print_xcp_on_ip_common(host_name, address, ipv6, *port);
 }
 
 
-fn print_xcp_on_ip_common(host_name: &Option<HostName>, address: &Option<Address2>, ipv6: &Option<Ipv6>, port: u16) {
+fn print_xcp_on_ip_common(
+    host_name: &Option<HostName>,
+    address: &Option<Address2>,
+    ipv6: &Option<Ipv6>,
+    port: u16,
+) {
     if let Some(HostName { hostname, .. }) = host_name {
         println!("    hostname: {}", hostname);
     }

@@ -6,7 +6,10 @@ type OptionalAttribute<'data> = Option<gimli::AttributeValue<SliceType<'data>>>;
 
 
 // try to get the attribute of the type attrtype for the DIE
-pub(crate) fn get_attr_value<'abbrev, 'unit>(entry: &DebuggingInformationEntry<'abbrev, 'unit, SliceType, usize>, attrtype: gimli::DwAt) -> OptionalAttribute<'unit> {
+pub(crate) fn get_attr_value<'abbrev, 'unit>(
+    entry: &DebuggingInformationEntry<'abbrev, 'unit, SliceType, usize>,
+    attrtype: gimli::DwAt
+) -> OptionalAttribute<'unit> {
     entry
         .attr_value(attrtype)
         .or_else(|_| -> gimli::Result<OptionalAttribute> { Ok(None) })
@@ -60,7 +63,10 @@ pub(crate) fn get_name_attribute(
 
 // get a type reference as an offset relative to the start of .debug_info from a DW_AT_type attribute
 // it the type reference is a UnitRef (relative to the unit header) it will be converted first
-pub(crate) fn get_typeref_attribute(entry: &DebuggingInformationEntry<SliceType, usize>, unit: &UnitHeader<SliceType>) -> Option<usize> {
+pub(crate) fn get_typeref_attribute(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+    unit: &UnitHeader<SliceType>
+) -> Option<usize> {
     let type_attr = get_attr_value(entry, gimli::constants::DW_AT_type)?;
     match type_attr {
         gimli::AttributeValue::UnitRef(unitoffset) => {
@@ -86,7 +92,10 @@ pub(crate) fn get_typeref_attribute(entry: &DebuggingInformationEntry<SliceType,
 // get the address of a variable from a DW_AT_location attribute
 // The DW_AT_location contains an Exprloc expression that allows the address to be calculated
 // in complex ways, so the expression must be evaluated in order to get the address
-pub(crate) fn get_location_attribute(entry: &DebuggingInformationEntry<SliceType, usize>, encoding: gimli::Encoding) -> Option<u64> {
+pub(crate) fn get_location_attribute(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+    encoding: gimli::Encoding
+) -> Option<u64> {
     let loc_attr = get_attr_value(entry, gimli::constants::DW_AT_location)?;
     if let gimli::AttributeValue::Exprloc(expression) = loc_attr {
         evaluate_exprloc(expression, encoding)
@@ -97,7 +106,10 @@ pub(crate) fn get_location_attribute(entry: &DebuggingInformationEntry<SliceType
 
 
 // get the address offset of a struct member from a DW_AT_data_member_location attribute
-pub(crate) fn get_data_member_location_attribute(entry: &DebuggingInformationEntry<SliceType, usize>, encoding: gimli::Encoding) -> Option<u64> {
+pub(crate) fn get_data_member_location_attribute(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+    encoding: gimli::Encoding
+) -> Option<u64> {
     let loc_attr = get_attr_value(entry, gimli::constants::DW_AT_data_member_location)?;
     match loc_attr {
         gimli::AttributeValue::Exprloc(expression) => {
@@ -222,7 +234,10 @@ pub(crate) fn get_specification_attribute<'data, 'abbrev, 'unit, 'b>(
 
 
 // evaluate an exprloc expression to get a variable address or struct member offset
-fn evaluate_exprloc(expression: gimli::Expression<EndianSlice<RunTimeEndian>>, encoding: gimli::Encoding) -> Option<u64> {
+fn evaluate_exprloc(
+    expression: gimli::Expression<EndianSlice<RunTimeEndian>>,
+    encoding: gimli::Encoding
+) -> Option<u64> {
     let mut evaluation = expression.evaluation(encoding);
     evaluation.set_object_address(0);
     evaluation.set_initial_value(0);
@@ -239,7 +254,7 @@ fn evaluate_exprloc(expression: gimli::Expression<EndianSlice<RunTimeEndian>>, e
                 // a variable in the stack frame of a function. Not useful in the conext of A2l files, where we only care about global values
                 return None;
             }
-            gimli::EvaluationResult::RequiresRegister {..} => {
+            gimli::EvaluationResult::RequiresRegister { .. } => {
                 // the value is relative to a register (e.g. the stack base)
                 // this means it cannot be referenced at a unique global address and is not suitable for use in a2l
                 return None;

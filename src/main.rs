@@ -35,7 +35,7 @@ macro_rules! cond_print {
                 }
             }
         }
-    }
+    };
 }
 
 
@@ -52,7 +52,7 @@ macro_rules! ext_println {
                 }
             }
         }
-    }
+    };
 }
 
 
@@ -177,18 +177,25 @@ fn core() -> Result<(), String> {
 
     // create new items
     if arg_matches.is_present("INSERT_CHARACTERISTIC") || arg_matches.is_present("INSERT_MEASUREMENT") {
-        let measurement_symbols: Vec<&str> = if let Some(values) = arg_matches.values_of("INSERT_MEASUREMENT") {
-            values.into_iter().collect()
-        } else {
-            Vec::new()
-        };
-        let characteristic_symbols: Vec<&str> = if let Some(values) = arg_matches.values_of("INSERT_CHARACTERISTIC") {
-            values.into_iter().collect()
-        } else {
-            Vec::new()
-        };
+        let measurement_symbols: Vec<&str> =
+            if let Some(values) = arg_matches.values_of("INSERT_MEASUREMENT") {
+                values.into_iter().collect()
+            } else {
+                Vec::new()
+            };
+        let characteristic_symbols: Vec<&str> =
+            if let Some(values) = arg_matches.values_of("INSERT_CHARACTERISTIC") {
+                values.into_iter().collect()
+            } else {
+                Vec::new()
+            };
         
-        insert::insert_items(&mut a2l_file, &elf_info.as_ref().unwrap(), measurement_symbols, characteristic_symbols);
+        insert::insert_items(
+            &mut a2l_file,
+            &elf_info.as_ref().unwrap(),
+            measurement_symbols,
+            characteristic_symbols
+        );
     }
 
 

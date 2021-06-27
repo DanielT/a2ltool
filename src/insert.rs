@@ -14,7 +14,12 @@ enum ItemType {
     AxisPts(usize)
 }
 
-pub(crate) fn insert_items(a2l_file: &mut A2lFile, debugdata: &DebugData, measurement_symbols: Vec<&str>, characteristic_symbols: Vec<&str>) {
+pub(crate) fn insert_items(
+    a2l_file: &mut A2lFile,
+    debugdata: &DebugData,
+    measurement_symbols: Vec<&str>,
+    characteristic_symbols: Vec<&str>
+) {
     let module = &mut a2l_file.project.module[0];
     let (name_map, sym_map) = build_maps(&module);
 
@@ -29,7 +34,13 @@ pub(crate) fn insert_items(a2l_file: &mut A2lFile, debugdata: &DebugData, measur
 
 
 // create a new MEASUREMENT for the given symbol
-fn insert_measurement(module: &mut Module, debugdata: &DebugData, measure_sym: &str, name_map: &HashMap<String, ItemType>, sym_map: &HashMap<String, ItemType>) {
+fn insert_measurement(
+    module: &mut Module,
+    debugdata: &DebugData,
+    measure_sym: &str,
+    name_map: &HashMap<String, ItemType>,
+    sym_map: &HashMap<String, ItemType>
+) {
     // get info about the symbol from the debug data
     let varinfo = if let Some(varinfo) = debugdata.variables.get(measure_sym) {
         varinfo
@@ -112,7 +123,13 @@ fn insert_measurement(module: &mut Module, debugdata: &DebugData, measure_sym: &
 
 
 // Add a new CHARACTERISTIC for the given symbol
-fn insert_characteristic(module: &mut Module, debugdata: &DebugData, characteristic_sym: &str, name_map: &HashMap<String, ItemType>, sym_map: &HashMap<String, ItemType>) {
+fn insert_characteristic(
+    module: &mut Module,
+    debugdata: &DebugData,
+    characteristic_sym: &str,
+    name_map: &HashMap<String, ItemType>,
+    sym_map: &HashMap<String, ItemType>
+) {
     let varinfo = if let Some(varinfo) = debugdata.variables.get(characteristic_sym) {
         varinfo
     } else {
