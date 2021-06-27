@@ -7,7 +7,9 @@ use a2lfile::A2lObject;
 mod ifdata;
 mod dwarf;
 mod update;
+mod insert;
 mod xcp;
+mod datatype;
 
 
 struct A2lLogger {
@@ -173,6 +175,23 @@ fn core() -> Result<(), String> {
         cond_print!(verbose, now, format!("   instance: {} updated, {} not found", summary.instance_updated, summary.instance_not_updated));
     }
 
+    // create new items
+    if arg_matches.is_present("INSERT_CHARACTERISTIC") || arg_matches.is_present("INSERT_MEASUREMENT") {
+        let measurement_symbols: Vec<&str> = if let Some(values) = arg_matches.values_of("INSERT_MEASUREMENT") {
+            values.into_iter().collect()
+        } else {
+            Vec::new()
+        };
+        let characteristic_symbols: Vec<&str> = if let Some(values) = arg_matches.values_of("INSERT_CHARACTERISTIC") {
+            values.into_iter().collect()
+        } else {
+            Vec::new()
+        };
+        
+        insert::insert_items(&mut a2l_file, &elf_info.as_ref().unwrap(), measurement_symbols, characteristic_symbols);
+    }
+
+
     // remove unknown IF_DATA
     if arg_matches.is_present("IFDATA_CLEANUP") {
         a2l_file.ifdata_cleanup();
@@ -310,6 +329,24 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .long("show-xcp")
         .takes_value(false)
         .multiple(false)
+    )
+    .arg(Arg::with_name("INSERT_CHARACTERISTIC")
+        .help("Insert a CHARACTERISTIC based on a variable in the elf file.\nThe variable name can be complex, e.g. var.element[0].subelement")
+        .long("insert-characteristic")
+        .takes_value(true)
+        .number_of_values(1)
+        .multiple(true)
+        .requires("ELFFILE")
+        .value_name("VAR")
+    )
+    .arg(Arg::with_name("INSERT_MEASUREMENT")
+        .help("Insert a MEASUREMENT based on a variable in the elf file.\nThe variable name can be complex, e.g. var.element[0].subelement")
+        .long("insert-measurement")
+        .takes_value(true)
+        .number_of_values(1)
+        .multiple(true)
+        .requires("ELFFILE")
+        .value_name("VAR")
     )
     .group(
         ArgGroup::with_name("UPDATE_GROUP")

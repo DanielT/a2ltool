@@ -29,12 +29,12 @@ pub(crate) fn update_module_axis_pts(module: &mut Module, debug_data: &DebugData
                         if dim.len() >= 1 {
                             axis_pts.max_axis_points = dim[0] as u16;
                         }
-                        if let TypeInfo::Enum{typename, ..} = &**arraytype {
+                        if let TypeInfo::Enum{typename, enumerators, ..} = &**arraytype {
                             // an array of enums? it could be done...
                             if axis_pts.conversion == "NO_COMPU_METHOD" {
                                 axis_pts.conversion = typename.to_owned();
                             }
-                            cond_create_enum_conversion(module, &axis_pts.conversion);
+                            cond_create_enum_conversion(module, &axis_pts.conversion, enumerators);
                             enum_convlist.insert(axis_pts.conversion.clone(), arraytype);
                         }
                     }

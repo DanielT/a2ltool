@@ -59,11 +59,11 @@ fn update_measurement_information<'enumlist, 'typeinfo : 'enumlist>(
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
     use_new_matrix_dim: bool
 ) {
-    if let TypeInfo::Enum{typename, ..} = typeinfo {
+    if let TypeInfo::Enum{typename, enumerators, ..} = typeinfo {
         if measurement.conversion == "NO_COMPU_METHOD" {
             measurement.conversion = typename.to_owned();
         }
-        cond_create_enum_conversion(module, &measurement.conversion);
+        cond_create_enum_conversion(module, &measurement.conversion, enumerators);
         enum_convlist.insert(measurement.conversion.clone(), typeinfo);
     }
 

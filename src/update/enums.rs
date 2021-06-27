@@ -3,7 +3,7 @@ use a2lfile::*;
 use crate::dwarf::TypeInfo;
 
 // create a COMPU_METHOD and a COMPU_VTAB for the typename of an enum
-pub(crate) fn cond_create_enum_conversion(module: &mut Module, typename: &str) {
+pub(crate) fn cond_create_enum_conversion(module: &mut Module, typename: &str, enumerators: &Vec<(String, i64)>) {
     let compu_method_find = module.compu_method.iter().find(|item| item.name == typename);
     if compu_method_find.is_none() {
         let mut new_compu_method = CompuMethod::new(
@@ -20,12 +20,18 @@ pub(crate) fn cond_create_enum_conversion(module: &mut Module, typename: &str) {
         let compu_vtab_range_find = module.compu_vtab_range.iter().find(|item| item.name == typename);
 
         if compu_vtab_find.is_none() && compu_vtab_range_find.is_none() {
-            module.compu_vtab.push(CompuVtab::new(
+            let mut new_compu_vtab = CompuVtab::new(
                 typename.to_string(),
                 format!("Conversion table for enum {}", typename),
                 ConversionType::TabVerb,
-                0 // will be updated by update_enum_compu_methods, which will also add the actual enum values
-            ));
+                enumerators.len() as u16
+            );
+            for (name, value) in enumerators {
+                new_compu_vtab.value_pairs.push(
+                    ValuePairsStruct::new(*value as f64, name.to_owned())
+                );
+            }
+            module.compu_vtab.push(new_compu_vtab);
         }
     }
 }

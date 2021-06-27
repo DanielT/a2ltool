@@ -64,11 +64,11 @@ fn update_characteristic_information<'enumlist, 'typeinfo : 'enumlist>(
 ) {
     let member_id = get_fnc_values_memberid(module, recordlayout_info, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
-        if let TypeInfo::Enum{typename, ..} = inner_typeinfo {
+        if let TypeInfo::Enum{typename, enumerators, ..} = inner_typeinfo {
             if characteristic.conversion == "NO_COMPU_METHOD" {
                 characteristic.conversion = typename.to_owned();
             }
-            cond_create_enum_conversion(module, &characteristic.conversion);
+            cond_create_enum_conversion(module, &characteristic.conversion, enumerators);
             enum_convlist.insert(characteristic.conversion.clone(), typeinfo);
         }
 
