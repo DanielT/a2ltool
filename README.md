@@ -11,7 +11,9 @@ A tool to edit, merge and update a2l files
 
 ## About a2l Files
 A2l files describe measurement variables and tunable parameters of an embedded device (typically: an automotive ECU).
+
 The consumer of the a2l file typically allows online calibraction over a protocol such as XCP and/or offline tuning by generating flashable parameter sets. There are several commercial tools for this purpose.
+
 The a2l file format is specified by ASAM and is formally called ASAM MCD-2 MC.
 
 ## Project Status
