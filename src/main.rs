@@ -1,4 +1,4 @@
-use clap::{App, Arg, ArgGroup, ArgMatches};
+use clap::{App, Arg, ArgGroup, ArgMatches, crate_version};
 
 use dwarf::load_debuginfo;
 use std::time::Instant;
@@ -84,7 +84,7 @@ fn core() -> Result<(), String> {
     let debugprint = arg_matches.is_present("DEBUGPRINT");
 
     let now = Instant::now();
-    cond_print!(verbose, now, format!("\na2ltool {} ({})\n", env!("VERGEN_BUILD_SEMVER"), env!("VERGEN_GIT_SHA_SHORT")));
+    cond_print!(verbose, now, format!("\na2ltool {}\n", crate_version!()));
 
     // load input
     let input_filename = arg_matches.value_of("INPUT").unwrap();
@@ -215,7 +215,7 @@ fn core() -> Result<(), String> {
     if arg_matches.is_present("OUTPUT") {
         a2l_file.sort_new_items();
         let out_filename = arg_matches.value_of("OUTPUT").unwrap();
-        let banner = &*format!("a2ltool {} ({})", env!("VERGEN_GIT_SEMVER"), env!("VERGEN_GIT_SHA_SHORT"));
+        let banner = &*format!("a2ltool {}", crate_version!());
         a2l_file.write(out_filename, Some(banner))?;
         cond_print!(verbose, now, format!("Output written to \"{}\"", out_filename));
     }
@@ -231,7 +231,7 @@ fn core() -> Result<(), String> {
 // fortunately clap makes this painless
 fn get_args<'a>() -> ArgMatches<'a> {
     App::new("a2ltool")
-    .version(&*format!("{} ({})", env!("VERGEN_GIT_SEMVER"), env!("VERGEN_GIT_SHA_SHORT")))
+    .version(crate_version!())
     .about("Reads, writes and modifies A2L files")
     .arg(Arg::with_name("INPUT")
         .help("Input A2L file")
