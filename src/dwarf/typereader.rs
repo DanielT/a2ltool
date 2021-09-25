@@ -157,7 +157,7 @@ fn get_type(
         }
         gimli::constants::DW_TAG_structure_type => {
             let size = get_byte_size_attribute(entry)?;
-            let typename = if let Some(name) = typedef_name {
+            /*let typename = if let Some(name) = typedef_name {
                 name
             } else {
                 if let Some(name_from_attr) = get_name_attribute(entry, dwarf) {
@@ -166,13 +166,13 @@ fn get_type(
                     let (unit, _) = &unit_list[current_unit];
                     format!("anonymous_struct_{}", entry.offset().to_debug_info_offset(unit).unwrap().0)
                 }
-            };
+            };*/
             let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, dwarf)?;
-            Some(TypeInfo::Struct {typename, size, members})
+            Some(TypeInfo::Struct {/*typename,*/ size, members})
         }
         gimli::constants::DW_TAG_class_type => {
             let size = get_byte_size_attribute(entry)?;
-            let typename = if let Some(name) = typedef_name {
+            /*let typename = if let Some(name) = typedef_name {
                 name
             } else {
                 if let Some(name_from_attr) = get_name_attribute(entry, dwarf) {
@@ -181,9 +181,9 @@ fn get_type(
                     let (unit, _) = &unit_list[current_unit];
                     format!("anonymous_class_{}", entry.offset().to_debug_info_offset(unit).unwrap().0)
                 }
-            };
+            };*/
             let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, dwarf)?;
-            Some(TypeInfo::Class {typename, size, members})
+            Some(TypeInfo::Class {/*typename,*/ size, members})
         }
         gimli::constants::DW_TAG_union_type => {
             let size = get_byte_size_attribute(entry)?;

@@ -12,16 +12,6 @@ mod xcp;
 mod datatype;
 
 
-struct A2lLogger {
-    log: Vec<String>
-}
-
-impl a2lfile::Logger for A2lLogger {
-    fn log_message(&mut self, msg: String) {
-        self.log.push(msg);
-    }
-}
-
 macro_rules! cond_print {
     ($verbose:ident, $now:ident, $formatexp:expr) => {
         if $verbose == 1 {
@@ -87,14 +77,14 @@ fn core() -> Result<(), String> {
     cond_print!(verbose, now, format!("\na2ltool {}\n", crate_version!()));
 
     // load input
-    let input_filename = arg_matches.value_of("INPUT").unwrap();
-    let mut logger = A2lLogger { log: Vec::new() };
-    let a2lresult = a2lfile::load(input_filename, Some(ifdata::A2MLVECTOR_TEXT.to_string()), &mut logger, strict);
-    for msg in logger.log {
+    let input_filename = arg_matches.value_of_os("INPUT").unwrap();
+    let mut log_msgs = Vec::<String>::new();
+    let a2lresult = a2lfile::load(input_filename, Some(ifdata::A2MLVECTOR_TEXT.to_string()), &mut log_msgs, strict);
+    for msg in log_msgs {
         cond_print!(verbose, now, format!("{}\n", msg));
     }
     let mut a2l_file = a2lresult?;
-    cond_print!(verbose, now, format!("Input \"{}\" loaded", input_filename));
+    cond_print!(verbose, now, format!("Input \"{}\" loaded", input_filename.to_string_lossy()));
     if debugprint {
         // why not cond_print? in that case the output string must always be
         // formatted before cond_print can decide whether to print it. This can take longer than parsing the file.
@@ -108,24 +98,24 @@ fn core() -> Result<(), String> {
 
     // additional consistency checks
     if arg_matches.is_present("CHECK") {
-        cond_print!(verbose, now, format!("Performing consistency check for {}.", input_filename));
-        let mut logger = A2lLogger { log: Vec::new() };
-        a2l_file.check(&mut logger);
-        if logger.log.len() == 0 {
+        cond_print!(verbose, now, format!("Performing consistency check for {}.", input_filename.to_string_lossy()));
+        let mut log_msgs = Vec::<String>::new();
+        a2l_file.check(&mut log_msgs);
+        if log_msgs.len() == 0 {
             ext_println!(verbose, now, format!("Consistency check complete. No problems found."));
         } else {
-            for  msg in &logger.log {
+            for  msg in &log_msgs {
                 ext_println!(verbose, now, format!("    {}", msg));
             }
-            ext_println!(verbose, now, format!("Consistency check complete. {} problems reported.", logger.log.len()));
+            ext_println!(verbose, now, format!("Consistency check complete. {} problems reported.", log_msgs.len()));
         }
     }
 
     // load elf
     let elf_info = if arg_matches.is_present("ELFFILE") {
-        let elffile = arg_matches.value_of("ELFFILE").unwrap();
+        let elffile = arg_matches.value_of_os("ELFFILE").unwrap();
         let elf_info = load_debuginfo(elffile)?;
-        cond_print!(verbose, now, format!("Variables and types loaded from \"{}\": {} variables available", elffile, elf_info.variables.len()));
+        cond_print!(verbose, now, format!("Variables and types loaded from \"{}\": {} variables available", elffile.to_string_lossy(), elf_info.variables.len()));
         if debugprint {
             println!("================\n{:#?}\n================\n", elf_info);
         }
@@ -135,24 +125,24 @@ fn core() -> Result<(), String> {
     };
 
     // merge at the module level
-    if let Some(merge_modules) = arg_matches.values_of("MERGEMODULE") {
+    if let Some(merge_modules) = arg_matches.values_of_os("MERGEMODULE") {
         for mergemodule in merge_modules {
-            let mut merge_logger = A2lLogger { log: Vec::new() };
-            let mut merge_a2l= a2lfile::load(mergemodule, None, &mut merge_logger, strict)?;
+            let mut merge_log_msgs = Vec::<String>::new();
+            let mut merge_a2l= a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict)?;
             
             a2l_file.merge_modules(&mut merge_a2l);
-            cond_print!(verbose, now, format!("Merged A2l objects from \"{}\"\n", mergemodule));
+            cond_print!(verbose, now, format!("Merged A2l objects from \"{}\"\n", mergemodule.to_string_lossy()));
         }
     }
 
     // merge at the project level
-    if let Some(merge_projects) = arg_matches.values_of("MERGEPROJECT") {
+    if let Some(merge_projects) = arg_matches.values_of_os("MERGEPROJECT") {
         for mergeproject in merge_projects {
-            let mut merge_logger = A2lLogger { log: Vec::new() };
-            let merge_a2l= a2lfile::load(mergeproject, None, &mut merge_logger, strict)?;
+            let mut merge_log_msgs = Vec::<String>::new();
+            let merge_a2l= a2lfile::load(mergeproject, None, &mut merge_log_msgs, strict)?;
     
             a2l_file.project.module.extend(merge_a2l.project.module);
-            cond_print!(verbose, now, format!("Project level merge with \"{}\". There are now {} modules.\n", mergeproject, a2l_file.project.module.len()));
+            cond_print!(verbose, now, format!("Project level merge with \"{}\". There are now {} modules.\n", mergeproject.to_string_lossy(), a2l_file.project.module.len()));
         }
     }
 

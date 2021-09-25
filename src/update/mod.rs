@@ -236,6 +236,7 @@ fn find_membertype<'a>(
         Some((address, typeinfo))
     } else {
         match typeinfo {
+            TypeInfo::Class { members, .. } |
             TypeInfo::Struct { members, .. } |
             TypeInfo::Union { members, .. } => {
                 if let Some((membertype, offset)) = members.get(components[component_index]) {

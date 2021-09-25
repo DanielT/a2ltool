@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::{collections::HashMap, fs::File};
 use object::Object;
 use object::read::ObjectSection;
@@ -41,12 +42,12 @@ pub(crate) enum TypeInfo {
     Pointer(u64),
     Other(u64),
     Struct {
-        typename: String,
+        // typename: String,
         size: u64,
         members: HashMap<String, (TypeInfo, u64)>
     },
     Class {
-        typename: String,
+        // typename: String,
         size: u64,
         members: HashMap<String, (TypeInfo, u64)>
     },
@@ -79,9 +80,9 @@ pub(crate) struct DebugData {
 
 
 // load the debug info from an elf file
-pub(crate) fn load_debuginfo(filename: &str) -> Result<DebugData, String> {
+pub(crate) fn load_debuginfo(filename: &OsStr) -> Result<DebugData, String> {
     let filedata = load_filedata(filename)?;
-    let elffile = load_elf_file(filename, &*filedata)?;
+    let elffile = load_elf_file(&filename.to_string_lossy(), &*filedata)?;
     let dwarf = load_dwarf(&elffile)?;
 
     Ok(read_debug_info_entries(&dwarf))
@@ -89,16 +90,16 @@ pub(crate) fn load_debuginfo(filename: &str) -> Result<DebugData, String> {
 
 
 // open a file and mmap its content
-fn load_filedata(filename: &str) -> Result<memmap::Mmap, String> {
+fn load_filedata(filename: &OsStr) -> Result<memmap::Mmap, String> {
     let file = match File::open(filename) {
         Ok(file) => file,
-        Err(error) => return Err(format!("Error: could not open file {}: {}", filename, error))
+        Err(error) => return Err(format!("Error: could not open file {}: {}", filename.to_string_lossy(), error))
     };
 
     match unsafe { memmap::Mmap::map(&file) } {
         Ok(mmap) => Ok(mmap),
         Err(err) => {
-            return Err(format!("Error: Failed to map file '{}': {}", filename, err));
+            return Err(format!("Error: Failed to map file '{}': {}", filename.to_string_lossy(), err));
         }
     }
 }

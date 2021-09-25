@@ -1,11 +1,13 @@
+use std::ffi::OsStr;
+
 use crate::ifdata::*;
 use a2lfile::*;
 
 
-pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &str) {
+pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
     let multi_module = a2l_file.project.module.len() > 1;
 
-    println!("XCP settings in {}:", filename);
+    println!("XCP settings in {}:", filename.to_string_lossy());
 
     for module in &a2l_file.project.module {
         if multi_module {
