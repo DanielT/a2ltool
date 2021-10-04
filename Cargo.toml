@@ -9,8 +9,8 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 a2lfile = "0.9.0"
-object = "~0.23"
-gimli = "~0.23"
+object = "~0.26"
+gimli = "~0.25"
 memmap = "~0.7"
 clap = "~2.33.0"
-cpp_demangle = "0.3.2"
+cpp_demangle = "0.3.3"

@@ -125,8 +125,7 @@ fn load_dwarf<'data>(
 ) -> Result<gimli::Dwarf<SliceType<'data>>, String> {
     // Dwarf::load takes two closures / functions and uses them to load all the required debug sections
     let loader = |section: gimli::SectionId| { get_file_section_reader(elffile, section.name()) };
-    let sup_loader = |section: gimli::SectionId| { get_sup_file_section_reader(elffile, section.name()) };
-    gimli::Dwarf::load(loader, sup_loader)
+    gimli::Dwarf::load(loader)
 }
 
 
@@ -144,16 +143,6 @@ fn get_file_section_reader<'data>(
     } else {
         Ok(EndianSlice::new(&[], get_endian(elffile)))
     }
-}
-
-
-// required by Dwarf::load: get a section from a supplementary file.
-// Supplementary files are not supported, so the function always returns an empty slice
-fn get_sup_file_section_reader<'data>(
-    elffile: &object::read::File<'data>,
-    _section_name: &str
-) -> Result<SliceType<'data>, String> {
-    Ok(EndianSlice::new(&[], get_endian(elffile)))
 }
 
 
