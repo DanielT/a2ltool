@@ -81,7 +81,7 @@ fn core() -> Result<(), String> {
     let mut log_msgs = Vec::<String>::new();
     let a2lresult = a2lfile::load(input_filename, Some(ifdata::A2MLVECTOR_TEXT.to_string()), &mut log_msgs, strict);
     for msg in log_msgs {
-        cond_print!(verbose, now, format!("{}\n", msg));
+        cond_print!(verbose, now, msg);
     }
     let mut a2l_file = a2lresult?;
     cond_print!(verbose, now, format!("Input \"{}\" loaded", input_filename.to_string_lossy()));
