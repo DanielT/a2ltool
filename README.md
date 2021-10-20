@@ -17,4 +17,5 @@ The consumer of the a2l file typically allows online calibraction over a protoco
 The a2l file format is specified by ASAM and is formally called ASAM MCD-2 MC.
 
 ## Project Status
-All planned features are implemented; once the tool has had more use and testing it will be called version 1.0
+The Project appears to be done: all planned features are implemented and there are no known bugs.
+

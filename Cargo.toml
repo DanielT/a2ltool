@@ -1,6 +1,6 @@
 [package]
 name = "a2ltool"
-version = "0.9.2"
+version = "1.0.0"
 authors = ["Daniel Thaler <daniel@dthaler.de>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -8,8 +8,8 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-a2lfile = "0.9.1"
-object = "~0.26"
+a2lfile = "1.0.0"
+object = "~0.27"
 gimli = "~0.25"
 memmap = "~0.7"
 clap = "~2.33.0"
