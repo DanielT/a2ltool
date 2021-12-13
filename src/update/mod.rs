@@ -204,7 +204,7 @@ fn get_symbol_name_from_ifdata(ifdata_vec: &Vec<IfData>) -> Option<String> {
 
 
 // find a symbol in the elf_info data structure that was derived from the DWARF debug info in the elf file
-fn find_symbol<'a>(varname: &str, debug_data: &'a DebugData) -> Option<(u64, &'a TypeInfo)> {
+pub(crate) fn find_symbol<'a>(varname: &str, debug_data: &'a DebugData) -> Option<(u64, &'a TypeInfo)> {
     // split the a2l symbol name: e.g. "motortune.param._0_" -> ["motortune", "param", "_0_"]
     let components = split_symbol_components(varname);
 

@@ -42,19 +42,12 @@ fn insert_measurement(
     sym_map: &HashMap<String, ItemType>
 ) {
     // get info about the symbol from the debug data
-    let varinfo = if let Some(varinfo) = debugdata.variables.get(measure_sym) {
-        varinfo
-    } else {
+    let findresult = crate::update::find_symbol(measure_sym, debugdata);
+    if findresult.is_none() {
         println!("Symbol {} was not found in the elf file. It cannot be added.", measure_sym);
         return;
-    };
-
-    let typeinfo = if let Some(typeinfo) = debugdata.types.get(&varinfo.typeref) {
-        typeinfo
-    } else {
-        println!("Symbol {} exists in the elf file, but the associated type info could not be loaded. It cannot be added.", measure_sym);
-        return;
-    };
+    }
+    let (address, typeinfo) = findresult.unwrap();
 
     // Abort if a MEASUREMENT for this symbol already exists. Warn if any other reference to the symbol exists
     let item_name = match sym_map.get(measure_sym) {
@@ -108,7 +101,7 @@ fn insert_measurement(
         upper_limit
     );
     // The measurement stores the address in the optional ECU_ADDRESS element
-    let mut ecu_address = EcuAddress::new(varinfo.address as u32);
+    let mut ecu_address = EcuAddress::new(address as u32);
     // enable hex mode for the ecu address
     ecu_address.get_layout_mut().item_location.0.1 = true;
     new_measurement.ecu_address = Some(ecu_address);    
@@ -130,19 +123,12 @@ fn insert_characteristic(
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, ItemType>
 ) {
-    let varinfo = if let Some(varinfo) = debugdata.variables.get(characteristic_sym) {
-        varinfo
-    } else {
+    let findresult = crate::update::find_symbol(characteristic_sym, debugdata);
+    if findresult.is_none() {
         println!("Symbol {} was not found in the elf file. It cannot be added.", characteristic_sym);
         return;
-    };
-
-    let typeinfo = if let Some(typeinfo) = debugdata.types.get(&varinfo.typeref) {
-        typeinfo
-    } else {
-        println!("Symbol {} exists in the elf file, but the associated type info could not be loaded. It cannot be added.", characteristic_sym);
-        return;
-    };
+    }
+    let (address, typeinfo) = findresult.unwrap();
 
     let item_name = match sym_map.get(characteristic_sym) {
         Some(ItemType::Characteristic(idx)) => {
@@ -199,9 +185,9 @@ fn insert_characteristic(
                 item_name,
                 format!("characterisitic for {}", characteristic_sym),
                 CharacteristicType::ValBlk,
-                varinfo.address as u32,
+                address as u32,
                 recordlayout_name.to_owned(),
-                f64::MAX,
+                0f64,
                 "NO_COMPU_METHOD".to_string(),
                 lower_limit,
                 upper_limit
@@ -223,9 +209,9 @@ fn insert_characteristic(
                 item_name,
                 format!("characterisitic for {}", characteristic_sym),
                 CharacteristicType::Value,
-                varinfo.address as u32,
+                address as u32,
                 recordlayout_name.to_owned(),
-                f64::MAX,
+                0f64,
                 typename.to_string(),
                 lower_limit,
                 upper_limit
@@ -236,11 +222,11 @@ fn insert_characteristic(
             let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
             Characteristic::new(
                 item_name,
-                format!("characterisitic for {}", characteristic_sym),
+                format!("characteristic for {}", characteristic_sym),
                 CharacteristicType::Value,
-                varinfo.address as u32,
+                address as u32,
                 recordlayout_name.to_owned(),
-                f64::MAX,
+                0f64,
                 "NO_COMPU_METHOD".to_string(),
                 lower_limit,
                 upper_limit
