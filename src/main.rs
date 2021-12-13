@@ -1,7 +1,7 @@
 use clap::{App, Arg, ArgGroup, ArgMatches, crate_version};
 
 use dwarf::load_debuginfo;
-use std::time::Instant;
+use std::{time::Instant, ffi::OsStr};
 use a2lfile::A2lObject;
 
 mod ifdata;
@@ -77,14 +77,7 @@ fn core() -> Result<(), String> {
     cond_print!(verbose, now, format!("\na2ltool {}\n", crate_version!()));
 
     // load input
-    let input_filename = arg_matches.value_of_os("INPUT").unwrap();
-    let mut log_msgs = Vec::<String>::new();
-    let a2lresult = a2lfile::load(input_filename, Some(ifdata::A2MLVECTOR_TEXT.to_string()), &mut log_msgs, strict);
-    for msg in log_msgs {
-        cond_print!(verbose, now, msg);
-    }
-    let mut a2l_file = a2lresult?;
-    cond_print!(verbose, now, format!("Input \"{}\" loaded", input_filename.to_string_lossy()));
+    let (input_filename, mut a2l_file) = load_or_create_a2l(&arg_matches, strict, verbose, now)?;
     if debugprint {
         // why not cond_print? in that case the output string must always be
         // formatted before cond_print can decide whether to print it. This can take longer than parsing the file.
@@ -216,6 +209,35 @@ fn core() -> Result<(), String> {
     Ok(())
 }
 
+// load or create an a2l file, depending on the command line
+// return the file name (a dummy value if it is created) as well as the a2l data
+fn load_or_create_a2l<'a>(arg_matches: &'a ArgMatches<'a>, strict: bool, verbose: u64, now: Instant) -> Result<(&'a std::ffi::OsStr, a2lfile::A2lFile), String> {
+    if let Some(input_filename) = arg_matches.value_of_os("INPUT")
+    {
+        let mut log_msgs = Vec::<String>::new();
+        let a2lresult = a2lfile::load(input_filename, Some(ifdata::A2MLVECTOR_TEXT.to_string()), &mut log_msgs, strict);
+        for msg in log_msgs {
+            cond_print!(verbose, now, msg);
+        }
+        let a2l_file = a2lresult?;
+        cond_print!(verbose, now, format!("Input \"{}\" loaded", input_filename.to_string_lossy()));
+        Ok((input_filename, a2l_file))
+    } else if arg_matches.is_present("CREATE") {
+        // dummy file name
+        let input_filename = OsStr::new("<newly created>");
+        // a minimal a2l file needs only a PROJECT containing a MODULE
+        let mut project = a2lfile::Project::new("new_project".to_string(), "description of project".to_string());
+        project.module = vec![a2lfile::Module::new("new_module".to_string(), "".to_string())];
+        let mut a2l_file = a2lfile::A2lFile::new(project);
+        // also set ASAP2_VERSION 1.71
+        a2l_file.asap2_version = Some(a2lfile::Asap2Version::new(1, 71));
+        Ok((input_filename, a2l_file))
+    } else {
+        // shouldn't be able to get here, the clap config requires either INPUT or CREATE
+        Err("impossible: no input filename and no --create".to_string())
+    }
+}
+
 
 // set up the entire command line handling.
 // fortunately clap makes this painless
@@ -225,9 +247,18 @@ fn get_args<'a>() -> ArgMatches<'a> {
     .about("Reads, writes and modifies A2L files")
     .arg(Arg::with_name("INPUT")
         .help("Input A2L file")
-        .required(true)
         .index(1)
     )
+    .arg(Arg::with_name("CREATE")
+        .help("Create a new A2L file instead of loading an existing one")
+        .long("create")
+    )
+    .group(
+        ArgGroup::with_name("INPUT_GROUP")
+            .args(&["INPUT", "CREATE"])
+            .multiple(false)
+            .required(true)
+        )
     .arg(Arg::with_name("ELFFILE")
         .help("Elf file containing symbols and address information")
         .short("e")
