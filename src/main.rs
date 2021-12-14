@@ -107,7 +107,7 @@ fn core() -> Result<(), String> {
     // load elf
     let elf_info = if arg_matches.is_present("ELFFILE") {
         let elffile = arg_matches.value_of_os("ELFFILE").unwrap();
-        let elf_info = load_debuginfo(elffile)?;
+        let elf_info = load_debuginfo(elffile, verbose > 0)?;
         cond_print!(verbose, now, format!("Variables and types loaded from \"{}\": {} variables available", elffile.to_string_lossy(), elf_info.variables.len()));
         if debugprint {
             println!("================\n{:#?}\n================\n", elf_info);

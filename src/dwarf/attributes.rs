@@ -21,8 +21,10 @@ pub(crate) fn get_attr_value<'abbrev, 'unit>(
 pub(crate) fn get_name_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
     dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>
-) -> Option<String> {
-    let name_attr = get_attr_value(&entry, gimli::constants::DW_AT_name)?;
+) -> Result<String, String> {
+    let name_attr =
+        get_attr_value(&entry, gimli::constants::DW_AT_name)
+            .ok_or_else(|| "failed to get name attribute".to_string() )?;
     match name_attr {
         gimli::AttributeValue::String(slice) => {
             // try to demangle a c++ symbol
@@ -33,31 +35,39 @@ pub(crate) fn get_name_attribute(
             // attribute. The names are still mangled though and should be demangled.
             if let Ok(sym) = cpp_demangle::Symbol::new(&*slice) {
                 if let Ok(demangled) = sym.demangle(&cpp_demangle::DemangleOptions::default()) {
-                    return Some(demangled);
+                    return Ok(demangled);
                 }
             }
             if let Ok(utf8string) = slice.to_string() {
                 // could not demangle, but successfully converted the slice to utf8
-                return Some(utf8string.to_owned());
+                return Ok(utf8string.to_owned());
             }
+            Err(format!("could not decode {:#?} as a utf-8 string", slice))
         }
         gimli::AttributeValue::DebugStrRef(str_offset) => {
-            if let Ok(slice) = dwarf.debug_str.get_str(str_offset) {
-                // try to demangle a c++ symbol
-                if let Ok(sym) = cpp_demangle::Symbol::new(&*slice) {
-                    if let Ok(demangled) = sym.demangle(&cpp_demangle::DemangleOptions::default()) {
-                        return Some(demangled);
+            match dwarf.debug_str.get_str(str_offset) {
+                Ok(slice) => {
+                    // try to demangle a c++ symbol
+                    if let Ok(sym) = cpp_demangle::Symbol::new(&*slice) {
+                        if let Ok(demangled) = sym.demangle(&cpp_demangle::DemangleOptions::default()) {
+                            return Ok(demangled);
+                        }
                     }
+                    if let Ok(utf8string) = slice.to_string() {
+                        // could not demangle, but successfully converted the slice to utf8
+                        return Ok(utf8string.to_owned());
+                    }
+                    Err(format!("could not decode {:#?} as a utf-8 string", slice))
                 }
-                if let Ok(utf8string) = slice.to_string() {
-                    // could not demangle, but successfully converted the slice to utf8
-                    return Some(utf8string.to_owned());
+                Err(err) => {
+                    Err(err.to_string())
                 }
             }
         }
-        _ => {}
+        _ => {
+            Err(format!("invalid name attribute type {:#?}", name_attr))
+        }
     }
-    None
 }
 
 
@@ -66,24 +76,26 @@ pub(crate) fn get_name_attribute(
 pub(crate) fn get_typeref_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
     unit: &UnitHeader<SliceType>
-) -> Option<usize> {
-    let type_attr = get_attr_value(entry, gimli::constants::DW_AT_type)?;
+) -> Result<usize, String> {
+    let type_attr =
+        get_attr_value(entry, gimli::constants::DW_AT_type)
+            .ok_or_else(|| "failed to get type reference attribute".to_string() )?;
     match type_attr {
         gimli::AttributeValue::UnitRef(unitoffset) => {
-            Some(unitoffset.to_debug_info_offset(unit).unwrap().0)
+            Ok(unitoffset.to_debug_info_offset(unit).unwrap().0)
         }
         gimli::AttributeValue::DebugInfoRef(infooffset) => {
-            Some(infooffset.0)
+            Ok(infooffset.0)
         }
-        gimli::AttributeValue::DebugTypesRef(_) => {
+        gimli::AttributeValue::DebugTypesRef(_typesig) => {
             // .debug_types was added in DWARF v4 and removed again in v5.
             // silently ignore references to the .debug_types section
             // this is unlikely to matter as few compilers ever bothered with .debug_types
             // (for example gcc supports this, but support is only enabled if the user requests this explicitly)
-            None
+            Err("unsupported referene to a .debug_types entry (Dwarf 4)".to_string())
         }
         _ => {
-            None
+            Err(format!("unsupported type reference: {:#?}", type_attr))
         }
     }
 }
@@ -233,6 +245,27 @@ pub(crate) fn get_specification_attribute<'data, 'abbrev, 'unit, 'b>(
 }
 
 
+pub(crate) fn get_abstract_origin_attribute<'data, 'abbrev, 'unit, 'b>(
+    entry: &'data DebuggingInformationEntry<SliceType, usize>,
+    unit: &'unit UnitHeader<EndianSlice<'data, RunTimeEndian>>,
+    abbrev: &'abbrev gimli::Abbreviations
+) -> Option<DebuggingInformationEntry<'abbrev, 'unit, EndianSlice<'data, RunTimeEndian>, usize>> {
+    let origin_attr = get_attr_value(entry, gimli::constants::DW_AT_abstract_origin)?;
+    match origin_attr {
+        gimli::AttributeValue::UnitRef(unitoffset) => {
+            if let Ok(origin_entry) = unit.entry(&abbrev, unitoffset) {
+                Some(origin_entry)
+            } else {
+                None
+            }
+        }
+        _ => {
+            None
+        }
+    }
+}
+
+
 // evaluate an exprloc expression to get a variable address or struct member offset
 fn evaluate_exprloc(
     expression: gimli::Expression<EndianSlice<RunTimeEndian>>,
@@ -280,31 +313,24 @@ pub(crate) fn get_entries_tree_from_attribute<'input, 'b>(
     entry: &DebuggingInformationEntry<SliceType, usize>,
     unit_list: &'b UnitList<'input>,
     current_unit: usize
-) -> Option<(usize, gimli::EntriesTree<'b, 'b, EndianSlice<'input, RunTimeEndian>>)> {
-    let type_attr = get_attr_value(&entry, gimli::constants::DW_AT_type)?;
-
-    match type_attr {
-        gimli::AttributeValue::DebugInfoRef(dbginfo_offset) => {
+) -> Result<(usize, gimli::EntriesTree<'b, 'b, EndianSlice<'input, RunTimeEndian>>), String> {
+    match get_attr_value(&entry, gimli::constants::DW_AT_type) {
+        Some(gimli::AttributeValue::DebugInfoRef(dbginfo_offset)) => {
             if let Some(unit_idx) = unit_list.get_unit(dbginfo_offset.0) {
                 let (unit, abbrev) = &unit_list[unit_idx];
                 let unit_offset = dbginfo_offset.to_unit_offset(unit).unwrap();
                 if let Ok(entries_tree) = unit.entries_tree(&abbrev, Some(unit_offset)) {
-                    Some((current_unit, entries_tree))
-                } else {
-                    None
+                    return Ok((current_unit, entries_tree))
                 }
-            } else {
-                None
             }
         }
-        gimli::AttributeValue::UnitRef(unit_offset) => {
+        Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
             let (unit, abbrev) = &unit_list[current_unit];
             if let Ok(entries_tree) = unit.entries_tree(&abbrev, Some(unit_offset)) {
-                Some((current_unit, entries_tree))
-            } else {
-                None
+                return Ok((current_unit, entries_tree))
             }
         }
-        _ => None
+        _ => {}
     }
+    Err("failed to get DIE tree".to_string())
 }
