@@ -80,12 +80,12 @@ pub(crate) struct DebugData {
 
 
 // load the debug info from an elf file
-pub(crate) fn load_debuginfo(filename: &OsStr) -> Result<DebugData, String> {
+pub(crate) fn load_debuginfo(filename: &OsStr, verbose: bool) -> Result<DebugData, String> {
     let filedata = load_filedata(filename)?;
     let elffile = load_elf_file(&filename.to_string_lossy(), &*filedata)?;
     let dwarf = load_dwarf(&elffile)?;
 
-    Ok(read_debug_info_entries(&dwarf))
+    Ok(read_debug_info_entries(&dwarf, verbose))
 }
 
 
@@ -157,9 +157,9 @@ fn get_endian(elffile: &object::read::File) -> RunTimeEndian {
 
 
 // read the debug information entries in the DWAF data to get all the global variables and their types
-fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>) -> DebugData {
-    let (variables, units) = load_variables(dwarf);
-    let types = load_types(&variables, units, dwarf);
+fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>, verbose: bool) -> DebugData {
+    let (variables, units) = load_variables(dwarf, verbose);
+    let types = load_types(&variables, units, dwarf, verbose);
 
     DebugData {
         variables,
@@ -170,7 +170,8 @@ fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>) -> DebugData {
 
 // load all global variables from the dwarf data
 fn load_variables<'a>(
-    dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>
+    dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>,
+    verbose: bool
 ) -> (HashMap<String, VarInfo>, UnitList<'a>) {
     let mut variables = HashMap::<String, VarInfo>::new();
     let mut unit_list = UnitList::new();
@@ -186,13 +187,19 @@ fn load_variables<'a>(
         let mut entries_cursor = unit.entries(&abbreviations);
         while let Ok(Some((_depth_delta, entry))) = entries_cursor.next_dfs() {
             if entry.tag() == gimli::constants::DW_TAG_variable {
-                if let Some((name, typeref, address)) = get_global_variable(
-                    entry,
-                    &unit,
-                    &abbreviations,
-                    dwarf
-                ) {
-                    variables.insert(name, VarInfo{address, typeref});
+                match get_global_variable(entry, &unit, &abbreviations, dwarf) {
+                    Ok(Some((name, typeref, address))) => {
+                        variables.insert(name, VarInfo{address, typeref});
+                    }
+                    Ok(None) => {
+                        // unremarkable, the variable is not a global variable
+                    }
+                    Err(errmsg) => {
+                        if verbose {
+                            let offset = entry.offset().to_debug_info_offset(&unit).unwrap_or(gimli::DebugInfoOffset(0)).0;
+                            println!("Error loading variable @{:x}: {}", offset, errmsg);
+                        }
+                    }
                 }
             }
         }
@@ -211,20 +218,37 @@ fn get_global_variable(
     unit: &UnitHeader<SliceType>,
     abbrev: &gimli::Abbreviations,
     dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>
-) -> Option<(String, usize, u64)> {
-    let address = get_location_attribute(entry, unit.encoding())?;
-    if let Some(specification_entry) = get_specification_attribute(entry, unit, abbrev) {
-        // the entry refers to a specification, which contains the name and type reference
-        let name = get_name_attribute(&specification_entry, dwarf)?;
-        let typeref = get_typeref_attribute(&specification_entry, &unit)?;
+) -> Result<Option<(String, usize, u64)>, String> {
+    match get_location_attribute(entry, unit.encoding()) {
+        Some(address) => {
+            // if debugging information entry A has a DW_AT_specification or DW_AT_abstract_origin attribute
+            // pointing to another debugging information entry B, any attributes of B are considered to be part of A.
+            if let Some(specification_entry) = get_specification_attribute(entry, unit, abbrev) {
+                // the entry refers to a specification, which contains the name and type reference
+                let name = get_name_attribute(&specification_entry, dwarf)?;
+                let typeref = get_typeref_attribute(&specification_entry, &unit)?;
 
-        Some((name, typeref, address))
-    } else {
-        // there is no specification and all info is part of this entry
-        let name = get_name_attribute(entry, dwarf)?;
-        let typeref = get_typeref_attribute(entry, &unit)?;
+                Ok(Some( (name, typeref, address) ))
+            } else if let Some(abstract_origin_entry) = get_abstract_origin_attribute(entry, unit, abbrev) {
+                // the entry refers to an abstract origin, which should also be considered when getting the name and type ref
+                let name = get_name_attribute(entry, dwarf)
+                    .or_else(|_| get_name_attribute(&abstract_origin_entry, dwarf))?;
+                let typeref = get_typeref_attribute(entry, &unit)
+                    .or_else(|_| get_typeref_attribute(&abstract_origin_entry, &unit))?;
 
-        Some((name, typeref, address))
+                Ok(Some( (name, typeref, address) ))
+            } else {
+                // usual case: there is no specification or abstract origin and all info is part of this entry
+                let name = get_name_attribute(entry, dwarf)?;
+                let typeref = get_typeref_attribute(entry, &unit)?;
+
+                Ok(Some( (name, typeref, address) ))
+            }
+        }
+        None => {
+            // it's a local variable, no error
+            Ok(None)
+        }
     }
 }
 
