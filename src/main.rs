@@ -10,6 +10,7 @@ mod update;
 mod insert;
 mod xcp;
 mod datatype;
+mod symbol;
 
 
 macro_rules! cond_print {
@@ -148,7 +149,12 @@ fn core() -> Result<(), String> {
     // update addresses
     if arg_matches.is_present("UPDATE") || arg_matches.is_present("SAFE_UPDATE") {
         let preserve_unknown = arg_matches.is_present("SAFE_UPDATE");
-        let summary = update::update_addresses(&mut a2l_file, &elf_info.as_ref().unwrap(), preserve_unknown);
+        let mut log_msgs = Vec::<String>::new();
+        let summary = update::update_addresses(&mut a2l_file, &elf_info.as_ref().unwrap(), &mut log_msgs, preserve_unknown);
+
+        for msg in log_msgs {
+            cond_print!(verbose, now, msg);
+        }
 
         cond_print!(verbose, now, format!("Address update done\nSummary:"));
         cond_print!(verbose, now, format!("   characteristic: {} updated, {} not found", summary.characteristic_updated, summary.characteristic_not_updated));

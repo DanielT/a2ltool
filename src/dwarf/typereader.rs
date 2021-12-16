@@ -53,49 +53,7 @@ fn get_type(
     let entry = entries_tree.entry();
     match entry.tag() {
         gimli::constants::DW_TAG_base_type => {
-            let byte_size = get_byte_size_attribute(entry).unwrap_or(1u64);
-            let encoding = get_encoding_attribute(entry).unwrap_or(gimli::constants::DW_ATE_unsigned);
-            Ok(match encoding {
-                gimli::constants::DW_ATE_address => {
-                    let (unit, _) = &unit_list[current_unit];
-                    TypeInfo::Pointer(unit.encoding().address_size as u64)
-                }
-                gimli::constants::DW_ATE_float => {
-                    if byte_size == 8 {
-                        TypeInfo::Double
-                    } else {
-                        TypeInfo::Float
-                    }
-                }
-                gimli::constants::DW_ATE_signed |
-                gimli::constants::DW_ATE_signed_char => {
-                    match byte_size {
-                        1 => TypeInfo::Sint8,
-                        2 => TypeInfo::Sint16,
-                        4 => TypeInfo::Sint32,
-                        8 => TypeInfo::Sint64,
-                        val => {
-                            return Err(format!("error loading data type: signed int of size {}", val));
-                        }
-                    }
-                }
-                gimli::constants::DW_ATE_boolean |
-                gimli::constants::DW_ATE_unsigned |
-                gimli::constants::DW_ATE_unsigned_char => {
-                    match byte_size {
-                        1 => TypeInfo::Uint8,
-                        2 => TypeInfo::Uint16,
-                        4 => TypeInfo::Uint32,
-                        8 => TypeInfo::Uint64,
-                        val => {
-                            return Err(format!("error loading data type: unsigned int of size {}", val));
-                        }
-                    }
-                }
-                _other => {
-                    TypeInfo::Other(byte_size)
-                }
-            })
+            get_base_type(entry, &unit_list[current_unit].0)
         }
         gimli::constants::DW_TAG_pointer_type => {
             let (unit, _) = &unit_list[current_unit];
@@ -207,6 +165,55 @@ fn get_type(
             Err(format!("unexpected DWARF tag {} in type definition", other_tag))
         }
     }
+}
+
+
+fn get_base_type(
+    entry: &gimli::DebuggingInformationEntry<EndianSlice<RunTimeEndian>, usize>,
+    unit: &gimli::UnitHeader<EndianSlice<RunTimeEndian>>
+) -> Result<TypeInfo, String> {
+    let byte_size = get_byte_size_attribute(entry).unwrap_or(1u64);
+    let encoding = get_encoding_attribute(entry).unwrap_or(gimli::constants::DW_ATE_unsigned);
+    Ok(match encoding {
+        gimli::constants::DW_ATE_address => {
+            TypeInfo::Pointer(unit.encoding().address_size as u64)
+        }
+        gimli::constants::DW_ATE_float => {
+            if byte_size == 8 {
+                TypeInfo::Double
+            } else {
+                TypeInfo::Float
+            }
+        }
+        gimli::constants::DW_ATE_signed |
+        gimli::constants::DW_ATE_signed_char => {
+            match byte_size {
+                1 => TypeInfo::Sint8,
+                2 => TypeInfo::Sint16,
+                4 => TypeInfo::Sint32,
+                8 => TypeInfo::Sint64,
+                val => {
+                    return Err(format!("error loading data type: signed int of size {}", val));
+                }
+            }
+        }
+        gimli::constants::DW_ATE_boolean |
+        gimli::constants::DW_ATE_unsigned |
+        gimli::constants::DW_ATE_unsigned_char => {
+            match byte_size {
+                1 => TypeInfo::Uint8,
+                2 => TypeInfo::Uint16,
+                4 => TypeInfo::Uint32,
+                8 => TypeInfo::Uint64,
+                val => {
+                    return Err(format!("error loading data type: unsigned int of size {}", val));
+                }
+            }
+        }
+        _other => {
+            TypeInfo::Other(byte_size)
+        }
+    })
 }
 
 

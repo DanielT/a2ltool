@@ -11,6 +11,7 @@ use super::*;
 pub(crate) fn update_module_measurements(
     module: &mut Module,
     debug_data: &DebugData,
+    log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
     use_new_matrix_dim: bool
 ) -> (u32, u32) {
@@ -24,23 +25,28 @@ pub(crate) fn update_module_measurements(
     for mut measurement in measurement_list {
         if measurement.var_virtual.is_none() {
             // only MEASUREMENTS that are not VIRTUAL can be updated
-            if let Some(typeinfo) = update_measurement_address(&mut measurement, debug_data) {
-                // update all the information instide a MEASUREMENT
-                update_measurement_information(module, &mut measurement, typeinfo, &mut enum_convlist, use_new_matrix_dim);
+            match update_measurement_address(&mut measurement, debug_data) {
+                Ok(typeinfo) => {
+                    // update all the information instide a MEASUREMENT
+                    update_measurement_information(module, &mut measurement, typeinfo, &mut enum_convlist, use_new_matrix_dim);
 
-                module.measurement.push(measurement);
-                measurement_updated += 1;
-            } else {
-                if preserve_unknown {
-                    measurement.ecu_address = None;
-                    zero_if_data(&mut measurement.if_data);
                     module.measurement.push(measurement);
-                } else {
-                    // item is removed implicitly, because it is not added back to the list
-                    // but we need to track the name of the removed item so that references to it can be deleted
-                    removed_items.insert(measurement.name.to_owned());
+                    measurement_updated += 1;
                 }
-                measurement_not_updated += 1;
+                Err(errmsgs) => {
+                    log_update_errors(log_msgs, errmsgs, "MEASUREMENT", measurement.get_line());
+
+                    if preserve_unknown {
+                        measurement.ecu_address = None;
+                        zero_if_data(&mut measurement.if_data);
+                        module.measurement.push(measurement);
+                    } else {
+                        // item is removed implicitly, because it is not added back to the list
+                        // but we need to track the name of the removed item so that references to it can be deleted
+                        removed_items.insert(measurement.name.to_owned());
+                    }
+                    measurement_not_updated += 1;
+                }
             }
         } else {
             // VIRTUAL MEASUREMENTS don't need an address
@@ -85,25 +91,24 @@ fn update_measurement_information<'enumlist, 'typeinfo: 'enumlist>(
 fn update_measurement_address<'a>(
     measurement: &mut Measurement,
     debug_data: &'a DebugData
-) -> Option<&'a TypeInfo> {
-    let (symbol_info, symbol_name) = get_symbol_info(
+) -> Result<&'a TypeInfo, Vec<String>> {
+    match get_symbol_info(
         &measurement.name,
         &measurement.symbol_link,
         &measurement.if_data,
         debug_data
-    );
+    ) {
+        Ok((address, symbol_datatype, symbol_name)) => {
+            // make sure a valid SYMBOL_LINK exists
+            set_symbol_link(&mut measurement.symbol_link, symbol_name.clone());
+            set_measurement_ecu_address(&mut measurement.ecu_address, address);
+            measurement.datatype = get_a2l_datatype(symbol_datatype);
+            set_measurement_bitmask(&mut measurement.bit_mask, symbol_datatype);
+            update_ifdata(&mut measurement.if_data, symbol_name, symbol_datatype, address);
 
-    if let Some((address, symbol_datatype)) = symbol_info {
-        // make sure a valid SYMBOL_LINK exists
-        set_symbol_link(&mut measurement.symbol_link, symbol_name.clone());
-        set_measurement_ecu_address(&mut measurement.ecu_address, address);
-        measurement.datatype = get_a2l_datatype(symbol_datatype);
-        set_measurement_bitmask(&mut measurement.bit_mask, symbol_datatype);
-        update_ifdata(&mut measurement.if_data, symbol_name, symbol_datatype, address);
-
-        Some(symbol_datatype)
-    } else {
-        None
+            Ok(symbol_datatype)
+        }
+        Err(errmsgs) => Err(errmsgs)
     }
 }
 

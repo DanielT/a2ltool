@@ -9,6 +9,7 @@ use super::*;
 pub(crate) fn update_module_instances(
     module: &mut Module,
     debug_data: &DebugData,
+    log_msgs: &mut Vec<String>,
     preserve_unknown: bool
 ) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
@@ -17,21 +18,26 @@ pub(crate) fn update_module_instances(
     let mut instance_not_updated: u32 = 0;
     std::mem::swap(&mut module.instance, &mut instance_list);
     for mut instance in instance_list {
-        if let Some((_typedef_ref, _typeinfo)) = update_instance_address(&mut instance, debug_data) {
-            // possible extension: validate the referenced TYPEDEF_x that this INSTANCE is based on by comparing it to typeinfo
+        match update_instance_address(&mut instance, debug_data) {
+            Ok((_typedef_ref, _typeinfo)) => {
+                // possible extension: validate the referenced TYPEDEF_x that this INSTANCE is based on by comparing it to typeinfo
 
-            module.instance.push(instance);
-            instance_updated += 1;
-        } else {
-            if preserve_unknown {
-                instance.start_address = 0;
-                zero_if_data(&mut instance.if_data);
                 module.instance.push(instance);
-            } else {
-                // item is removed implicitly, because it is not added back to the list
-                removed_items.insert(instance.name.to_owned());
+                instance_updated += 1;
             }
-            instance_not_updated += 1;
+            Err(errmsgs) => {
+                log_update_errors(log_msgs, errmsgs, "INSTANCE", instance.get_line());
+
+                if preserve_unknown {
+                    instance.start_address = 0;
+                    zero_if_data(&mut instance.if_data);
+                    module.instance.push(instance);
+                } else {
+                    // item is removed implicitly, because it is not added back to the list
+                    removed_items.insert(instance.name.to_owned());
+                }
+                instance_not_updated += 1;
+            }
         }
     }
     cleanup_removed_instances(module, &removed_items);
@@ -44,23 +50,23 @@ pub(crate) fn update_module_instances(
 fn update_instance_address<'a>(
     instance: &mut Instance,
     debug_data: &'a DebugData
-) -> Option<(String, &'a TypeInfo)> {
-    let (symbol_info, symbol_name) = get_symbol_info(
+) -> Result<(String, &'a TypeInfo), Vec<String>> {
+    match get_symbol_info(
         &instance.name,
         &instance.symbol_link,
         &instance.if_data,
         debug_data
-    );
+    ) {
+        Ok((address, symbol_typeinfo, symbol_name)) => {
+            // make sure a valid SYMBOL_LINK exists
+            set_symbol_link(&mut instance.symbol_link, symbol_name.clone());
+            instance.start_address = address as u32;
+            update_ifdata(&mut instance.if_data, symbol_name, symbol_typeinfo, address);
 
-    if let Some((address, symbol_datatype)) = symbol_info {
-        // make sure a valid SYMBOL_LINK exists
-        set_symbol_link(&mut instance.symbol_link, symbol_name.clone());
-        instance.start_address = address as u32;
-        update_ifdata(&mut instance.if_data, symbol_name, symbol_datatype, address);
-
-        Some((instance.type_ref.to_owned(), symbol_datatype))
-    } else {
-        None
+            // return the name of the linked TYPEDEF_<x>
+            Ok((instance.type_ref.to_owned(), symbol_typeinfo))
+        }
+        Err(errmsgs) => Err(errmsgs)
     }
 }
 
