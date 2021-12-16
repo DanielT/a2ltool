@@ -42,9 +42,9 @@ fn insert_measurement(
     sym_map: &HashMap<String, ItemType>
 ) {
     // get info about the symbol from the debug data
-    let findresult = crate::update::find_symbol(measure_sym, debugdata);
-    if findresult.is_none() {
-        println!("Symbol {} was not found in the elf file. It cannot be added.", measure_sym);
+    let findresult = crate::symbol::find_symbol(measure_sym, debugdata);
+    if let Err(errmsg) = findresult {
+        println!("Symbol {} could not be added: {}", measure_sym, errmsg);
         return;
     }
     let (address, typeinfo) = findresult.unwrap();
@@ -123,9 +123,9 @@ fn insert_characteristic(
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, ItemType>
 ) {
-    let findresult = crate::update::find_symbol(characteristic_sym, debugdata);
-    if findresult.is_none() {
-        println!("Symbol {} was not found in the elf file. It cannot be added.", characteristic_sym);
+    let findresult = crate::symbol::find_symbol(characteristic_sym, debugdata);
+    if let Err(errmsg) = findresult {
+        println!("Symbol {} could not be added: {}", characteristic_sym, errmsg);
         return;
     }
     let (address, typeinfo) = findresult.unwrap();

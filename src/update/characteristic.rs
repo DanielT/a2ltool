@@ -11,6 +11,7 @@ use super::*;
 pub(crate) fn update_module_characteristics(
     module: &mut Module,
     debug_data: &DebugData,
+    log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
     recordlayout_info: &mut RecordLayoutInfo
 ) -> (u32, u32) {
@@ -30,29 +31,34 @@ pub(crate) fn update_module_characteristics(
     for mut characteristic in characteristic_list {
         if characteristic.virtual_characteristic.is_none() {
             // only update the address if the CHARACTERISTIC is not a VIRTUAL_CHARACTERISTIC
-            if let Some(typeinfo) = update_characteristic_address(&mut characteristic, debug_data) {
-                // update as much as possible of the information inside the CHARACTERISTIC
-                update_characteristic_information(
-                    module,
-                    recordlayout_info,
-                    &mut characteristic,
-                    typeinfo,
-                    &mut enum_convlist,
-                    &axis_pts_dim
-                );
+            match update_characteristic_address(&mut characteristic, debug_data) {
+                Ok(typeinfo) => {
+                    // update as much as possible of the information inside the CHARACTERISTIC
+                    update_characteristic_information(
+                        module,
+                        recordlayout_info,
+                        &mut characteristic,
+                        typeinfo,
+                        &mut enum_convlist,
+                        &axis_pts_dim
+                    );
 
-                module.characteristic.push(characteristic);
-                characteristic_updated += 1;
-            } else {
-                if preserve_unknown {
-                    characteristic.address = 0;
-                    zero_if_data(&mut characteristic.if_data);
                     module.characteristic.push(characteristic);
-                } else {
-                    // item is removed implicitly, because it is not added back to the list
-                    removed_items.insert(characteristic.name.to_owned());
+                    characteristic_updated += 1;
                 }
-                characteristic_not_updated += 1;
+                Err(errmsgs) => {
+                    log_update_errors(log_msgs, errmsgs, "CHARACTERISTIC", characteristic.get_line());
+
+                    if preserve_unknown {
+                        characteristic.address = 0;
+                        zero_if_data(&mut characteristic.if_data);
+                        module.characteristic.push(characteristic);
+                    } else {
+                        // item is removed implicitly, because it is not added back to the list
+                        removed_items.insert(characteristic.name.to_owned());
+                    }
+                    characteristic_not_updated += 1;
+                }
             }
         } else {
             // computed CHARACTERISTICS with a VIRTUAL_CHARACTERISTIC block shouldn't have an address and don't need to be updated
@@ -162,24 +168,23 @@ fn update_characteristic_axis(
 fn update_characteristic_address<'a>(
     characteristic: &mut Characteristic,
     debug_data: &'a DebugData
-) -> Option<&'a TypeInfo> {
-    let (symbol_info, symbol_name) = get_symbol_info(
+) -> Result<&'a TypeInfo, Vec<String>> {
+    match get_symbol_info(
         &characteristic.name,
         &characteristic.symbol_link,
         &characteristic.if_data,
         debug_data
-    );
+    ) {
+        Ok((address, symbol_datatype, symbol_name)) => {
+            // make sure a valid SYMBOL_LINK exists
+            set_symbol_link(&mut characteristic.symbol_link, symbol_name.clone());
+            characteristic.address = address as u32;
+            set_measurement_bitmask(&mut characteristic.bit_mask, symbol_datatype);
+            update_ifdata(&mut characteristic.if_data, symbol_name, symbol_datatype, address);
 
-    if let Some((address, symbol_datatype)) = symbol_info {
-        // make sure a valid SYMBOL_LINK exists
-        set_symbol_link(&mut characteristic.symbol_link, symbol_name.clone());
-        characteristic.address = address as u32;
-        set_measurement_bitmask(&mut characteristic.bit_mask, symbol_datatype);
-        update_ifdata(&mut characteristic.if_data, symbol_name, symbol_datatype, address);
-
-        Some(symbol_datatype)
-    } else {
-        None
+            Ok(symbol_datatype)
+        }
+        Err(errmsgs) => Err(errmsgs)
     }
 }
 
