@@ -197,6 +197,23 @@ fn core() -> Result<(), String> {
             char_ranges
         );
     }
+    if arg_matches.is_present("INSERT_CHARACTERISTIC_REGEX") || arg_matches.is_present("INSERT_MEASUREMENT_REGEX") {
+        let meas_regexes: Vec<&str> = match arg_matches.values_of("INSERT_MEASUREMENT_REGEX") {
+            Some(values) => values.collect(),
+            None => Vec::new()
+        };
+        let char_regexes: Vec<&str> = match arg_matches.values_of("INSERT_CHARACTERISTIC_RANGE") {
+            Some(values) => values.collect(),
+            None => Vec::new()
+        };
+
+        insert::insert_regex(
+            &mut a2l_file,
+            &elf_info.as_ref().unwrap(),
+            meas_regexes,
+            char_regexes
+        );
+    }
 
 
     // remove unknown IF_DATA
@@ -376,7 +393,7 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .multiple(false)
     )
     .arg(Arg::with_name("INSERT_CHARACTERISTIC")
-        .help("Insert a CHARACTERISTIC based on a variable in the elf file.\nThe variable name can be complex, e.g. var.element[0].subelement")
+        .help("Insert a CHARACTERISTIC based on a variable in the elf file. The variable name can be complex, e.g. var.element[0].subelement")
         .long("characteristic")
         .aliases(&["insert-characteristic"])
         .takes_value(true)
@@ -386,7 +403,7 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .value_name("VAR")
     )
     .arg(Arg::with_name("INSERT_CHARACTERISTIC_RANGE")
-        .help("Insert multiple CHARACTERISTICs. All variables whose address\nis inside the given range will be inserted as CHARACTERISTICs")
+        .help("Insert multiple CHARACTERISTICs. All variables whose address is inside the given range will be inserted as CHARACTERISTICs")
         .long("characteristic-range")
         .aliases(&["insert-characteristic-range"])
         .takes_value(true)
@@ -396,8 +413,18 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .value_name("RANGE")
         .validator(range_arg_validator)
     )
+    .arg(Arg::with_name("INSERT_CHARACTERISTIC_REGEX")
+        .help("Compare all symbol names in the elf file to the given regex. All matching ones will be inserted as CHARACTERISTICs")
+        .long("characteristic-regex")
+        .aliases(&["insert-characteristic-regex"])
+        .takes_value(true)
+        .number_of_values(1)
+        .multiple(true)
+        .requires("ELFFILE")
+        .value_name("REGEX")
+    )
     .arg(Arg::with_name("INSERT_MEASUREMENT")
-        .help("Insert a MEASUREMENT based on a variable in the elf file.\nThe variable name can be complex, e.g. var.element[0].subelement")
+        .help("Insert a MEASUREMENT based on a variable in the elf file. The variable name can be complex, e.g. var.element[0].subelement")
         .long("measurement")
         .aliases(&["insert-measurement"])
         .takes_value(true)
@@ -407,7 +434,7 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .value_name("VAR")
     )
     .arg(Arg::with_name("INSERT_MEASUREMENT_RANGE")
-        .help("Insert multiple MEASUREMENTs. All variables whose address\nis inside the given range will be inserted as MEASUREMENTs")
+        .help("Insert multiple MEASUREMENTs. All variables whose address is inside the given range will be inserted as MEASUREMENTs")
         .long("measurement-range")
         .aliases(&["insert-measurement-range"])
         .takes_value(true)
@@ -416,6 +443,16 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .requires("ELFFILE")
         .value_name("RANGE")
         .validator(range_arg_validator)
+    )
+    .arg(Arg::with_name("INSERT_MEASUREMENT_REGEX")
+        .help("Compare all symbol names in the elf file to the given regex. All matching ones will be inserted as MEASUREMENTs")
+        .long("measurement-regex")
+        .aliases(&["insert-measurement-regex"])
+        .takes_value(true)
+        .number_of_values(1)
+        .multiple(true)
+        .requires("ELFFILE")
+        .value_name("REGEX")
     )
     .group(
         ArgGroup::with_name("UPDATE_GROUP")
