@@ -4,6 +4,7 @@ use a2lfile::*;
 use crate::dwarf::*;
 use crate::datatype::*;
 use crate::update::enums;
+use regex::Regex;
 
 
 enum ItemType {
@@ -60,11 +61,11 @@ fn insert_measurement_sym(
     sym_map: &HashMap<String, ItemType>,
     typeinfo: &TypeInfo,
     address: u64
-) {
+) -> bool {
     // Abort if a MEASUREMENT for this symbol already exists. Warn if any other reference to the symbol exists
     let item_name = match make_unique_measurement_name(module, sym_map, measure_sym, name_map) {
         Some(value) => value,
-        None => return,
+        None => return false,
     };
 
     let datatype = get_a2l_datatype(typeinfo);
@@ -89,6 +90,8 @@ fn insert_measurement_sym(
         enums::cond_create_enum_conversion(module, typename, enumerators);
     }
     module.measurement.push(new_measurement);
+
+    true
 }
 
 
@@ -119,10 +122,10 @@ fn insert_characteristic_sym(
     sym_map: &HashMap<String, ItemType>,
     typeinfo: &TypeInfo,
     address: u64
-) {
+) -> bool {
     let item_name = match make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map) {
         Some(value) => value,
-        None => return,
+        None => return false,
     };
     let datatype = get_a2l_datatype(typeinfo);
     let recordlayout_name = format!("__{}_Z", datatype.to_string());
@@ -134,7 +137,7 @@ fn insert_characteristic_sym(
             // but in that case the struct represents function values together with axis info.
             // Much more information regarding which struct member has which use would be required
             println!("  Don't know how to add a CHARACTERISTIC for a struct. Please add a struct member instead.");
-            return;
+            return false;
         }
         TypeInfo::Array{arraytype, dim, ..} => {
             // an array is turned into a CHARACTERISTIC of type VAL_BLK, and needs a MATRIX_DIM sub-element
@@ -210,6 +213,8 @@ fn insert_characteristic_sym(
     if module.record_layout.iter().find(|&rl| rl.name == recordlayout_name).is_none() {
         module.record_layout.push(recordlayout);
     }
+
+    true
 }
 
 
@@ -375,6 +380,61 @@ pub(crate) fn insert_ranges(
                 // no type info, can't insert this symbol
             }
         }
+    }
+}
 
+
+pub(crate) fn insert_regex(
+    a2l_file: &mut A2lFile,
+    debugdata: &DebugData,
+    measurement_regexes: Vec<&str>,
+    characteristic_regexes: Vec<&str>
+) {
+    // compile the regular expressions
+    let mut compiled_meas_re = Vec::new();
+    let mut compiled_char_re = Vec::new();
+    for expr in measurement_regexes {
+        match Regex::new(expr) {
+            Ok(compiled_re) => compiled_meas_re.push(compiled_re),
+            Err(error) => println!("Invalid regex \"{}\": {}", expr, error)
+        }
+    }
+    for expr in characteristic_regexes {
+        match Regex::new(expr) {
+            Ok(compiled_re) => compiled_char_re.push(compiled_re),
+            Err(error) => println!("Invalid regex \"{}\": {}", expr, error)
+        }
+    }
+
+    let module = &mut a2l_file.project.module[0];
+    let (name_map, sym_map) = build_maps(&module);
+
+    for (symbol_name, symbol_type, address) in debugdata.iter() {
+        match symbol_type {
+            Some(TypeInfo::Array{..}) |
+            Some(TypeInfo::Struct{..}) |
+            Some(TypeInfo::Union{..}) |
+            Some(TypeInfo::Class{..}) => {
+                // don't insert complex types directly. Their individual members will be inserted instead
+            }
+            Some(typeinfo) => {
+                // insert the symbol as a measurement if it's address is within any of the given ranges
+                for re in &compiled_meas_re {
+                    if re.is_match(&symbol_name) {
+                        insert_measurement_sym(module, &symbol_name, &name_map, &sym_map, typeinfo, address);
+                    }
+                }
+
+                // insert the symbol as a characteristic if it's address is within any of the given ranges
+                for re in &compiled_char_re {
+                    if re.is_match(&symbol_name) {
+                        insert_characteristic_sym(module, &symbol_name, &name_map, &sym_map, typeinfo, address);
+                    }
+                }
+            }
+            None => {
+                // no type info, can't insert this symbol
+            }
+        }
     }
 }
