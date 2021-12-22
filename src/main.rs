@@ -1,6 +1,6 @@
 use clap::{App, Arg, ArgGroup, ArgMatches, crate_version};
 
-use dwarf::load_debuginfo;
+use dwarf::DebugData;
 use std::{time::Instant, ffi::OsStr};
 use a2lfile::A2lObject;
 
@@ -108,7 +108,7 @@ fn core() -> Result<(), String> {
     // load elf
     let elf_info = if arg_matches.is_present("ELFFILE") {
         let elffile = arg_matches.value_of_os("ELFFILE").unwrap();
-        let elf_info = load_debuginfo(elffile, verbose > 0)?;
+        let elf_info = DebugData::load(elffile, verbose > 0)?;
         cond_print!(verbose, now, format!("Variables and types loaded from \"{}\": {} variables available", elffile.to_string_lossy(), elf_info.variables.len()));
         if debugprint {
             println!("================\n{:#?}\n================\n", elf_info);
@@ -184,6 +184,17 @@ fn core() -> Result<(), String> {
             &elf_info.as_ref().unwrap(),
             measurement_symbols,
             characteristic_symbols
+        );
+    }
+    if arg_matches.is_present("INSERT_CHARACTERISTIC_RANGE") || arg_matches.is_present("INSERT_MEASUREMENT_RANGE") {
+        let meas_ranges = range_args_to_ranges(arg_matches.values_of("INSERT_MEASUREMENT_RANGE"));
+        let char_ranges = range_args_to_ranges(arg_matches.values_of("INSERT_CHARACTERISTIC_RANGE"));
+
+        insert::insert_ranges(
+            &mut a2l_file,
+            &elf_info.as_ref().unwrap(),
+            meas_ranges,
+            char_ranges
         );
     }
 
@@ -366,21 +377,45 @@ fn get_args<'a>() -> ArgMatches<'a> {
     )
     .arg(Arg::with_name("INSERT_CHARACTERISTIC")
         .help("Insert a CHARACTERISTIC based on a variable in the elf file.\nThe variable name can be complex, e.g. var.element[0].subelement")
-        .long("insert-characteristic")
+        .long("characteristic")
+        .aliases(&["insert-characteristic"])
         .takes_value(true)
         .number_of_values(1)
         .multiple(true)
         .requires("ELFFILE")
         .value_name("VAR")
     )
+    .arg(Arg::with_name("INSERT_CHARACTERISTIC_RANGE")
+        .help("Insert multiple CHARACTERISTICs. All variables whose address\nis inside the given range will be inserted as CHARACTERISTICs")
+        .long("characteristic-range")
+        .aliases(&["insert-characteristic-range"])
+        .takes_value(true)
+        .number_of_values(2)
+        .multiple(true)
+        .requires("ELFFILE")
+        .value_name("RANGE")
+        .validator(range_arg_validator)
+    )
     .arg(Arg::with_name("INSERT_MEASUREMENT")
         .help("Insert a MEASUREMENT based on a variable in the elf file.\nThe variable name can be complex, e.g. var.element[0].subelement")
-        .long("insert-measurement")
+        .long("measurement")
+        .aliases(&["insert-measurement"])
         .takes_value(true)
         .number_of_values(1)
         .multiple(true)
         .requires("ELFFILE")
         .value_name("VAR")
+    )
+    .arg(Arg::with_name("INSERT_MEASUREMENT_RANGE")
+        .help("Insert multiple MEASUREMENTs. All variables whose address\nis inside the given range will be inserted as MEASUREMENTs")
+        .long("measurement-range")
+        .aliases(&["insert-measurement-range"])
+        .takes_value(true)
+        .number_of_values(2)
+        .multiple(true)
+        .requires("ELFFILE")
+        .value_name("RANGE")
+        .validator(range_arg_validator)
     )
     .group(
         ArgGroup::with_name("UPDATE_GROUP")
@@ -388,4 +423,40 @@ fn get_args<'a>() -> ArgMatches<'a> {
             .multiple(false)
     )
     .get_matches()
+}
+
+
+fn range_arg_validator(arg: String) -> Result<(), String> {
+    if arg.starts_with("0x") {
+        match u64::from_str_radix(&arg[2..], 16) {
+            Ok(_) => Ok(()),
+            Err(error) => Err(format!("\"{}\" is not a valid address: {}", arg, error))
+        }
+    } else {
+        match arg.parse::<u64>() {
+            Ok(_) => Ok(()),
+            Err(error) => Err(format!("\"{}\" is not a valid address: {}", arg, error))
+        }
+    }
+}
+
+
+fn range_args_to_ranges(args: Option<clap::Values>) -> Vec<(u64, u64)> {
+    if let Some(values) = args {
+        let rangevals: Vec<u64> = values.map(
+            |arg| {
+                if arg.starts_with("0x") {
+                    u64::from_str_radix(&arg[2..], 16).unwrap()
+                } else {
+                    arg.parse::<u64>().unwrap()
+                }
+            }).collect();
+        let mut addr_ranges: Vec<(u64, u64)> = Vec::new();
+        for idx in (1..rangevals.len()).step_by(2) {
+            addr_ranges.push( (rangevals[idx-1], rangevals[idx]) );
+        }
+        addr_ranges
+    } else {
+        Vec::new()
+    }
 }

@@ -13,6 +13,7 @@ mod attributes;
 use attributes::*;
 mod typereader;
 use typereader::load_types;
+mod iter;
 
 
 #[derive(Debug)]
@@ -79,13 +80,19 @@ pub(crate) struct DebugData {
 }
 
 
-// load the debug info from an elf file
-pub(crate) fn load_debuginfo(filename: &OsStr, verbose: bool) -> Result<DebugData, String> {
-    let filedata = load_filedata(filename)?;
-    let elffile = load_elf_file(&filename.to_string_lossy(), &*filedata)?;
-    let dwarf = load_dwarf(&elffile)?;
+impl DebugData {
+    // load the debug info from an elf file
+    pub(crate) fn load(filename: &OsStr, verbose: bool) -> Result<Self, String> {
+        let filedata = load_filedata(filename)?;
+        let elffile = load_elf_file(&filename.to_string_lossy(), &*filedata)?;
+        let dwarf = load_dwarf(&elffile)?;
 
-    Ok(read_debug_info_entries(&dwarf, verbose))
+        Ok(read_debug_info_entries(&dwarf, verbose))
+    }
+
+    pub(crate) fn iter(&self) -> iter::VariablesIterator {
+        iter::VariablesIterator::new(self)
+    }
 }
 
 
