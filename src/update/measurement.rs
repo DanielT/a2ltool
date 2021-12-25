@@ -123,14 +123,14 @@ fn update_matrix_dim(
     let mut cur_typeinfo = typeinfo;
     // compilers can represent multi-dimensional arrays in two different ways:
     // either as nested arrays, each with one dimension, or as one array with multiple dimensions
-    while let TypeInfo::Array{ dim, arraytype, .. } = cur_typeinfo {
+    while let TypeInfo::Array { dim, arraytype, .. } = cur_typeinfo {
         for val in dim {
             matrix_dim_values.push(*val as u16);
         }
         cur_typeinfo = &**arraytype;
     }
 
-    if matrix_dim_values.len() == 0 {
+    if matrix_dim_values.is_empty() {
         // current type is not an array, so delete the MATRIX_DIM
         *opt_matrix_dim = None;
     } else {
@@ -151,14 +151,14 @@ fn update_matrix_dim(
 // when update runs without preserve some MEASUREMENTs could be removed
 // these items should also be removed from the identifier lists in GROUPs, FUNCTIONs, etc
 pub(crate) fn cleanup_removed_measurements(module: &mut Module, removed_items: &HashSet<String>) {
-    if removed_items.len() == 0 {
+    if removed_items.is_empty() {
         return;
     }
 
     for group in &mut module.group {
         if let Some(ref_measurement) = &mut group.ref_measurement {
-            cleanup_item_list(&mut ref_measurement.identifier_list, &removed_items);
-            if ref_measurement.identifier_list.len() == 0 {
+            cleanup_item_list(&mut ref_measurement.identifier_list, removed_items);
+            if ref_measurement.identifier_list.is_empty() {
                 group.ref_measurement = None;
             }
         }
@@ -166,20 +166,20 @@ pub(crate) fn cleanup_removed_measurements(module: &mut Module, removed_items: &
 
     for function in &mut module.function {
         if let Some(in_measurement) = &mut function.in_measurement {
-            cleanup_item_list(&mut in_measurement.identifier_list, &removed_items);
-            if in_measurement.identifier_list.len() == 0 {
+            cleanup_item_list(&mut in_measurement.identifier_list, removed_items);
+            if in_measurement.identifier_list.is_empty() {
                 function.in_measurement = None;
             }
         }
         if let Some(loc_measurement) = &mut function.loc_measurement {
-            cleanup_item_list(&mut loc_measurement.identifier_list, &removed_items);
-            if loc_measurement.identifier_list.len() == 0 {
+            cleanup_item_list(&mut loc_measurement.identifier_list, removed_items);
+            if loc_measurement.identifier_list.is_empty() {
                 function.loc_measurement = None;
             }
         }
         if let Some(out_measurement) = &mut function.out_measurement {
-            cleanup_item_list(&mut out_measurement.identifier_list, &removed_items);
-            if out_measurement.identifier_list.len() == 0 {
+            cleanup_item_list(&mut out_measurement.identifier_list, removed_items);
+            if out_measurement.identifier_list.is_empty() {
                 function.out_measurement = None;
             }
         }

@@ -28,7 +28,7 @@ pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
             println!("No XCP settings found in module {}", module.name);
         }
     }
-    println!("");
+    println!();
 }
 
 
@@ -76,7 +76,7 @@ fn print_xcp_on_can(xcp_on_can: &XcpOnCan) {
 
 fn print_xcp_on_flx(xcp_on_flx: &XcpOnFlx) {
     println!("  XCP on Flexray");
-    if xcp_on_flx.flx_parameters.fibex_file != "" {
+    if !xcp_on_flx.flx_parameters.fibex_file.is_empty() {
         println!("    fibex file: {}", xcp_on_flx.flx_parameters.fibex_file);
     }
 
@@ -122,7 +122,7 @@ fn print_xcp_on_flx_buffer(
     flx_buf_id: u8,
     max_flx_len_buf: &Option<MaxFlxLenBuf>,
     lpdu_id: &Option<LpduId>,
-    xcp_packet: &Option<XcpPacket>
+    xcp_packet: &Option<XcpPacket>,
 ) {
     println!("      buffer id: {}", flx_buf_id);
 
@@ -189,7 +189,7 @@ fn print_xcp_on_flx_buffer(
                 }
             }
         }
-        println!("");
+        println!();
     }
 
     if let Some(XcpPacket {

@@ -14,7 +14,7 @@ pub(crate) fn find_symbol<'a>(varname: &str, debug_data: &'a DebugData) -> Resul
 }
 
 
-fn find_symbol_from_components<'a>(components: &Vec<&str>, debug_data: &'a DebugData) -> Result<(u64, &'a TypeInfo), String> {
+fn find_symbol_from_components<'a>(components: &[&str], debug_data: &'a DebugData) -> Result<(u64, &'a TypeInfo), String> {
     // the first component of the symbol name is the name of the global variable.
     if let Some(varinfo) = debug_data.variables.get(components[0]) {
         // we also need the type in order to resolve struct members, etc.
@@ -61,7 +61,7 @@ fn split_symbol_components(varname: &str) -> Vec<&str> {
 // find the address and type of the current component of a symbol name
 fn find_membertype<'a>(
     typeinfo: &'a TypeInfo,
-    components: &Vec<&str>,
+    components: &[&str],
     component_index: usize,
     address: u64
 ) -> Result<(u64, &'a TypeInfo), String> {
@@ -81,21 +81,23 @@ fn find_membertype<'a>(
                     )
                 } else {
                     Err(format!("There is no member \"{}\" in \"{}\"",
-                        components[component_index], components[..component_index].join(".")))
+                        components[component_index],
+                        components[..component_index].join(".")
+                    ))
                 }
             }
             TypeInfo::Array { dim, stride, arraytype, .. } => {
                 let mut multi_index = 0;
-                for idx_pos in 0 .. dim.len() {
+                for (idx_pos, current_dim) in dim.iter().enumerate() {
                     let arraycomponent = components.get(component_index + idx_pos)
-                        .unwrap_or_else(|| &"_0_"); // default to first element if no more components are specified
+                        .unwrap_or(&"_0_"); // default to first element if no more components are specified
                     let indexval = get_index(arraycomponent)
                         .ok_or_else(|| format!("could not interpret \"{}\" as an array index", arraycomponent))?;
-                    if indexval >= dim[idx_pos] as usize {
+                    if indexval >= *current_dim as usize {
                         return Err(format!("requested array index {} in expression \"{}\", but the array only has {} elements",
-                            indexval, components.join("."), dim[idx_pos]));
+                            indexval, components.join("."), current_dim));
                     }
-                    multi_index = multi_index * dim[idx_pos] as usize + indexval;
+                    multi_index = multi_index * (*current_dim) as usize + indexval;
                 }
 
                 let elementaddr = address + (multi_index as u64 * stride);
@@ -113,7 +115,8 @@ fn find_membertype<'a>(
                     // could not descend further to match additional symbol name components
                     Err(format!("Remaining portion \"{}\" of \"{}\" could not be matched",
                         components[component_index..].join("."),
-                        components.join(".")))
+                        components.join(".")
+                    ))
                 }
             }
         }
@@ -127,7 +130,7 @@ fn get_index(idxstr: &str) -> Option<usize> {
     if (idxstr.starts_with('_') && idxstr.ends_with('_')) ||
        (idxstr.starts_with('[') && idxstr.ends_with(']')) {
         let idxstrlen = idxstr.len();
-        match idxstr[1..idxstrlen-1].parse() {
+        match idxstr[1 .. (idxstrlen - 1)].parse() {
             Ok(val) => Some(val),
             Err(_) => None
         }

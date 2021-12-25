@@ -30,7 +30,7 @@ pub(crate) fn get_a2l_datatype(datatype: &TypeInfo) -> DataType {
                 8 => DataType::AUint64,
                 4 => DataType::Ulong,
                 2 => DataType::Uword,
-                1 | _ => DataType::Ubyte
+                _ => DataType::Ubyte
             }
         }
         TypeInfo::Array { arraytype, .. } => {
@@ -73,8 +73,8 @@ pub(crate) fn get_type_limits(
         TypeInfo::Sint32 => (i32::MIN as f64, i32::MAX as f64),
         TypeInfo::Sint64 => (i64::MIN as f64, i64::MAX as f64),
         TypeInfo::Enum {enumerators, ..} => {
-            let lower = enumerators.iter().map(|val| val.1).min().unwrap_or_else(|| 0) as f64;
-            let upper = enumerators.iter().map(|val| val.1).max().unwrap_or_else(|| 0) as f64;
+            let lower = enumerators.iter().map(|val| val.1).min().unwrap_or(0) as f64;
+            let upper = enumerators.iter().map(|val| val.1).max().unwrap_or(0) as f64;
             (lower, upper)
         }
         _ => (default_lower, default_upper)

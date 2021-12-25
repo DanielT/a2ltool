@@ -27,12 +27,12 @@ pub(crate) fn update_ifdata(
 fn update_ifdata_canape_ext(
     canape_ext: &mut ifdata::CanapeExt,
     address: u64,
-    symbol_name: &String,
+    symbol_name: &str,
     datatype: &TypeInfo
 ) {
     if let Some(link_map) = &mut canape_ext.link_map {
         link_map.address = address as i32;
-        link_map.symbol_name = symbol_name.clone();
+        link_map.symbol_name = symbol_name.to_string();
         match datatype {
             TypeInfo::Uint8 => {
                 link_map.datatype = 0x87;

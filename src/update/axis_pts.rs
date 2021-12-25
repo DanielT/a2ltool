@@ -33,7 +33,7 @@ pub(crate) fn update_module_axis_pts(
                     match inner_typeinfo {
                         TypeInfo::Array{dim, arraytype, ..} => {
                             // update max_axis_points to match the size of the array
-                            if dim.len() >= 1 {
+                            if !dim.is_empty() {
                                 axis_pts.max_axis_points = dim[0] as u16;
                             }
                             if let TypeInfo::Enum{typename, enumerators, ..} = &**arraytype {
@@ -123,7 +123,7 @@ fn update_axis_pts_address<'a>(
 // when update runs without preserve, AXIS_PTS be removed from the module
 // AXIS_PTS are only referenced through CHARACTERISTIC > AXIS_DESCR > AXIS_PTS_REF
 pub(crate) fn cleanup_removed_axis_pts(module: &mut Module, removed_items: &HashSet<String>) {
-    if removed_items.len() == 0 {
+    if removed_items.is_empty() {
         return;
     }
 

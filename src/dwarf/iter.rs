@@ -17,7 +17,7 @@ pub(crate) enum TypeInfoIter<'a> {
         dim: &'a Vec<u64>,
         stride: u64,
         position: u64,
-        arraytype: &'a Box<TypeInfo>,
+        arraytype: &'a TypeInfo,
         item_iter: Option<Box<TypeInfoIter<'a>>>
     }
 }
@@ -94,14 +94,13 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                 if *position < total_elemcount {
                     // in a multi-dimensional array, e.g. [5][10], position goes from 0 to 50
                     // it needs to be decomposed into individual array indices
-                    let mut current_indices = Vec::<u64>::with_capacity(dim.len());
-                    current_indices.resize(dim.len(), 0);
+                    let mut current_indices = vec![0; dim.len()];
                     let mut rem = *position;
 
                     // going backward over the list of array dimensions, divide and keep the remainder
                     for idx in (0..dim.len()).rev() {
                         current_indices[idx] = rem % dim[idx];
-                        rem = rem / dim[idx];
+                        rem /= dim[idx];
                     }
                     let idxstr = current_indices.iter().map(
                         |val| format!("._{}_", val)

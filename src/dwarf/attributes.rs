@@ -10,10 +10,7 @@ pub(crate) fn get_attr_value<'abbrev, 'unit>(
     entry: &DebuggingInformationEntry<'abbrev, 'unit, SliceType, usize>,
     attrtype: gimli::DwAt
 ) -> OptionalAttribute<'unit> {
-    entry
-        .attr_value(attrtype)
-        .or_else(|_| -> gimli::Result<OptionalAttribute> { Ok(None) })
-        .unwrap()
+    entry.attr_value(attrtype).unwrap_or(None)
 }
 
 
@@ -23,7 +20,7 @@ pub(crate) fn get_name_attribute(
     dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>
 ) -> Result<String, String> {
     let name_attr =
-        get_attr_value(&entry, gimli::constants::DW_AT_name)
+        get_attr_value(entry, gimli::constants::DW_AT_name)
             .ok_or_else(|| "failed to get name attribute".to_string() )?;
     match name_attr {
         gimli::AttributeValue::String(slice) => {
@@ -218,7 +215,7 @@ pub(crate) fn get_bit_offset_attribute(entry: &DebuggingInformationEntry<SliceTy
 }
 
 
-pub(crate) fn get_specification_attribute<'data, 'abbrev, 'unit, 'b>(
+pub(crate) fn get_specification_attribute<'data, 'abbrev, 'unit>(
     entry: &'data DebuggingInformationEntry<SliceType, usize>,
     unit: &'unit UnitHeader<EndianSlice<'data, RunTimeEndian>>,
     abbrev: &'abbrev gimli::Abbreviations
@@ -226,7 +223,7 @@ pub(crate) fn get_specification_attribute<'data, 'abbrev, 'unit, 'b>(
     let specification_attr = get_attr_value(entry, gimli::constants::DW_AT_specification)?;
     match specification_attr {
         gimli::AttributeValue::UnitRef(unitoffset) => {
-            if let Ok(specification_entry) = unit.entry(&abbrev, unitoffset) {
+            if let Ok(specification_entry) = unit.entry(abbrev, unitoffset) {
                 Some(specification_entry)
             } else {
                 None
@@ -245,7 +242,7 @@ pub(crate) fn get_specification_attribute<'data, 'abbrev, 'unit, 'b>(
 }
 
 
-pub(crate) fn get_abstract_origin_attribute<'data, 'abbrev, 'unit, 'b>(
+pub(crate) fn get_abstract_origin_attribute<'data, 'abbrev, 'unit>(
     entry: &'data DebuggingInformationEntry<SliceType, usize>,
     unit: &'unit UnitHeader<EndianSlice<'data, RunTimeEndian>>,
     abbrev: &'abbrev gimli::Abbreviations
@@ -253,7 +250,7 @@ pub(crate) fn get_abstract_origin_attribute<'data, 'abbrev, 'unit, 'b>(
     let origin_attr = get_attr_value(entry, gimli::constants::DW_AT_abstract_origin)?;
     match origin_attr {
         gimli::AttributeValue::UnitRef(unitoffset) => {
-            if let Ok(origin_entry) = unit.entry(&abbrev, unitoffset) {
+            if let Ok(origin_entry) = unit.entry(abbrev, unitoffset) {
                 Some(origin_entry)
             } else {
                 None
@@ -314,19 +311,19 @@ pub(crate) fn get_entries_tree_from_attribute<'input, 'b>(
     unit_list: &'b UnitList<'input>,
     current_unit: usize
 ) -> Result<(usize, gimli::EntriesTree<'b, 'b, EndianSlice<'input, RunTimeEndian>>), String> {
-    match get_attr_value(&entry, gimli::constants::DW_AT_type) {
+    match get_attr_value(entry, gimli::constants::DW_AT_type) {
         Some(gimli::AttributeValue::DebugInfoRef(dbginfo_offset)) => {
             if let Some(unit_idx) = unit_list.get_unit(dbginfo_offset.0) {
                 let (unit, abbrev) = &unit_list[unit_idx];
                 let unit_offset = dbginfo_offset.to_unit_offset(unit).unwrap();
-                if let Ok(entries_tree) = unit.entries_tree(&abbrev, Some(unit_offset)) {
+                if let Ok(entries_tree) = unit.entries_tree(abbrev, Some(unit_offset)) {
                     return Ok((current_unit, entries_tree))
                 }
             }
         }
         Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
             let (unit, abbrev) = &unit_list[current_unit];
-            if let Ok(entries_tree) = unit.entries_tree(&abbrev, Some(unit_offset)) {
+            if let Ok(entries_tree) = unit.entries_tree(abbrev, Some(unit_offset)) {
                 return Ok((current_unit, entries_tree))
             }
         }

@@ -21,7 +21,7 @@ pub(crate) fn load_types(
                 let (unit, abbrev) = &units[unit_idx];
                 let dbginfo_offset = gimli::DebugInfoOffset(*typeref);
                 let unit_offset = dbginfo_offset.to_unit_offset(unit).unwrap();
-                let mut entries_tree = unit.entries_tree(&abbrev, Some(unit_offset)).unwrap();
+                let mut entries_tree = unit.entries_tree(abbrev, Some(unit_offset)).unwrap();
 
                 // load one type and add it to the collection (always succeeds for correctly structured DWARF debug info)
                 match get_type(&units, unit_idx, entries_tree.root().unwrap(), None, dwarf) {
@@ -99,13 +99,11 @@ fn get_type(
             let mut enumerators = Vec::new();
             let typename = if let Some(name) = typedef_name {
                 name
+            } else if let Ok(name_from_attr) = get_name_attribute(entry, dwarf) {
+                name_from_attr
             } else {
-                if let Ok(name_from_attr) = get_name_attribute(entry, dwarf) {
-                    name_from_attr
-                } else {
-                    let (unit, _) = &unit_list[current_unit];
-                    format!("anonymous_enum_{}", entry.offset().to_debug_info_offset(unit).unwrap().0)
-                }
+                let (unit, _) = &unit_list[current_unit];
+                format!("anonymous_enum_{}", entry.offset().to_debug_info_offset(unit).unwrap().0)
             };
             let mut iter = entries_tree.children();
             // get all the enumerators

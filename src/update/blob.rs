@@ -64,10 +64,10 @@ fn update_blob_address<'a>(blob: &mut Blob, debug_data: &'a DebugData) -> Result
 pub(crate) fn cleanup_removed_blobs(module: &mut Module, removed_items: &HashSet<String>) {
     for transformer in &mut module.transformer {
         if let Some(transformer_in_objects) = &mut transformer.transformer_in_objects {
-            cleanup_item_list(&mut transformer_in_objects.identifier_list, &removed_items);
+            cleanup_item_list(&mut transformer_in_objects.identifier_list, removed_items);
         }
         if let Some(transformer_out_objects) = &mut transformer.transformer_out_objects {
-            cleanup_item_list(&mut transformer_out_objects.identifier_list, &removed_items);
+            cleanup_item_list(&mut transformer_out_objects.identifier_list, removed_items);
         }
     }
 

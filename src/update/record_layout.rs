@@ -198,40 +198,40 @@ pub(crate) fn update_record_layout(
             name.to_owned()
         } else {
             // try to find an existing record_layout with these parameters
-            if let Some((existing_idx, existing_reclayout)) = module.record_layout.iter().enumerate().find(
-                |&(_, item)| compare_rl_content(&new_reclayout, item)
-            ) {
+            if let Some((existing_idx, existing_reclayout)) = module.record_layout
+                .iter()
+                .enumerate()
+                .find(|&(_, item)| compare_rl_content(&new_reclayout, item))
+            {
                 // there already is a record layout with these parameters
                 recordlayout_info.refcount[idx] -= 1;
                 recordlayout_info.refcount[existing_idx] += 1;
                 existing_reclayout.name.to_owned()
-            } else {
-                if recordlayout_info.refcount[idx] == 1 {
-                    // the original record layout only has one reference; that means we can simply overwrite it with the modified data
-                    if module.record_layout[idx].name != new_reclayout.name {
-                        // the name has changed, so idxmap needs to be fixed
-                        recordlayout_info
-                            .idxmap
-                            .remove(&module.record_layout[idx].name);
-                        recordlayout_info
-                            .idxmap
-                            .insert(new_reclayout.name.to_owned(), idx);
-                    }
-                    module.record_layout[idx] = new_reclayout;
-                    module.record_layout[idx].name.to_owned()
-                } else {
-                    // the original record layout has multiple users, so it's reference count
-                    // decreases by one and the new record layout is added to the list
-                    recordlayout_info.refcount[idx] -= 1;
-                    new_reclayout.name =
-                        make_unique_reclayout_name(new_reclayout.name, recordlayout_info);
-                    recordlayout_info.refcount.push(1);
+            } else if recordlayout_info.refcount[idx] == 1 {
+                // the original record layout only has one reference; that means we can simply overwrite it with the modified data
+                if module.record_layout[idx].name != new_reclayout.name {
+                    // the name has changed, so idxmap needs to be fixed
                     recordlayout_info
                         .idxmap
-                        .insert(new_reclayout.name.to_owned(), module.record_layout.len());
-                    module.record_layout.push(new_reclayout);
-                    module.record_layout.last().unwrap().name.to_owned()
+                        .remove(&module.record_layout[idx].name);
+                    recordlayout_info
+                        .idxmap
+                        .insert(new_reclayout.name.to_owned(), idx);
                 }
+                module.record_layout[idx] = new_reclayout;
+                module.record_layout[idx].name.to_owned()
+            } else {
+                // the original record layout has multiple users, so it's reference count
+                // decreases by one and the new record layout is added to the list
+                recordlayout_info.refcount[idx] -= 1;
+                new_reclayout.name =
+                    make_unique_reclayout_name(new_reclayout.name, recordlayout_info);
+                recordlayout_info.refcount.push(1);
+                recordlayout_info
+                    .idxmap
+                    .insert(new_reclayout.name.to_owned(), module.record_layout.len());
+                module.record_layout.push(new_reclayout);
+                module.record_layout.last().unwrap().name.to_owned()
             }
         }
     } else {
@@ -253,7 +253,7 @@ fn make_unique_reclayout_name(
         // instead of BASIC_RECORD_LAYOUT_UPDATED_UPDATED
         let basename = if let Some(pos) = initial_name.find("_UPDATED") {
             let end_of_updated = pos + "_UPDATED".len();
-            if end_of_updated == initial_name.len() || initial_name[end_of_updated..].starts_with(".") {
+            if end_of_updated == initial_name.len() || initial_name[end_of_updated..].starts_with('.') {
                 initial_name[..end_of_updated].to_string()
             } else {
                 format!("{}_UPDATED", initial_name)
@@ -349,7 +349,7 @@ impl RecordLayoutInfo {
             .enumerate()
             .map(|(idx, rl)| (rl.name.to_owned(), idx))
             .collect();
-        let mut refcount = Vec::<usize>::with_capacity(module.record_layout.len());
+        let mut refcount = vec![0; module.record_layout.len()];
         refcount.resize(module.record_layout.len(), 0);
         for ap in &module.axis_pts {
             if let Some(idx) = idxmap.get(&ap.deposit_record) {

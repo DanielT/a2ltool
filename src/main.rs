@@ -95,8 +95,8 @@ fn core() -> Result<(), String> {
         cond_print!(verbose, now, format!("Performing consistency check for {}.", input_filename.to_string_lossy()));
         let mut log_msgs = Vec::<String>::new();
         a2l_file.check(&mut log_msgs);
-        if log_msgs.len() == 0 {
-            ext_println!(verbose, now, format!("Consistency check complete. No problems found."));
+        if log_msgs.is_empty() {
+            ext_println!(verbose, now, "Consistency check complete. No problems found.".to_string());
         } else {
             for  msg in &log_msgs {
                 ext_println!(verbose, now, format!("    {}", msg));
@@ -143,7 +143,7 @@ fn core() -> Result<(), String> {
     // merge includes
     if arg_matches.is_present("MERGEINCLUDES") {
         a2l_file.merge_includes();
-        cond_print!(verbose, now, format!("Include directives have been merged\n"));
+        cond_print!(verbose, now, "Include directives have been merged\n".to_string());
     }
 
     if let Some(debugdata) = &elf_info {
@@ -157,7 +157,7 @@ fn core() -> Result<(), String> {
                 cond_print!(verbose, now, msg);
             }
 
-            cond_print!(verbose, now, format!("Address update done\nSummary:"));
+            cond_print!(verbose, now, "Address update done\nSummary:".to_string());
             cond_print!(verbose, now, format!("   characteristic: {} updated, {} not found", summary.characteristic_updated, summary.characteristic_not_updated));
             cond_print!(verbose, now, format!("   measurement: {} updated, {} not found", summary.measurement_updated, summary.measurement_not_updated));
             cond_print!(verbose, now, format!("   axis_pts: {} updated, {} not found", summary.axis_pts_updated, summary.axis_pts_not_updated));
@@ -235,13 +235,13 @@ fn core() -> Result<(), String> {
     // remove unknown IF_DATA
     if arg_matches.is_present("IFDATA_CLEANUP") {
         a2l_file.ifdata_cleanup();
-        cond_print!(verbose, now, format!("Unknown ifdata removal is done"));
+        cond_print!(verbose, now, "Unknown ifdata removal is done".to_string());
     }
 
     // sort all elements in the file
     if arg_matches.is_present("SORT") {
         a2l_file.sort();
-        cond_print!(verbose, now, format!("All objects have been sorted"));
+        cond_print!(verbose, now, "All objects have been sorted".to_string());
     }
 
     // output
@@ -254,7 +254,7 @@ fn core() -> Result<(), String> {
     }
 
 
-    cond_print!(verbose, now, format!("\nRun complete. Have a nice day!\n\n"));
+    cond_print!(verbose, now, "\nRun complete. Have a nice day!\n\n".to_string());
 
     Ok(())
 }
@@ -480,8 +480,8 @@ fn get_args<'a>() -> ArgMatches<'a> {
 
 
 fn range_arg_validator(arg: String) -> Result<(), String> {
-    if arg.starts_with("0x") {
-        match u64::from_str_radix(&arg[2..], 16) {
+    if let Some(hexnumber) = arg.strip_prefix("0x") {
+        match u64::from_str_radix(hexnumber, 16) {
             Ok(_) => Ok(()),
             Err(error) => Err(format!("\"{}\" is not a valid address: {}", arg, error))
         }
@@ -498,8 +498,8 @@ fn range_args_to_ranges(args: Option<clap::Values>) -> Vec<(u64, u64)> {
     if let Some(values) = args {
         let rangevals: Vec<u64> = values.map(
             |arg| {
-                if arg.starts_with("0x") {
-                    u64::from_str_radix(&arg[2..], 16).unwrap()
+                if let Some(hexnumber) = arg.strip_prefix("0x") {
+                    u64::from_str_radix(hexnumber, 16).unwrap()
                 } else {
                     arg.parse::<u64>().unwrap()
                 }

@@ -164,7 +164,7 @@ fn insert_characteristic_sym(
             // Structs cannot be handled at all in this code. In some cases structs can be used by CHARACTERISTICs,
             // but in that case the struct represents function values together with axis info.
             // Much more information regarding which struct member has which use would be required
-            return Err(format!("Don't know how to add a CHARACTERISTIC for a struct. Please add a struct member instead."));
+            return Err("Don't know how to add a CHARACTERISTIC for a struct. Please add a struct member instead.".to_string());
         }
         TypeInfo::Array { arraytype, dim, .. } => {
             // an array is turned into a CHARACTERISTIC of type VAL_BLK, and needs a MATRIX_DIM sub-element
@@ -186,10 +186,10 @@ fn insert_characteristic_sym(
             // for compat with 1.61 and previous, "1" is set as the arry dimension for y and z if dim[1] and dim[2] don't exist
             matrix_dim
                 .dim_list
-                .push(*dim.get(1).unwrap_or_else(|| &1) as u16);
+                .push(*dim.get(1).unwrap_or(&1) as u16);
             matrix_dim
                 .dim_list
-                .push(*dim.get(2).unwrap_or_else(|| &1) as u16);
+                .push(*dim.get(2).unwrap_or(&1) as u16);
             newitem.matrix_dim = Some(matrix_dim);
             newitem
         }
@@ -246,11 +246,10 @@ fn insert_characteristic_sym(
         AddrType::Direct,
     ));
     // search through all existing record layouts and only add the new one if it doesn't exist yet
-    if module
+    if !module
         .record_layout
         .iter()
-        .find(|&rl| rl.name == recordlayout_name)
-        .is_none()
+        .any(|rl| rl.name == recordlayout_name)
     {
         module.record_layout.push(recordlayout);
     }
@@ -283,7 +282,7 @@ fn make_unique_measurement_name(
         None => measure_sym.to_string(),
     };
     // fail if the name still isn't unique
-    if let Some(_) = name_map.get(&item_name) {
+    if name_map.get(&item_name).is_some() {
         return Err(format!("MEASUREMENT {} already exists.", item_name));
     }
     Ok(item_name)
@@ -314,7 +313,7 @@ fn make_unique_characteristic_name(
         None => characteristic_sym.to_string(),
     };
     // fail if the name still isn't unique
-    if let Some(_) = name_map.get(&item_name) {
+    if name_map.get(&item_name).is_some() {
         return Err(format!("CHARACTERISTIC {} already exists.", item_name));
     }
     Ok(item_name)
@@ -464,17 +463,15 @@ pub(crate) fn insert_many(
 fn is_insert_requested(
     address: u64,
     symbol_name: &str,
-    addr_ranges: &Vec<(u64, u64)>,
-    name_regexes: &Vec<Regex>,
+    addr_ranges: &[(u64, u64)],
+    name_regexes: &[Regex],
 ) -> bool {
     // insert the symbol if its address is within any of the given ranges
-    addr_ranges.iter().map(
-            |(lower, upper)| *lower <= address && address < *upper
-        )
-        .fold(false, |acc, cur| acc || cur)
+    addr_ranges
+        .iter()
+        .any(|(lower, upper)| *lower <= address && address < *upper)
     // alternatively insert the symbol if its name is matched by any regex
-    || name_regexes.iter().map(
-            |re| re.is_match(symbol_name)
-        )
-        .fold(false, |acc, cur| acc || cur)
+    || name_regexes
+        .iter()
+        .any(|re| re.is_match(symbol_name))
 }

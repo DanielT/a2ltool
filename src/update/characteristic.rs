@@ -109,7 +109,7 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
     update_characteristic_axis(
         &mut characteristic.axis_descr,
         record_layout,
-        &axis_pts_dim,
+        axis_pts_dim,
         typeinfo
     );
     characteristic.deposit = update_record_layout(module, recordlayout_info, &characteristic.deposit, typeinfo);
@@ -195,14 +195,14 @@ pub(crate) fn cleanup_removed_characteristics(
     module: &mut Module,
     removed_items: &HashSet<String>
 ) {
-    if removed_items.len() == 0 {
+    if removed_items.is_empty() {
         return;
     }
 
     for group in &mut module.group {
         if let Some(ref_characteristic) = &mut group.ref_characteristic {
-            cleanup_item_list(&mut ref_characteristic.identifier_list, &removed_items);
-            if ref_characteristic.identifier_list.len() == 0 {
+            cleanup_item_list(&mut ref_characteristic.identifier_list, removed_items);
+            if ref_characteristic.identifier_list.is_empty() {
                 group.ref_characteristic = None;
             }
         }
@@ -210,14 +210,14 @@ pub(crate) fn cleanup_removed_characteristics(
 
     for function in &mut module.function {
         if let Some(def_characteristic) = &mut function.def_characteristic {
-            cleanup_item_list(&mut def_characteristic.identifier_list, &removed_items);
-            if def_characteristic.identifier_list.len() == 0 {
+            cleanup_item_list(&mut def_characteristic.identifier_list, removed_items);
+            if def_characteristic.identifier_list.is_empty() {
                 function.def_characteristic = None;
             }
         }
         if let Some(ref_characteristic) = &mut function.ref_characteristic {
-            cleanup_item_list(&mut ref_characteristic.identifier_list, &removed_items);
-            if ref_characteristic.identifier_list.len() == 0 {
+            cleanup_item_list(&mut ref_characteristic.identifier_list, removed_items);
+            if ref_characteristic.identifier_list.is_empty() {
                 function.ref_characteristic = None;
             }
         }

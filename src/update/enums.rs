@@ -6,7 +6,7 @@ use crate::dwarf::TypeInfo;
 pub(crate) fn cond_create_enum_conversion(
     module: &mut Module,
     typename: &str,
-    enumerators: &Vec<(String, i64)>
+    enumerators: &[(String, i64)]
 ) {
     let compu_method_find = module.compu_method.iter().find(|item| item.name == typename);
     if compu_method_find.is_none() {
@@ -58,7 +58,7 @@ pub(crate) fn update_enum_compu_methods(
 ) {
     // enum_convlist: a table of COMPU_METHODS and the associated types (filtered to contain only enums)
     // if the list is empty then there is nothing to do
-    if enum_convlist.len() == 0 {
+    if enum_convlist.is_empty() {
         return;
     }
 

@@ -233,21 +233,21 @@ fn get_global_variable(
             if let Some(specification_entry) = get_specification_attribute(entry, unit, abbrev) {
                 // the entry refers to a specification, which contains the name and type reference
                 let name = get_name_attribute(&specification_entry, dwarf)?;
-                let typeref = get_typeref_attribute(&specification_entry, &unit)?;
+                let typeref = get_typeref_attribute(&specification_entry, unit)?;
 
                 Ok(Some( (name, typeref, address) ))
             } else if let Some(abstract_origin_entry) = get_abstract_origin_attribute(entry, unit, abbrev) {
                 // the entry refers to an abstract origin, which should also be considered when getting the name and type ref
                 let name = get_name_attribute(entry, dwarf)
                     .or_else(|_| get_name_attribute(&abstract_origin_entry, dwarf))?;
-                let typeref = get_typeref_attribute(entry, &unit)
-                    .or_else(|_| get_typeref_attribute(&abstract_origin_entry, &unit))?;
+                let typeref = get_typeref_attribute(entry, unit)
+                    .or_else(|_| get_typeref_attribute(&abstract_origin_entry, unit))?;
 
                 Ok(Some( (name, typeref, address) ))
             } else {
                 // usual case: there is no specification or abstract origin and all info is part of this entry
                 let name = get_name_attribute(entry, dwarf)?;
-                let typeref = get_typeref_attribute(entry, &unit)?;
+                let typeref = get_typeref_attribute(entry, unit)?;
 
                 Ok(Some( (name, typeref, address) ))
             }
@@ -272,7 +272,7 @@ impl<'a> UnitList<'a> {
         self.list.push((unit, abbrev));
     }
 
-    fn get_unit<'b>(&'b self, itemoffset: usize) -> Option<usize> {
+    fn get_unit(&self, itemoffset: usize) -> Option<usize> {
         for (idx, (unit, _)) in self.list.iter().enumerate() {
             let unitoffset = unit.offset().as_debug_info_offset().unwrap().0;
             if unitoffset < itemoffset && unitoffset + unit.length_including_self() > itemoffset {

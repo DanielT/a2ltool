@@ -122,7 +122,7 @@ fn check_version_1_70(a2l_file: &A2lFile) -> bool {
 fn get_symbol_info<'a>(
     name: &str,
     opt_symbol_link: &Option<SymbolLink>,
-    ifdata_vec: &Vec<IfData>,
+    ifdata_vec: &[IfData],
     debug_data: &'a DebugData
 ) -> Result<(u64, &'a TypeInfo, String), Vec<String>> {
     let mut symbol_link_errmsg = None;
@@ -152,14 +152,14 @@ fn get_symbol_info<'a>(
 
     // If there is no SYMBOL_LINK and no (usable) IF_DATA, then maybe the object name is also the symbol name
     if opt_symbol_link.is_none() {
-        match find_symbol(&name, debug_data) {
+        match find_symbol(name, debug_data) {
             Ok((addr, typeinfo)) => {
                 return Ok((addr, typeinfo, name.to_string()))
             }
             Err(errmsg) => object_name_errmsg = Some(errmsg)
         };
     }
-    
+
     // all attempts to get a matching symbol from the debug info have failed
     // construct an array of (unique) error messages
     let mut errorstrings = Vec::<String>::new();
@@ -228,12 +228,12 @@ fn set_measurement_bitmask(opt_bitmask: &mut Option<BitMask>, datatype: &TypeInf
 
 // Try to get a symbol name from an IF_DATA object.
 // specifically the pseudo-standard CANAPE_EXT could be present and contain symbol information
-fn get_symbol_name_from_ifdata(ifdata_vec: &Vec<IfData>) -> Option<String> {
+fn get_symbol_name_from_ifdata(ifdata_vec: &[IfData]) -> Option<String> {
     for ifdata in ifdata_vec {
         if let Some(decoded) = ifdata::A2mlVector::load_from_ifdata(ifdata) {
             if let Some(canape_ext) = decoded.canape_ext {
                 if let Some(link_map) = canape_ext.link_map {
-                    return Some(link_map.symbol_name.to_owned());
+                    return Some(link_map.symbol_name);
                 }
             }
         }

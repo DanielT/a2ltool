@@ -1,3 +1,5 @@
+#![allow(clippy::all)] // don't care about mesages in generated code
+
 use a2lfile::a2ml_specification;
 
 a2ml_specification! {
