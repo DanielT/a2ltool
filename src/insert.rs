@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use a2lfile::*;
+use std::collections::HashMap;
 
-use crate::dwarf::*;
 use crate::datatype::*;
+use crate::dwarf::*;
 use crate::update::enums;
 use regex::Regex;
 
@@ -12,24 +12,39 @@ enum ItemType {
     Characteristic(usize),
     Instance(usize),
     Blob(usize),
-    AxisPts(usize)
+    AxisPts(usize),
 }
 
 pub(crate) fn insert_items(
     a2l_file: &mut A2lFile,
     debugdata: &DebugData,
     measurement_symbols: Vec<&str>,
-    characteristic_symbols: Vec<&str>
+    characteristic_symbols: Vec<&str>,
+    log_msgs: &mut Vec<String>,
 ) {
     let module = &mut a2l_file.project.module[0];
     let (name_map, sym_map) = build_maps(&module);
 
     for measure_sym in measurement_symbols {
-        insert_measurement(module, debugdata, measure_sym, &name_map, &sym_map);
+        match insert_measurement(module, debugdata, measure_sym, &name_map, &sym_map) {
+            Ok(measure_name) => {
+                log_msgs.push(format!("Inserted MEASUREMENT {}", measure_name));
+            }
+            Err(errmsg) => {
+                log_msgs.push(format!("Error: {}", errmsg));
+            }
+        }
     }
 
     for characteristic_sym in characteristic_symbols {
-        insert_characteristic(module, debugdata, characteristic_sym, &name_map, &sym_map);
+        match insert_characteristic(module, debugdata, characteristic_sym, &name_map, &sym_map) {
+            Ok(characteristic_name) => {
+                log_msgs.push(format!("Inserted CHARACTERISTIC {}", characteristic_name));
+            }
+            Err(errmsg) => {
+                log_msgs.push(format!("Error: {}", errmsg));
+            }
+        }
     }
 }
 
@@ -40,16 +55,17 @@ fn insert_measurement(
     debugdata: &DebugData,
     measure_sym: &str,
     name_map: &HashMap<String, ItemType>,
-    sym_map: &HashMap<String, ItemType>
-) {
+    sym_map: &HashMap<String, ItemType>,
+) -> Result<String, String> {
     // get info about the symbol from the debug data
     match crate::symbol::find_symbol(measure_sym, debugdata) {
         Ok((address, typeinfo)) => {
-            insert_measurement_sym(module, measure_sym, name_map, sym_map, typeinfo, address);
+            insert_measurement_sym(module, measure_sym, name_map, sym_map, typeinfo, address)
         }
-        Err(errmsg) => {
-            println!("Symbol {} could not be added: {}", measure_sym, errmsg);
-        }
+        Err(errmsg) => Err(format!(
+            "Symbol {} could not be added: {}",
+            measure_sym, errmsg
+        )),
     }
 }
 
@@ -60,38 +76,45 @@ fn insert_measurement_sym(
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, ItemType>,
     typeinfo: &TypeInfo,
-    address: u64
-) -> bool {
+    address: u64,
+) -> Result<String, String> {
     // Abort if a MEASUREMENT for this symbol already exists. Warn if any other reference to the symbol exists
     let item_name = match make_unique_measurement_name(module, sym_map, measure_sym, name_map) {
-        Some(value) => value,
-        None => return false,
+        Ok(value) => value,
+        Err(errmsg) => return Err(errmsg),
     };
 
     let datatype = get_a2l_datatype(typeinfo);
     let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
     let mut new_measurement = Measurement::new(
-        item_name,
-        format!("measurement for symbol {}",
-        measure_sym),
+        item_name.clone(),
+        format!("measurement for symbol {}", measure_sym),
         datatype,
         "NO_COMPU_METHOD".to_string(),
         0,
         0f64,
         lower_limit,
-        upper_limit
+        upper_limit,
     );
+    // create an ECU_ADDRESS attribute, and set it tot hex display mode
     let mut ecu_address = EcuAddress::new(address as u32);
     ecu_address.get_layout_mut().item_location.0.1 = true;
     new_measurement.ecu_address = Some(ecu_address);
+    // create a SYMBOL_LINK attribute
     new_measurement.symbol_link = Some(SymbolLink::new(measure_sym.to_string(), 0));
-    if let TypeInfo::Enum{typename, enumerators, ..} = typeinfo {
+    // create a conversion table for enums
+    if let TypeInfo::Enum {
+        typename,
+        enumerators,
+        ..
+    } = typeinfo
+    {
         new_measurement.conversion = typename.to_owned();
         enums::cond_create_enum_conversion(module, typename, enumerators);
     }
     module.measurement.push(new_measurement);
 
-    true
+    Ok(item_name)
 }
 
 
@@ -101,16 +124,22 @@ fn insert_characteristic(
     debugdata: &DebugData,
     characteristic_sym: &str,
     name_map: &HashMap<String, ItemType>,
-    sym_map: &HashMap<String, ItemType>
-) {
+    sym_map: &HashMap<String, ItemType>,
+) -> Result<String, String> {
     // get info about the symbol from the debug data
     match crate::symbol::find_symbol(characteristic_sym, debugdata) {
-        Ok((address, typeinfo)) => {
-            insert_characteristic_sym(module, characteristic_sym, name_map, sym_map, typeinfo, address);
-        }
-        Err(errmsg) => {
-            println!("Symbol {} could not be added: {}", characteristic_sym, errmsg);
-        }
+        Ok((address, typeinfo)) => insert_characteristic_sym(
+            module,
+            characteristic_sym,
+            name_map,
+            sym_map,
+            typeinfo,
+            address,
+        ),
+        Err(errmsg) => Err(format!(
+            "Symbol {} could not be added: {}",
+            characteristic_sym, errmsg
+        )),
     }
 }
 
@@ -121,29 +150,27 @@ fn insert_characteristic_sym(
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, ItemType>,
     typeinfo: &TypeInfo,
-    address: u64
-) -> bool {
-    let item_name = match make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map) {
-        Some(value) => value,
-        None => return false,
-    };
+    address: u64,
+) -> Result<String, String> {
+    let item_name =
+        match make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map) {
+            Ok(value) => value,
+            Err(errmsg) => return Err(errmsg),
+        };
     let datatype = get_a2l_datatype(typeinfo);
     let recordlayout_name = format!("__{}_Z", datatype.to_string());
     let mut new_characteristic = match typeinfo {
-        TypeInfo::Class{..} |
-        TypeInfo::Union{..} |
-        TypeInfo::Struct{..} => {
+        TypeInfo::Class { .. } | TypeInfo::Union { .. } | TypeInfo::Struct { .. } => {
             // Structs cannot be handled at all in this code. In some cases structs can be used by CHARACTERISTICs,
             // but in that case the struct represents function values together with axis info.
             // Much more information regarding which struct member has which use would be required
-            println!("  Don't know how to add a CHARACTERISTIC for a struct. Please add a struct member instead.");
-            return false;
+            return Err(format!("Don't know how to add a CHARACTERISTIC for a struct. Please add a struct member instead."));
         }
-        TypeInfo::Array{arraytype, dim, ..} => {
+        TypeInfo::Array { arraytype, dim, .. } => {
             // an array is turned into a CHARACTERISTIC of type VAL_BLK, and needs a MATRIX_DIM sub-element
             let (lower_limit, upper_limit) = get_type_limits(arraytype, f64::MIN, f64::MAX);
             let mut newitem = Characteristic::new(
-                item_name,
+                item_name.clone(),
                 format!("characterisitic for {}", characteristic_sym),
                 CharacteristicType::ValBlk,
                 address as u32,
@@ -151,23 +178,27 @@ fn insert_characteristic_sym(
                 0f64,
                 "NO_COMPU_METHOD".to_string(),
                 lower_limit,
-                upper_limit
+                upper_limit,
             );
             let mut matrix_dim = MatrixDim::new();
             // dim[0] always exists
             matrix_dim.dim_list.push(dim[0] as u16);
             // for compat with 1.61 and previous, "1" is set as the arry dimension for y and z if dim[1] and dim[2] don't exist
-            matrix_dim.dim_list.push(*dim.get(1).unwrap_or_else(|| &1) as u16);
-            matrix_dim.dim_list.push(*dim.get(2).unwrap_or_else(|| &1) as u16);
+            matrix_dim
+                .dim_list
+                .push(*dim.get(1).unwrap_or_else(|| &1) as u16);
+            matrix_dim
+                .dim_list
+                .push(*dim.get(2).unwrap_or_else(|| &1) as u16);
             newitem.matrix_dim = Some(matrix_dim);
             newitem
         }
-        TypeInfo::Enum{typename, enumerators, ..} => {
+        TypeInfo::Enum{ typename, enumerators, .. } => {
             // CHARACTERISTICs for enums get a COMPU_METHOD and COMPU_VTAB providing translation of values to text
             let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
             enums::cond_create_enum_conversion(module, typename, enumerators);
             Characteristic::new(
-                item_name,
+                item_name.clone(),
                 format!("characterisitic for {}", characteristic_sym),
                 CharacteristicType::Value,
                 address as u32,
@@ -175,14 +206,14 @@ fn insert_characteristic_sym(
                 0f64,
                 typename.to_string(),
                 lower_limit,
-                upper_limit
+                upper_limit,
             )
         }
         _ => {
             // any other data type: create a basic CHARACTERISTIC
             let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
             Characteristic::new(
-                item_name,
+                item_name.clone(),
                 format!("characteristic for {}", characteristic_sym),
                 CharacteristicType::Value,
                 address as u32,
@@ -190,7 +221,7 @@ fn insert_characteristic_sym(
                 0f64,
                 "NO_COMPU_METHOD".to_string(),
                 lower_limit,
-                upper_limit
+                upper_limit,
             )
         }
     };
@@ -208,13 +239,23 @@ fn insert_characteristic_sym(
     let mut recordlayout = RecordLayout::new(recordlayout_name.to_owned());
     // set item 0 (name) to use an offset of 0 lines, i.e. no line break after /begin RECORD_LAYOUT
     recordlayout.get_layout_mut().item_location.0 = 0;
-    recordlayout.fnc_values = Some(FncValues::new(1, datatype, IndexMode::RowDir, AddrType::Direct));
+    recordlayout.fnc_values = Some(FncValues::new(
+        1,
+        datatype,
+        IndexMode::RowDir,
+        AddrType::Direct,
+    ));
     // search through all existing record layouts and only add the new one if it doesn't exist yet
-    if module.record_layout.iter().find(|&rl| rl.name == recordlayout_name).is_none() {
+    if module
+        .record_layout
+        .iter()
+        .find(|&rl| rl.name == recordlayout_name)
+        .is_none()
+    {
         module.record_layout.push(recordlayout);
     }
 
-    true
+    Ok(item_name)
 }
 
 
@@ -222,43 +263,30 @@ fn make_unique_measurement_name(
     module: &Module,
     sym_map: &HashMap<String, ItemType>,
     measure_sym: &str,
-    name_map: &HashMap<String, ItemType>
-) -> Option<String> {
+    name_map: &HashMap<String, ItemType>,
+) -> Result<String, String> {
+    // ideally the item name is the symbol name.
+    // If an object of a different type already has this name, add the prefix "CHARACTERISTIC."
     let item_name = match sym_map.get(measure_sym) {
         Some(ItemType::Measurement(idx)) => {
-            println!("  MEASUREMENT {} already references symbol {}. It will not be added again.",
-                module.measurement[*idx].name, measure_sym);
-            return None;
+            return Err(format!(
+                "MEASUREMENT {} already references symbol {}.",
+                module.measurement[*idx].name, measure_sym
+            ))
         }
-        Some(ItemType::Characteristic(idx)) => {
-            println!("  CHARACTERISTIC {} already references symbol {}.",
-                module.characteristic[*idx].name, measure_sym);
+        Some(ItemType::Characteristic(_))
+        | Some(ItemType::Instance(_))
+        | Some(ItemType::Blob(_))
+        | Some(ItemType::AxisPts(_)) => {
             format!("MEASUREMENT.{}", measure_sym)
         }
-        Some(ItemType::Instance(idx)) => {
-            println!("  INSTANCE {} already references symbol {}.",
-                module.instance[*idx].name, measure_sym);
-            format!("MEASUREMENT.{}", measure_sym)
-        }
-        Some(ItemType::Blob(idx)) => {
-            println!("  BLOB {} already references symbol {}.",
-                module.blob[*idx].name, measure_sym);
-            format!("MEASUREMENT.{}", measure_sym)
-        }
-        Some(ItemType::AxisPts(idx)) => {
-            println!("  AXIS_PTS {} already references symbol {}.",
-                module.axis_pts[*idx].name, measure_sym);
-            format!("MEASUREMENT.{}", measure_sym)
-        }
-        None => {
-            measure_sym.to_string()
-        }
+        None => measure_sym.to_string(),
     };
+    // fail if the name still isn't unique
     if let Some(_) = name_map.get(&item_name) {
-        println!("  The item name {} is already in use. No MEASUREMENT will be added for symbol {}.", item_name, measure_sym);
-        return None;
+        return Err(format!("MEASUREMENT {} already exists.", item_name));
     }
-    Some(item_name)
+    Ok(item_name)
 }
 
 
@@ -266,43 +294,30 @@ fn make_unique_characteristic_name(
     module: &Module,
     sym_map: &HashMap<String, ItemType>,
     characteristic_sym: &str,
-    name_map: &HashMap<String, ItemType>
-) -> Option<String> {
+    name_map: &HashMap<String, ItemType>,
+) -> Result<String, String> {
+    // ideally the item name is the symbol name.
+    // If an object of a different type already has this name, add the prefix "CHARACTERISTIC."
     let item_name = match sym_map.get(characteristic_sym) {
         Some(ItemType::Characteristic(idx)) => {
-            println!("  CHARACTERISTIC {} already references symbol {}. It will not be added again.",
-                module.characteristic[*idx].name, characteristic_sym);
-            return None;
+            return Err(format!(
+                "CHARACTERISTIC {} already references symbol {}.",
+                module.characteristic[*idx].name, characteristic_sym
+            ))
         }
-        Some(ItemType::Measurement(idx)) => {
-            println!("  MEASUREMENT {} already references symbol {}.",
-                module.measurement[*idx].name, characteristic_sym);
+        Some(ItemType::Measurement(_))
+        | Some(ItemType::Instance(_))
+        | Some(ItemType::Blob(_))
+        | Some(ItemType::AxisPts(_)) => {
             format!("CHARACTERISTIC.{}", characteristic_sym)
         }
-        Some(ItemType::Instance(idx)) => {
-            println!("  INSTANCE {} already references symbol {}.",
-                module.instance[*idx].name, characteristic_sym);
-            format!("CHARACTERISTIC.{}", characteristic_sym)
-        }
-        Some(ItemType::Blob(idx)) => {
-            println!("  BLOB {} already references symbol {}.",
-                module.blob[*idx].name, characteristic_sym);
-            format!("CHARACTERISTIC.{}", characteristic_sym)
-        }
-        Some(ItemType::AxisPts(idx)) => {
-            println!("  AXIS_PTS {} already references symbol {}.",
-                module.axis_pts[*idx].name, characteristic_sym);
-            format!("CHARACTERISTIC.{}", characteristic_sym)
-        }
-        None => {
-            characteristic_sym.to_string()
-        }
+        None => characteristic_sym.to_string(),
     };
+    // fail if the name still isn't unique
     if let Some(_) = name_map.get(&item_name) {
-        println!("  The item name {} is already in use. No CHARACTERISTIC will be added for symbol {}.", item_name, characteristic_sym);
-        return None;
+        return Err(format!("CHARACTERISTIC {} already exists.", item_name));
     }
-    Some(item_name)
+    Ok(item_name)
 }
 
 
@@ -344,51 +359,14 @@ fn build_maps(module: &&mut Module) -> (HashMap<String, ItemType>, HashMap<Strin
 }
 
 
-pub(crate) fn insert_ranges(
+pub(crate) fn insert_many(
     a2l_file: &mut A2lFile,
     debugdata: &DebugData,
     measurement_ranges: Vec<(u64, u64)>,
-    characteristic_ranges: Vec<(u64, u64)>
-) {
-    let module = &mut a2l_file.project.module[0];
-    let (name_map, sym_map) = build_maps(&module);
-
-    for (symbol_name, symbol_type, address) in debugdata.iter() {
-        match symbol_type {
-            Some(TypeInfo::Array{..}) |
-            Some(TypeInfo::Struct{..}) |
-            Some(TypeInfo::Union{..}) |
-            Some(TypeInfo::Class{..}) => {
-                // don't insert complex types directly. Their individual members will be inserted instead
-            }
-            Some(typeinfo) => {
-                // insert the symbol as a measurement if it's address is within any of the given ranges
-                for (lower_limit, upper_limit) in &measurement_ranges {
-                    if *lower_limit <= address && address < *upper_limit {
-                        insert_measurement_sym(module, &symbol_name, &name_map, &sym_map, typeinfo, address);
-                    }
-                }
-
-                // insert the symbol as a characteristic if it's address is within any of the given ranges
-                for (lower_limit, upper_limit) in &characteristic_ranges {
-                    if *lower_limit <= address && address < *upper_limit {
-                        insert_characteristic_sym(module, &symbol_name, &name_map, &sym_map, typeinfo, address);
-                    }
-                }
-            }
-            None => {
-                // no type info, can't insert this symbol
-            }
-        }
-    }
-}
-
-
-pub(crate) fn insert_regex(
-    a2l_file: &mut A2lFile,
-    debugdata: &DebugData,
+    characteristic_ranges: Vec<(u64, u64)>,
     measurement_regexes: Vec<&str>,
-    characteristic_regexes: Vec<&str>
+    characteristic_regexes: Vec<&str>,
+    log_msgs: &mut Vec<String>,
 ) {
     // compile the regular expressions
     let mut compiled_meas_re = Vec::new();
@@ -396,39 +374,76 @@ pub(crate) fn insert_regex(
     for expr in measurement_regexes {
         match Regex::new(expr) {
             Ok(compiled_re) => compiled_meas_re.push(compiled_re),
-            Err(error) => println!("Invalid regex \"{}\": {}", expr, error)
+            Err(error) => println!("Invalid regex \"{}\": {}", expr, error),
         }
     }
     for expr in characteristic_regexes {
         match Regex::new(expr) {
             Ok(compiled_re) => compiled_char_re.push(compiled_re),
-            Err(error) => println!("Invalid regex \"{}\": {}", expr, error)
+            Err(error) => println!("Invalid regex \"{}\": {}", expr, error),
         }
     }
-
     let module = &mut a2l_file.project.module[0];
     let (name_map, sym_map) = build_maps(&module);
+    let mut insert_meas_count = 0u32;
+    let mut insert_chara_count = 0u32;
 
     for (symbol_name, symbol_type, address) in debugdata.iter() {
         match symbol_type {
-            Some(TypeInfo::Array{..}) |
-            Some(TypeInfo::Struct{..}) |
-            Some(TypeInfo::Union{..}) |
-            Some(TypeInfo::Class{..}) => {
+            Some(TypeInfo::Array { .. })
+            | Some(TypeInfo::Struct { .. })
+            | Some(TypeInfo::Union { .. })
+            | Some(TypeInfo::Class { .. }) => {
                 // don't insert complex types directly. Their individual members will be inserted instead
             }
             Some(typeinfo) => {
-                // insert the symbol as a measurement if it's address is within any of the given ranges
-                for re in &compiled_meas_re {
-                    if re.is_match(&symbol_name) {
-                        insert_measurement_sym(module, &symbol_name, &name_map, &sym_map, typeinfo, address);
+                // insert if the address is inside a given range, or if a regex matches the symbol name
+                if is_insert_requested(
+                    address,
+                    &symbol_name,
+                    &measurement_ranges,
+                    &compiled_meas_re,
+                ) {
+                    match insert_measurement_sym(
+                        module,
+                        &symbol_name,
+                        &name_map,
+                        &sym_map,
+                        typeinfo,
+                        address,
+                    ) {
+                        Ok(measurement_name) => {
+                            log_msgs.push(format!("Inserted MEASUREMENT {} (0x{:08x})", measurement_name, address));
+                            insert_meas_count += 1;
+                        }
+                        Err(errmsg) => {
+                            log_msgs.push(format!("Error: {}", errmsg));
+                        }
                     }
                 }
 
-                // insert the symbol as a characteristic if it's address is within any of the given ranges
-                for re in &compiled_char_re {
-                    if re.is_match(&symbol_name) {
-                        insert_characteristic_sym(module, &symbol_name, &name_map, &sym_map, typeinfo, address);
+                // insert if the address is inside a given range, or if a regex matches the symbol name
+                if is_insert_requested(
+                    address,
+                    &symbol_name,
+                    &characteristic_ranges,
+                    &compiled_char_re,
+                ) {
+                    match insert_characteristic_sym(
+                        module,
+                        &symbol_name,
+                        &name_map,
+                        &sym_map,
+                        typeinfo,
+                        address,
+                    ) {
+                        Ok(characteristic_name) => {
+                            log_msgs.push(format!("Inserted CHARACTERISTIC {} (0x{:08x})", characteristic_name, address));
+                            insert_chara_count += 1;
+                        }
+                        Err(errmsg) => {
+                            log_msgs.push(format!("Error: {}", errmsg));
+                        }
                     }
                 }
             }
@@ -437,4 +452,29 @@ pub(crate) fn insert_regex(
             }
         }
     }
+
+    if insert_meas_count > 0 {
+        log_msgs.push(format!("Inserted {} MEASUREMENTs", insert_meas_count));
+    }
+    if insert_chara_count > 0 {
+        log_msgs.push(format!("Inserted {} CHARACTERISTICs", insert_chara_count));
+    }
+}
+
+fn is_insert_requested(
+    address: u64,
+    symbol_name: &str,
+    addr_ranges: &Vec<(u64, u64)>,
+    name_regexes: &Vec<Regex>,
+) -> bool {
+    // insert the symbol if its address is within any of the given ranges
+    addr_ranges.iter().map(
+            |(lower, upper)| *lower <= address && address < *upper
+        )
+        .fold(false, |acc, cur| acc || cur)
+    // alternatively insert the symbol if its name is matched by any regex
+    || name_regexes.iter().map(
+            |re| re.is_match(symbol_name)
+        )
+        .fold(false, |acc, cur| acc || cur)
 }

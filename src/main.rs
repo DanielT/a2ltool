@@ -146,73 +146,89 @@ fn core() -> Result<(), String> {
         cond_print!(verbose, now, format!("Include directives have been merged\n"));
     }
 
-    // update addresses
-    if arg_matches.is_present("UPDATE") || arg_matches.is_present("SAFE_UPDATE") {
-        let preserve_unknown = arg_matches.is_present("SAFE_UPDATE");
-        let mut log_msgs = Vec::<String>::new();
-        let summary = update::update_addresses(&mut a2l_file, &elf_info.as_ref().unwrap(), &mut log_msgs, preserve_unknown);
+    if let Some(debugdata) = &elf_info {
+        // update addresses
+        if arg_matches.is_present("UPDATE") || arg_matches.is_present("SAFE_UPDATE") {
+            let preserve_unknown = arg_matches.is_present("SAFE_UPDATE");
+            let mut log_msgs = Vec::<String>::new();
+            let summary = update::update_addresses(&mut a2l_file, debugdata, &mut log_msgs, preserve_unknown);
 
-        for msg in log_msgs {
-            cond_print!(verbose, now, msg);
+            for msg in log_msgs {
+                cond_print!(verbose, now, msg);
+            }
+
+            cond_print!(verbose, now, format!("Address update done\nSummary:"));
+            cond_print!(verbose, now, format!("   characteristic: {} updated, {} not found", summary.characteristic_updated, summary.characteristic_not_updated));
+            cond_print!(verbose, now, format!("   measurement: {} updated, {} not found", summary.measurement_updated, summary.measurement_not_updated));
+            cond_print!(verbose, now, format!("   axis_pts: {} updated, {} not found", summary.axis_pts_updated, summary.axis_pts_not_updated));
+            cond_print!(verbose, now, format!("   blob: {} updated, {} not found", summary.blob_updated, summary.blob_not_updated));
+            cond_print!(verbose, now, format!("   instance: {} updated, {} not found", summary.instance_updated, summary.instance_not_updated));
         }
 
-        cond_print!(verbose, now, format!("Address update done\nSummary:"));
-        cond_print!(verbose, now, format!("   characteristic: {} updated, {} not found", summary.characteristic_updated, summary.characteristic_not_updated));
-        cond_print!(verbose, now, format!("   measurement: {} updated, {} not found", summary.measurement_updated, summary.measurement_not_updated));
-        cond_print!(verbose, now, format!("   axis_pts: {} updated, {} not found", summary.axis_pts_updated, summary.axis_pts_not_updated));
-        cond_print!(verbose, now, format!("   blob: {} updated, {} not found", summary.blob_updated, summary.blob_not_updated));
-        cond_print!(verbose, now, format!("   instance: {} updated, {} not found", summary.instance_updated, summary.instance_not_updated));
-    }
+        // create new items
+        if arg_matches.is_present("INSERT_CHARACTERISTIC")
+            || arg_matches.is_present("INSERT_MEASUREMENT")
+        {
+            let measurement_symbols: Vec<&str> =
+                if let Some(values) = arg_matches.values_of("INSERT_MEASUREMENT") {
+                    values.into_iter().collect()
+                } else {
+                    Vec::new()
+                };
+            let characteristic_symbols: Vec<&str> =
+                if let Some(values) = arg_matches.values_of("INSERT_CHARACTERISTIC") {
+                    values.into_iter().collect()
+                } else {
+                    Vec::new()
+                };
 
-    // create new items
-    if arg_matches.is_present("INSERT_CHARACTERISTIC") || arg_matches.is_present("INSERT_MEASUREMENT") {
-        let measurement_symbols: Vec<&str> =
-            if let Some(values) = arg_matches.values_of("INSERT_MEASUREMENT") {
-                values.into_iter().collect()
-            } else {
-                Vec::new()
+            let mut log_msgs: Vec<String> = Vec::new();
+            insert::insert_items(
+                &mut a2l_file,
+                debugdata,
+                measurement_symbols,
+                characteristic_symbols,
+                &mut log_msgs,
+            );
+            for msg in log_msgs {
+                cond_print!(verbose, now, msg);
+            }
+        }
+
+        if arg_matches.is_present("INSERT_CHARACTERISTIC_RANGE")
+            || arg_matches.is_present("INSERT_MEASUREMENT_RANGE")
+            || arg_matches.is_present("INSERT_CHARACTERISTIC_REGEX")
+            || arg_matches.is_present("INSERT_MEASUREMENT_REGEX")
+        {
+            let meas_ranges =
+                range_args_to_ranges(arg_matches.values_of("INSERT_MEASUREMENT_RANGE"));
+            let char_ranges =
+                range_args_to_ranges(arg_matches.values_of("INSERT_CHARACTERISTIC_RANGE"));
+            let meas_regexes: Vec<&str> = match arg_matches.values_of("INSERT_MEASUREMENT_REGEX") {
+                Some(values) => values.collect(),
+                None => Vec::new(),
             };
-        let characteristic_symbols: Vec<&str> =
-            if let Some(values) = arg_matches.values_of("INSERT_CHARACTERISTIC") {
-                values.into_iter().collect()
-            } else {
-                Vec::new()
+            let char_regexes: Vec<&str> = match arg_matches.values_of("INSERT_CHARACTERISTIC_REGEX")
+            {
+                Some(values) => values.collect(),
+                None => Vec::new(),
             };
-        
-        insert::insert_items(
-            &mut a2l_file,
-            &elf_info.as_ref().unwrap(),
-            measurement_symbols,
-            characteristic_symbols
-        );
-    }
-    if arg_matches.is_present("INSERT_CHARACTERISTIC_RANGE") || arg_matches.is_present("INSERT_MEASUREMENT_RANGE") {
-        let meas_ranges = range_args_to_ranges(arg_matches.values_of("INSERT_MEASUREMENT_RANGE"));
-        let char_ranges = range_args_to_ranges(arg_matches.values_of("INSERT_CHARACTERISTIC_RANGE"));
 
-        insert::insert_ranges(
-            &mut a2l_file,
-            &elf_info.as_ref().unwrap(),
-            meas_ranges,
-            char_ranges
-        );
-    }
-    if arg_matches.is_present("INSERT_CHARACTERISTIC_REGEX") || arg_matches.is_present("INSERT_MEASUREMENT_REGEX") {
-        let meas_regexes: Vec<&str> = match arg_matches.values_of("INSERT_MEASUREMENT_REGEX") {
-            Some(values) => values.collect(),
-            None => Vec::new()
-        };
-        let char_regexes: Vec<&str> = match arg_matches.values_of("INSERT_CHARACTERISTIC_RANGE") {
-            Some(values) => values.collect(),
-            None => Vec::new()
-        };
+            let mut log_msgs: Vec<String> = Vec::new();
+            insert::insert_many(
+                &mut a2l_file,
+                debugdata,
+                meas_ranges,
+                char_ranges,
+                meas_regexes,
+                char_regexes,
+                &mut log_msgs,
+            );
+            for msg in log_msgs {
+                cond_print!(verbose, now, msg);
+            }
+        }
 
-        insert::insert_regex(
-            &mut a2l_file,
-            &elf_info.as_ref().unwrap(),
-            meas_regexes,
-            char_regexes
-        );
     }
 
 
