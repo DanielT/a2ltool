@@ -106,8 +106,7 @@ fn core() -> Result<(), String> {
     }
 
     // load elf
-    let elf_info = if arg_matches.is_present("ELFFILE") {
-        let elffile = arg_matches.value_of_os("ELFFILE").unwrap();
+    let elf_info = if let Some(elffile) = arg_matches.value_of_os("ELFFILE") {
         let elf_info = DebugData::load(elffile, verbose > 0)?;
         cond_print!(verbose, now, format!("Variables and types loaded from \"{}\": {} variables available", elffile.to_string_lossy(), elf_info.variables.len()));
         if debugprint {
@@ -247,10 +246,11 @@ fn core() -> Result<(), String> {
     // output
     if arg_matches.is_present("OUTPUT") {
         a2l_file.sort_new_items();
-        let out_filename = arg_matches.value_of("OUTPUT").unwrap();
-        let banner = &*format!("a2ltool {}", crate_version!());
-        a2l_file.write(out_filename, Some(banner))?;
-        cond_print!(verbose, now, format!("Output written to \"{}\"", out_filename));
+        if let Some(out_filename) = arg_matches.value_of_os("OUTPUT") {
+            let banner = &*format!("a2ltool {}", crate_version!());
+            a2l_file.write(out_filename, Some(banner))?;
+            cond_print!(verbose, now, format!("Output written to \"{}\"", out_filename.to_string_lossy()));
+        }
     }
 
 
