@@ -4,18 +4,18 @@ version = 3
 
 [[package]]
 name = "a2lfile"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "515feaa3b5c95872af7b59f3d8ded26ea1379e4e0533fc2c313ff621b92a686d"
+checksum = "ecc5defe972b09fcd87ebadd99aa53b7b430dc5bc416ad33339fdeee8ca15184"
 dependencies = [
  "a2lmacros",
 ]
 
 [[package]]
 name = "a2lmacros"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "496f0034a7c46555480b3ffec89870c9bd55523552667f0227e0484e2a18f811"
+checksum = "98358403089a3911a7e642ec55d3bf1913283a81125641b7ed16a793191abc31"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -23,7 +23,7 @@ dependencies = [
 
 [[package]]
 name = "a2ltool"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "a2lfile",
  "clap",
@@ -176,9 +176,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.111"
+version = "0.2.112"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e167738f1866a7ec625567bae89ca0d44477232a4f7c52b1c7f2adc2c98804f"
+checksum = "1b03d17f364a3a042d5e5d46b053bbbf82c92c9430c592dd4c064dc6ee997125"
 
 [[package]]
 name = "memchr"
@@ -218,18 +218,18 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.33"
+version = "1.0.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb37d2df5df740e582f28f8560cf425f52bb267d872fe58358eadb554909f07a"
+checksum = "c7342d5883fbccae1cc37a2353b09c87c9b0f3afd73f5fb9bba687a1f733b029"
 dependencies = [
  "unicode-xid",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.10"
+version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38bc8cc6a5f2e3655e0899c1b848643b2562f853f114bfec7be120678e3ace05"
+checksum = "47aa80447ce4daf1717500037052af176af5d38cc3e571d9ec1c7353fc10c87d"
 dependencies = [
  "proc-macro2",
 ]
