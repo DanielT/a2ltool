@@ -291,6 +291,10 @@ fn load_or_create_a2l<'a>(arg_matches: &'a ArgMatches<'a>, strict: bool, verbose
         let mut project = a2lfile::Project::new("new_project".to_string(), "description of project".to_string());
         project.module = vec![a2lfile::Module::new("new_module".to_string(), "".to_string())];
         let mut a2l_file = a2lfile::A2lFile::new(project);
+        // only one line break for PROJECT (after ASAP2_VERSION) instead of the default 2
+        a2l_file.project.get_layout_mut().start_offset = 1;
+        // only one line break for MODULE [0] instead of the default 2
+        a2l_file.project.module[0].get_layout_mut().start_offset = 1;
         // also set ASAP2_VERSION 1.71
         a2l_file.asap2_version = Some(a2lfile::Asap2Version::new(1, 71));
         Ok((input_filename, a2l_file))
