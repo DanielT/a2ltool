@@ -18,4 +18,4 @@ The a2l file format is specified by ASAM and is formally called ASAM MCD-2 MC.
 
 ## Project Status
 With a2ltool version 1.0 all initially planned features were fully implemented.
-Version 1.1.0 brings some new features that go beyond the initial plan - see the changelog.
+Further improvements have been made as needed since then - see the changelog.

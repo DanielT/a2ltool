@@ -1,4 +1,10 @@
 # Changelog
+## Version 1.2.0
+ - add --cleanup wich cleans up unused or useless items in the file
+   It removes empty groups and functions, as well as unused compu_methods, compu_tabs, record_layouts and units.
+ - add --target-group which allows new items created by --measurement[...] and --characteristic[...] to be directly added to a group
+ - minor formatting improvements
+
 ## Version 1.1.0
  - rename --insert-characteristic to --characteristic and --insert-measurement to --measurement.
    The old nemaes remain as aliases, though they are not shown by --help
