@@ -232,6 +232,12 @@ fn core() -> Result<(), String> {
 
 
     // remove unknown IF_DATA
+    if arg_matches.is_present("CLEANUP") {
+        a2l_file.cleanup();
+        cond_print!(verbose, now, "Cleanup of unused items and empty groups is complete".to_string());
+    }
+
+    // remove unknown IF_DATA
     if arg_matches.is_present("IFDATA_CLEANUP") {
         a2l_file.ifdata_cleanup();
         cond_print!(verbose, now, "Unknown ifdata removal is done".to_string());
@@ -319,6 +325,12 @@ fn get_args<'a>() -> ArgMatches<'a> {
     .arg(Arg::with_name("CHECK")
         .help("Perform additional consistency checks")
         .long("check")
+        .takes_value(false)
+        .multiple(false)
+    )
+    .arg(Arg::with_name("CLEANUP")
+        .help("Remove empty or unreferenced items")
+        .long("cleanup")
         .takes_value(false)
         .multiple(false)
     )

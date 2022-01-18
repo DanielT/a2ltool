@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "a2lfile"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc5defe972b09fcd87ebadd99aa53b7b430dc5bc416ad33339fdeee8ca15184"
+checksum = "2483f778031c3e14ec38dcd675f726ee758478e3373a8e56f5790b75dfb06f3c"
 dependencies = [
  "a2lmacros",
 ]
