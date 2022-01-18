@@ -168,6 +168,8 @@ fn core() -> Result<(), String> {
         if arg_matches.is_present("INSERT_CHARACTERISTIC")
             || arg_matches.is_present("INSERT_MEASUREMENT")
         {
+            let target_group = arg_matches.value_of("TARGET_GROUP");
+
             let measurement_symbols: Vec<&str> =
                 if let Some(values) = arg_matches.values_of("INSERT_MEASUREMENT") {
                     values.into_iter().collect()
@@ -187,6 +189,7 @@ fn core() -> Result<(), String> {
                 debugdata,
                 measurement_symbols,
                 characteristic_symbols,
+                target_group,
                 &mut log_msgs,
             );
             for msg in log_msgs {
@@ -199,6 +202,8 @@ fn core() -> Result<(), String> {
             || arg_matches.is_present("INSERT_CHARACTERISTIC_REGEX")
             || arg_matches.is_present("INSERT_MEASUREMENT_REGEX")
         {
+            let target_group = arg_matches.value_of("TARGET_GROUP");
+
             let meas_ranges =
                 range_args_to_ranges(arg_matches.values_of("INSERT_MEASUREMENT_RANGE"));
             let char_ranges =
@@ -221,6 +226,7 @@ fn core() -> Result<(), String> {
                 char_ranges,
                 meas_regexes,
                 char_regexes,
+                target_group,
                 &mut log_msgs,
             );
             for msg in log_msgs {
@@ -309,12 +315,6 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .help("Create a new A2L file instead of loading an existing one")
         .long("create")
     )
-    .group(
-        ArgGroup::with_name("INPUT_GROUP")
-            .args(&["INPUT", "CREATE"])
-            .multiple(false)
-            .required(true)
-        )
     .arg(Arg::with_name("ELFFILE")
         .help("Elf file containing symbols and address information")
         .short("e")
@@ -482,10 +482,31 @@ fn get_args<'a>() -> ArgMatches<'a> {
         .requires("ELFFILE")
         .value_name("REGEX")
     )
+    .arg(Arg::with_name("TARGET_GROUP")
+        .help("When inserting items, put them into the group named in this option. The group will be created if it doe not exist.")
+        .long("target-group")
+        .takes_value(true)
+        .number_of_values(1)
+        .multiple(false)
+        .requires("INSERT_ARGGROUP")
+        .value_name("GROUP")
+    )
     .group(
-        ArgGroup::with_name("UPDATE_GROUP")
+        ArgGroup::with_name("INPUT_ARGGROUP")
+            .args(&["INPUT", "CREATE"])
+            .multiple(false)
+            .required(true)
+     )
+    .group(
+        ArgGroup::with_name("UPDATE_ARGGROUP")
             .args(&["UPDATE", "SAFE_UPDATE"])
             .multiple(false)
+    )
+    .group(
+        ArgGroup::with_name("INSERT_ARGGROUP")
+            .args(&["INSERT_CHARACTERISTIC", "INSERT_CHARACTERISTIC_RANGE", "INSERT_CHARACTERISTIC_REGEX",
+                "INSERT_MEASUREMENT", "INSERT_MEASUREMENT_RANGE", "INSERT_MEASUREMENT_REGEX", ])
+            .multiple(true)
     )
     .get_matches()
 }

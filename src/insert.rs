@@ -20,15 +20,19 @@ pub(crate) fn insert_items(
     debugdata: &DebugData,
     measurement_symbols: Vec<&str>,
     characteristic_symbols: Vec<&str>,
+    target_group: Option<&str>,
     log_msgs: &mut Vec<String>,
 ) {
     let module = &mut a2l_file.project.module[0];
     let (name_map, sym_map) = build_maps(&module);
+    let mut characteristic_list = vec![];
+    let mut measurement_list = vec![];
 
     for measure_sym in measurement_symbols {
         match insert_measurement(module, debugdata, measure_sym, &name_map, &sym_map) {
             Ok(measure_name) => {
                 log_msgs.push(format!("Inserted MEASUREMENT {}", measure_name));
+                measurement_list.push(measure_name);
             }
             Err(errmsg) => {
                 log_msgs.push(format!("Error: {}", errmsg));
@@ -40,11 +44,16 @@ pub(crate) fn insert_items(
         match insert_characteristic(module, debugdata, characteristic_sym, &name_map, &sym_map) {
             Ok(characteristic_name) => {
                 log_msgs.push(format!("Inserted CHARACTERISTIC {}", characteristic_name));
+                characteristic_list.push(characteristic_name);
             }
             Err(errmsg) => {
                 log_msgs.push(format!("Error: {}", errmsg));
             }
         }
+    }
+
+    if let Some(group_name) = target_group {
+        create_or_update_group(module, group_name, characteristic_list, measurement_list);
     }
 }
 
@@ -365,6 +374,7 @@ pub(crate) fn insert_many(
     characteristic_ranges: Vec<(u64, u64)>,
     measurement_regexes: Vec<&str>,
     characteristic_regexes: Vec<&str>,
+    target_group: Option<&str>,
     log_msgs: &mut Vec<String>,
 ) {
     // compile the regular expressions
@@ -386,6 +396,8 @@ pub(crate) fn insert_many(
     let (name_map, sym_map) = build_maps(&module);
     let mut insert_meas_count = 0u32;
     let mut insert_chara_count = 0u32;
+    let mut characteristic_list = vec![];
+    let mut measurement_list = vec![];
 
     for (symbol_name, symbol_type, address) in debugdata.iter() {
         match symbol_type {
@@ -413,6 +425,7 @@ pub(crate) fn insert_many(
                     ) {
                         Ok(measurement_name) => {
                             log_msgs.push(format!("Inserted MEASUREMENT {} (0x{:08x})", measurement_name, address));
+                            measurement_list.push(measurement_name);
                             insert_meas_count += 1;
                         }
                         Err(errmsg) => {
@@ -438,6 +451,7 @@ pub(crate) fn insert_many(
                     ) {
                         Ok(characteristic_name) => {
                             log_msgs.push(format!("Inserted CHARACTERISTIC {} (0x{:08x})", characteristic_name, address));
+                            characteristic_list.push(characteristic_name);
                             insert_chara_count += 1;
                         }
                         Err(errmsg) => {
@@ -450,6 +464,10 @@ pub(crate) fn insert_many(
                 // no type info, can't insert this symbol
             }
         }
+    }
+
+    if let Some(group_name) = target_group {
+        create_or_update_group(module, group_name, characteristic_list, measurement_list);
     }
 
     if insert_meas_count > 0 {
@@ -474,4 +492,49 @@ fn is_insert_requested(
     || name_regexes
         .iter()
         .any(|re| re.is_match(symbol_name))
+}
+
+
+fn create_or_update_group(module: &mut Module, group_name: &str, characteristic_list: Vec<String>, measurement_list: Vec<String>) {
+    // try to find an existing group with the given name
+    let existing_group = module
+        .group
+        .iter_mut()
+        .find(|grp| grp.name == group_name);
+
+    let group: &mut Group = if let Some(grp) = existing_group {
+        grp
+    } else {
+        // create a new group
+        let mut group = Group::new(group_name.to_string(), "".to_string());
+        // the group is not a sub-group of some other group, so it gets the ROOT attribute
+        group.root = Some(Root::new());
+        module.group.push(group);
+        let len = module.group.len();
+        &mut module.group[len - 1]
+    };
+
+    // add all characteristics to the REF_CHARACTERISTIC block in the group
+    if !characteristic_list.is_empty() {
+        if group.ref_characteristic.is_none() {
+            group.ref_characteristic = Some(RefCharacteristic::new());
+        }
+        if let Some(ref_characteristic) = &mut group.ref_characteristic {
+            for new_characteristic in characteristic_list {
+                ref_characteristic.identifier_list.push(new_characteristic);
+            }
+        }
+    }
+
+    // add all measurements to the REF_MEASUREMENT block in the group
+    if !measurement_list.is_empty() {
+        if group.ref_measurement.is_none() {
+            group.ref_measurement = Some(RefMeasurement::new());
+        }
+        if let Some(ref_measurement) = &mut group.ref_measurement {
+            for new_measurement in measurement_list {
+                ref_measurement.identifier_list.push(new_measurement);
+            }
+        }
+    }
 }
