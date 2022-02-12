@@ -206,9 +206,20 @@ pub(crate) fn get_bit_size_attribute(entry: &DebuggingInformationEntry<SliceType
 // get the bit offset of a variable from the DW_AT_data_bit_offset attribute
 // this attribute is only present if the variable is in a bitfield
 pub(crate) fn get_bit_offset_attribute(entry: &DebuggingInformationEntry<SliceType, usize>) -> Option<u64> {
-    let bit_offset_attr = get_attr_value(entry, gimli::constants::DW_AT_data_bit_offset)?;
-    if let gimli::AttributeValue::Udata(bit_offset) = bit_offset_attr {
-        Some(bit_offset)
+    if let Some(data_bit_offset_attr) = get_attr_value(entry, gimli::constants::DW_AT_data_bit_offset) {
+        // DW_AT_data_bit_offset: Dwarf 4 and following
+        if let gimli::AttributeValue::Udata(bit_offset) = data_bit_offset_attr {
+            Some(bit_offset)
+        } else {
+            None
+        }
+    } else if let Some(bit_offset_attr) = get_attr_value(entry, gimli::constants::DW_AT_bit_offset) {
+        // DW_AT_bit_offset: up to Dwarf 3
+        if let gimli::AttributeValue::Udata(bit_offset) = bit_offset_attr {
+            Some(bit_offset)
+        } else {
+            None
+        }
     } else {
         None
     }
