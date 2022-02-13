@@ -165,8 +165,8 @@ fn get_endian(elffile: &object::read::File) -> RunTimeEndian {
 
 // read the debug information entries in the DWAF data to get all the global variables and their types
 fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>, verbose: bool) -> DebugData {
-    let (variables, units) = load_variables(dwarf, verbose);
-    let types = load_types(&variables, units, dwarf, verbose);
+    let (variables, typedefs, units) = load_variables(dwarf, verbose);
+    let types = load_types(&variables, typedefs, units, dwarf, verbose);
 
     DebugData {
         variables,
@@ -179,8 +179,9 @@ fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>, verbose: bool) -> De
 fn load_variables<'a>(
     dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>,
     verbose: bool
-) -> (HashMap<String, VarInfo>, UnitList<'a>) {
+) -> (HashMap<String, VarInfo>, HashMap<usize, String>, UnitList<'a>) {
     let mut variables = HashMap::<String, VarInfo>::new();
+    let mut typedefs = HashMap::<usize, String>::new();
     let mut unit_list = UnitList::new();
 
     let mut iter = dwarf.debug_info.units();
@@ -208,13 +209,22 @@ fn load_variables<'a>(
                         }
                     }
                 }
+            } else if entry.tag() == gimli::constants::DW_TAG_typedef {
+                // collect information about all typedefs
+                if let Ok(name) = get_name_attribute(&entry, dwarf) {
+                    if let Ok(typeref) = get_typeref_attribute(entry, &unit) {
+                        // build a reverse map from the referenced type to the typedef name
+                        // it's possible that a type has multiple typedefs, in which case we only keep the last one
+                        typedefs.insert(typeref, name);
+                    }
+                }
             }
         }
 
         unit_list.add(unit, abbreviations);
     }
 
-    (variables, unit_list)
+    (variables, typedefs, unit_list)
 }
 
 

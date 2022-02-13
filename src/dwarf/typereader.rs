@@ -7,6 +7,7 @@ use super::attributes::*;
 // load all the types referenced by variables in given HashMap
 pub(crate) fn load_types(
     variables: &HashMap<String, VarInfo>,
+    typedefs: HashMap<usize, String>,
     units: UnitList,
     dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
     verbose: bool
@@ -24,7 +25,7 @@ pub(crate) fn load_types(
                 let mut entries_tree = unit.entries_tree(abbrev, Some(unit_offset)).unwrap();
 
                 // load one type and add it to the collection (always succeeds for correctly structured DWARF debug info)
-                match get_type(&units, unit_idx, entries_tree.root().unwrap(), None, dwarf) {
+                match get_type(&units, unit_idx, entries_tree.root().unwrap(), None, &typedefs, dwarf) {
                     Ok(vartype) => {
                         types.insert(*typeref, vartype);
                     }
@@ -48,6 +49,7 @@ fn get_type(
     current_unit: usize,
     entries_tree: EntriesTreeNode<EndianSlice<RunTimeEndian>>,
     typedef_name: Option<String>,
+    typedefs: &HashMap<usize, String>,
     dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>
 ) -> Result<TypeInfo, String> {
     let entry = entries_tree.entry();
@@ -68,6 +70,7 @@ fn get_type(
                 new_cur_unit,
                 new_entries_tree.root().unwrap(),
                 None,
+                typedefs,
                 dwarf)?;
 
             let mut dim = Vec::<u64>::new();
@@ -97,14 +100,26 @@ fn get_type(
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing enum byte size attribute".to_string())?;
             let mut enumerators = Vec::new();
+            let (unit, _) = &unit_list[current_unit];
+            let dioffset = entry.offset().to_debug_info_offset(unit).unwrap().0;
+
             let typename = if let Some(name) = typedef_name {
+                // enum referenced by a typedef: the compiler generated debuginfo that had e.g.
+                //   variable -> typedef -> (named or anonymous) enum
                 name
             } else if let Ok(name_from_attr) = get_name_attribute(entry, dwarf) {
+                // named enum that is not directly referenced by a typedef. It might still have been typedef'd in the original code.
                 name_from_attr
+            } else if let Some(name) = typedefs.get(&dioffset) {
+                // anonymous enum, with a typedef name recovered from the global list
+                // the compiler had the typedef info at compile time, but didn't refer to it in the debug info
+                name.to_owned()
             } else {
-                let (unit, _) = &unit_list[current_unit];
-                format!("anonymous_enum_{}", entry.offset().to_debug_info_offset(unit).unwrap().0)
+                // a truly anonymous enum. This can happen if someone writes C code that looks like this:
+                // enum { ... } varname;
+                format!("anonymous_enum_{}", dioffset)
             };
+
             let mut iter = entries_tree.children();
             // get all the enumerators
             while let Ok(Some(child_node)) = iter.next() {
@@ -122,19 +137,19 @@ fn get_type(
         gimli::constants::DW_TAG_structure_type => {
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing struct byte size attribute".to_string())?;
-            let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, dwarf)?;
+            let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, typedefs, dwarf)?;
             Ok(TypeInfo::Struct {size, members})
         }
         gimli::constants::DW_TAG_class_type => {
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing class byte size attribute".to_string())?;
-            let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, dwarf)?;
+            let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, typedefs, dwarf)?;
             Ok(TypeInfo::Class {size, members})
         }
         gimli::constants::DW_TAG_union_type => {
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing union byte size attribute".to_string())?;
-            let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, dwarf)?;
+            let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, typedefs, dwarf)?;
             Ok(TypeInfo::Union {size, members})
         }
         gimli::constants::DW_TAG_typedef => {
@@ -145,6 +160,7 @@ fn get_type(
                 new_cur_unit,
                 new_entries_tree.root().unwrap(),
                 Some(name),
+                typedefs,
                 dwarf
             )
         }
@@ -156,6 +172,7 @@ fn get_type(
                 new_cur_unit,
                 new_entries_tree.root().unwrap(),
                 typedef_name,
+                typedefs,
                 dwarf
             )
         }
@@ -220,7 +237,8 @@ fn get_struct_or_union_members(
     entries_tree: EntriesTreeNode<EndianSlice<RunTimeEndian>>,
     unit_list: &UnitList,
     current_unit: usize,
-    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>
+    typedefs: &HashMap<usize, String>,
+    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
 ) -> Result<HashMap<String, (TypeInfo, u64)>, String> {
     let (unit, _) = &unit_list[current_unit];
     let mut members = HashMap::<String, (TypeInfo, u64)>::new();
@@ -241,6 +259,7 @@ fn get_struct_or_union_members(
                 new_cur_unit,
                 new_entries_tree.root().unwrap(),
                 None,
+                typedefs,
                 dwarf
             )?;
 
