@@ -3,7 +3,6 @@ use std::ffi::OsStr;
 use crate::ifdata::*;
 use a2lfile::*;
 
-
 pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
     let multi_module = a2l_file.project.module.len() > 1;
 
@@ -31,7 +30,6 @@ pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
     println!();
 }
 
-
 fn print_xcp(xcp: &Xcp) {
     if let Some(xcp_on_can) = &xcp.xcp_on_can {
         print_xcp_on_can(xcp_on_can);
@@ -50,14 +48,19 @@ fn print_xcp(xcp: &Xcp) {
     }
 }
 
-
 fn print_xcp_on_can(xcp_on_can: &XcpOnCan) {
     println!("  XCP on CAN:");
     if let Some(can_id_master) = &xcp_on_can.can_parameters.can_id_master {
-        println!("    CAN id master: 0x{:X}", (can_id_master.value & 0x1fffffff));
+        println!(
+            "    CAN id master: 0x{:X}",
+            (can_id_master.value & 0x1fffffff)
+        );
     }
     if let Some(can_id_slave) = &xcp_on_can.can_parameters.can_id_slave {
-        println!("    CAN id slave: 0x{:X}", (can_id_slave.value & 0x1fffffff));
+        println!(
+            "    CAN id slave: 0x{:X}",
+            (can_id_slave.value & 0x1fffffff)
+        );
     }
     if let Some(baudrate) = &xcp_on_can.can_parameters.baudrate {
         println!("    CAN baudrate: {} kbps", baudrate.value / 1000);
@@ -72,7 +75,6 @@ fn print_xcp_on_can(xcp_on_can: &XcpOnCan) {
         }
     }
 }
-
 
 fn print_xcp_on_flx(xcp_on_flx: &XcpOnFlx) {
     println!("  XCP on Flexray");
@@ -117,7 +119,6 @@ fn print_xcp_on_flx(xcp_on_flx: &XcpOnFlx) {
     }
 }
 
-
 fn print_xcp_on_flx_buffer(
     flx_buf_id: u8,
     max_flx_len_buf: &Option<MaxFlxLenBuf>,
@@ -126,7 +127,10 @@ fn print_xcp_on_flx_buffer(
 ) {
     println!("      buffer id: {}", flx_buf_id);
 
-    if let Some(MaxFlxLenBuf { fixed, variable, .. }) = &max_flx_len_buf {
+    if let Some(MaxFlxLenBuf {
+        fixed, variable, ..
+    }) = &max_flx_len_buf
+    {
         if let Some(fixed) = fixed {
             println!("      buffer length: {} bytes (fixed)", fixed.length);
         }
@@ -134,9 +138,19 @@ fn print_xcp_on_flx_buffer(
             println!("      buffer length: {} bytes (variable)", variable.length);
         }
     }
-    if let Some(LpduId { flx_slot_id, offset, cycle_repetition, channel, .. }) = lpdu_id {
+    if let Some(LpduId {
+        flx_slot_id,
+        offset,
+        cycle_repetition,
+        channel,
+        ..
+    }) = lpdu_id
+    {
         print!("      ");
-        if let Some(FlxSlotId { fixed, variable, .. }) = flx_slot_id {
+        if let Some(FlxSlotId {
+            fixed, variable, ..
+        }) = flx_slot_id
+        {
             if let Some(fixed) = fixed {
                 print!("slot id: {}", fixed.slot_id);
             }
@@ -151,7 +165,10 @@ fn print_xcp_on_flx_buffer(
             print!("slot id: undefined");
         }
 
-        if let Some(CycleRepetition { fixed, variable, .. }) = cycle_repetition {
+        if let Some(CycleRepetition {
+            fixed, variable, ..
+        }) = cycle_repetition
+        {
             if let Some(fixed) = fixed {
                 print!(", cycle: {}", fixed.cycle);
             }
@@ -164,7 +181,10 @@ fn print_xcp_on_flx_buffer(
             }
         }
 
-        if let Some(Offset { fixed, variable, .. }) = offset {
+        if let Some(Offset {
+            fixed, variable, ..
+        }) = offset
+        {
             if let Some(fixed) = fixed {
                 print!(", offset: {}", fixed.offset);
             }
@@ -177,7 +197,10 @@ fn print_xcp_on_flx_buffer(
             }
         }
 
-        if let Some(Channel { fixed, variable, .. }) = channel {
+        if let Some(Channel {
+            fixed, variable, ..
+        }) = channel
+        {
             if let Some(fixed) = fixed {
                 print!(", channel: {:?}", fixed.channel);
             }
@@ -199,26 +222,46 @@ fn print_xcp_on_flx_buffer(
         daq,
         stim,
         ..
-    }) = xcp_packet {
+    }) = xcp_packet
+    {
         println!("      packet types: ");
-        if let Some(Cmd { packet_assignment_type, .. }) = cmd {
+        if let Some(Cmd {
+            packet_assignment_type,
+            ..
+        }) = cmd
+        {
             println!("        Cmd: {:?}", packet_assignment_type)
         }
-        if let Some(ResErr { packet_assignment_type, .. }) = res_err {
+        if let Some(ResErr {
+            packet_assignment_type,
+            ..
+        }) = res_err
+        {
             println!("        Res / Err: {:?}", packet_assignment_type)
         }
-        if let Some(EvServ { packet_assignment_type, .. }) = ev_serv {
+        if let Some(EvServ {
+            packet_assignment_type,
+            ..
+        }) = ev_serv
+        {
             println!("        EvServ: {:?}", packet_assignment_type)
         }
-        if let Some(Daq2 { packet_assignment_type, .. }) = daq {
+        if let Some(Daq2 {
+            packet_assignment_type,
+            ..
+        }) = daq
+        {
             println!("        Daq: {:?}", packet_assignment_type)
         }
-        if let Some(Stim2 { packet_assignment_type, .. }) = stim {
+        if let Some(Stim2 {
+            packet_assignment_type,
+            ..
+        }) = stim
+        {
             println!("        Stim: {:?}", packet_assignment_type)
         }
     }
 }
-
 
 fn print_xcp_on_tcp_ip(xcp_on_tcp_ip: &XcpOnTcpIp) {
     let XcpOnTcpIp {
@@ -236,7 +279,6 @@ fn print_xcp_on_tcp_ip(xcp_on_tcp_ip: &XcpOnTcpIp) {
     print_xcp_on_ip_common(host_name, address, ipv6, *port);
 }
 
-
 fn print_xcp_on_udp_ip(xcp_on_udp_ip: &XcpOnUdpIp) {
     let XcpOnUdpIp {
         udp_ip_parameters:
@@ -252,7 +294,6 @@ fn print_xcp_on_udp_ip(xcp_on_udp_ip: &XcpOnUdpIp) {
     println!("  XCP on UDP/IP");
     print_xcp_on_ip_common(host_name, address, ipv6, *port);
 }
-
 
 fn print_xcp_on_ip_common(
     host_name: &Option<HostName>,

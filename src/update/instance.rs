@@ -1,16 +1,15 @@
-use std::collections::HashSet;
-use a2lfile::*;
 use crate::dwarf::*;
+use a2lfile::*;
+use std::collections::HashSet;
 
 use super::ifdata_update::*;
 use super::*;
-
 
 pub(crate) fn update_module_instances(
     module: &mut Module,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
-    preserve_unknown: bool
+    preserve_unknown: bool,
 ) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
     let mut instance_list = Vec::new();
@@ -45,17 +44,16 @@ pub(crate) fn update_module_instances(
     (instance_updated, instance_not_updated)
 }
 
-
 // update the address of an INSTANCE object
 fn update_instance_address<'a>(
     instance: &mut Instance,
-    debug_data: &'a DebugData
+    debug_data: &'a DebugData,
 ) -> Result<(String, &'a TypeInfo), Vec<String>> {
     match get_symbol_info(
         &instance.name,
         &instance.symbol_link,
         &instance.if_data,
-        debug_data
+        debug_data,
     ) {
         Ok((address, symbol_typeinfo, symbol_name)) => {
             // make sure a valid SYMBOL_LINK exists
@@ -66,10 +64,9 @@ fn update_instance_address<'a>(
             // return the name of the linked TYPEDEF_<x>
             Ok((instance.type_ref.to_owned(), symbol_typeinfo))
         }
-        Err(errmsgs) => Err(errmsgs)
+        Err(errmsgs) => Err(errmsgs),
     }
 }
-
 
 pub(crate) fn cleanup_removed_instances(module: &mut Module, removed_items: &HashSet<String>) {
     // INSTANCEs can take the place of AXIS_PTS, BLOBs, CHARACTERISTICs or MEASUREMENTs, depending on which kind of TYPEDEF the instance is based on

@@ -1,29 +1,29 @@
-use std::collections::HashMap;
-use a2lfile::*;
 use crate::dwarf::TypeInfo;
+use a2lfile::*;
+use std::collections::HashMap;
 
 // create a COMPU_METHOD and a COMPU_VTAB for the typename of an enum
 pub(crate) fn cond_create_enum_conversion(
     module: &mut Module,
     typename: &str,
-    enumerators: &[(String, i64)]
+    enumerators: &[(String, i64)],
 ) {
-    let compu_method_find = module.compu_method.iter().find(|item| item.name == typename);
+    let compu_method_find = module
+        .compu_method
+        .iter()
+        .find(|item| item.name == typename);
     if compu_method_find.is_none() {
         let mut new_compu_method = CompuMethod::new(
             typename.to_string(),
             format!("Conversion table for enum {}", typename),
             ConversionType::TabVerb,
             "%.4".to_string(),
-            "".to_string()
+            "".to_string(),
         );
         new_compu_method.compu_tab_ref = Some(CompuTabRef::new(typename.to_string()));
         module.compu_method.push(new_compu_method);
 
-        let compu_vtab_find = module
-            .compu_vtab
-            .iter()
-            .find(|item| item.name == typename);
+        let compu_vtab_find = module.compu_vtab.iter().find(|item| item.name == typename);
         let compu_vtab_range_find = module
             .compu_vtab_range
             .iter()
@@ -34,18 +34,17 @@ pub(crate) fn cond_create_enum_conversion(
                 typename.to_string(),
                 format!("Conversion table for enum {}", typename),
                 ConversionType::TabVerb,
-                enumerators.len() as u16
+                enumerators.len() as u16,
             );
             for (name, value) in enumerators {
-                new_compu_vtab.value_pairs.push(
-                    ValuePairsStruct::new(*value as f64, name.to_owned())
-                );
+                new_compu_vtab
+                    .value_pairs
+                    .push(ValuePairsStruct::new(*value as f64, name.to_owned()));
             }
             module.compu_vtab.push(new_compu_vtab);
         }
     }
 }
-
 
 // every MEASUREMENT, CHARACTERISTIC and AXIS_PTS object can reference a COMPU_METHOD which describes the conversion of values
 // in some cases the the COMPU_METHOS in turn references a COMPU_VTAB to provide number to string mapping and display named values
@@ -54,7 +53,7 @@ pub(crate) fn cond_create_enum_conversion(
 // remove enumerators to match the software
 pub(crate) fn update_enum_compu_methods(
     module: &mut Module,
-    enum_convlist: &HashMap<String, &TypeInfo>
+    enum_convlist: &HashMap<String, &TypeInfo>,
 ) {
     // enum_convlist: a table of COMPU_METHODS and the associated types (filtered to contain only enums)
     // if the list is empty then there is nothing to do
@@ -74,7 +73,7 @@ pub(crate) fn update_enum_compu_methods(
 
     // check all COMPU_VTABs in the module to see if we know of an associated enum type
     for compu_vtab in &mut module.compu_vtab {
-        if let Some(TypeInfo::Enum{ enumerators, .. }) = enum_compu_tab.get(&compu_vtab.name) {
+        if let Some(TypeInfo::Enum { enumerators, .. }) = enum_compu_tab.get(&compu_vtab.name) {
             // TabVerb is the only permitted conversion type for a compu_vtab
             compu_vtab.conversion_type = ConversionType::TabVerb;
 
@@ -84,7 +83,9 @@ pub(crate) fn update_enum_compu_methods(
             }
             // if compu_vtab has less entries than the enum, append some dummy entries
             while compu_vtab.value_pairs.len() < enumerators.len() {
-                compu_vtab.value_pairs.push(ValuePairsStruct::new(0f64, "dummy".to_string()));
+                compu_vtab
+                    .value_pairs
+                    .push(ValuePairsStruct::new(0f64, "dummy".to_string()));
             }
             compu_vtab.number_value_pairs = enumerators.len() as u16;
 
@@ -98,7 +99,8 @@ pub(crate) fn update_enum_compu_methods(
 
     // do the same for COMPU_VTAB_RANGE, because the enum could also be stored as a COMPU_VTAB_RANGE where min = max for all entries
     for compu_vtab_range in &mut module.compu_vtab_range {
-        if let Some(TypeInfo::Enum{ enumerators, .. }) = enum_compu_tab.get(&compu_vtab_range.name) {
+        if let Some(TypeInfo::Enum { enumerators, .. }) = enum_compu_tab.get(&compu_vtab_range.name)
+        {
             // if compu_vtab_range has more entries than the enum, delete the extras
             while compu_vtab_range.value_triples.len() > enumerators.len() {
                 compu_vtab_range.value_triples.pop();
@@ -108,7 +110,7 @@ pub(crate) fn update_enum_compu_methods(
                 compu_vtab_range.value_triples.push(ValueTriplesStruct::new(
                     0f64,
                     0f64,
-                    "dummy".to_string()
+                    "dummy".to_string(),
                 ));
             }
             compu_vtab_range.number_value_triples = enumerators.len() as u16;

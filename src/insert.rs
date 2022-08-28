@@ -6,7 +6,6 @@ use crate::dwarf::*;
 use crate::update::enums;
 use regex::Regex;
 
-
 enum ItemType {
     Measurement(usize),
     Characteristic(usize),
@@ -57,7 +56,6 @@ pub(crate) fn insert_items(
     }
 }
 
-
 // create a new MEASUREMENT for the given symbol
 fn insert_measurement(
     module: &mut Module,
@@ -77,7 +75,6 @@ fn insert_measurement(
         )),
     }
 }
-
 
 fn insert_measurement_sym(
     module: &mut Module,
@@ -104,7 +101,7 @@ fn insert_measurement_sym(
     );
     // create an ECU_ADDRESS attribute, and set it tot hex display mode
     let mut ecu_address = EcuAddress::new(address as u32);
-    ecu_address.get_layout_mut().item_location.0.1 = true;
+    ecu_address.get_layout_mut().item_location.0 .1 = true;
     new_measurement.ecu_address = Some(ecu_address);
     // create a SYMBOL_LINK attribute
     new_measurement.symbol_link = Some(SymbolLink::new(measure_sym.to_string(), 0));
@@ -122,7 +119,6 @@ fn insert_measurement_sym(
 
     Ok(item_name)
 }
-
 
 // Add a new CHARACTERISTIC for the given symbol
 fn insert_characteristic(
@@ -149,7 +145,6 @@ fn insert_characteristic(
     }
 }
 
-
 fn insert_characteristic_sym(
     module: &mut Module,
     characteristic_sym: &str,
@@ -161,7 +156,7 @@ fn insert_characteristic_sym(
     let item_name = make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map)?;
 
     let datatype = get_a2l_datatype(typeinfo);
-    let recordlayout_name = format!("__{}_Z", datatype.to_string());
+    let recordlayout_name = format!("__{}_Z", datatype);
     let mut new_characteristic = match typeinfo {
         TypeInfo::Class { .. } | TypeInfo::Union { .. } | TypeInfo::Struct { .. } => {
             // Structs cannot be handled at all in this code. In some cases structs can be used by CHARACTERISTICs,
@@ -187,16 +182,16 @@ fn insert_characteristic_sym(
             // dim[0] always exists
             matrix_dim.dim_list.push(dim[0] as u16);
             // for compat with 1.61 and previous, "1" is set as the arry dimension for y and z if dim[1] and dim[2] don't exist
-            matrix_dim
-                .dim_list
-                .push(*dim.get(1).unwrap_or(&1) as u16);
-            matrix_dim
-                .dim_list
-                .push(*dim.get(2).unwrap_or(&1) as u16);
+            matrix_dim.dim_list.push(*dim.get(1).unwrap_or(&1) as u16);
+            matrix_dim.dim_list.push(*dim.get(2).unwrap_or(&1) as u16);
             newitem.matrix_dim = Some(matrix_dim);
             newitem
         }
-        TypeInfo::Enum{ typename, enumerators, .. } => {
+        TypeInfo::Enum {
+            typename,
+            enumerators,
+            ..
+        } => {
             // CHARACTERISTICs for enums get a COMPU_METHOD and COMPU_VTAB providing translation of values to text
             let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
             enums::cond_create_enum_conversion(module, typename, enumerators);
@@ -229,7 +224,7 @@ fn insert_characteristic_sym(
         }
     };
     // enable hex mode for the address (item 3 in the CHARACTERISTIC)
-    new_characteristic.get_layout_mut().item_location.3.1 = true;
+    new_characteristic.get_layout_mut().item_location.3 .1 = true;
 
     // create a SYMBOL_LINK
     new_characteristic.symbol_link = Some(SymbolLink::new(characteristic_sym.to_string(), 0));
@@ -259,7 +254,6 @@ fn insert_characteristic_sym(
 
     Ok(item_name)
 }
-
 
 fn make_unique_measurement_name(
     module: &Module,
@@ -291,7 +285,6 @@ fn make_unique_measurement_name(
     Ok(item_name)
 }
 
-
 fn make_unique_characteristic_name(
     module: &Module,
     sym_map: &HashMap<String, ItemType>,
@@ -322,14 +315,16 @@ fn make_unique_characteristic_name(
     Ok(item_name)
 }
 
-
 fn build_maps(module: &&mut Module) -> (HashMap<String, ItemType>, HashMap<String, ItemType>) {
     let mut name_map = HashMap::<String, ItemType>::new();
     let mut sym_map = HashMap::<String, ItemType>::new();
     for (idx, chr) in module.characteristic.iter().enumerate() {
         name_map.insert(chr.name.to_owned(), ItemType::Characteristic(idx));
         if let Some(sym_link) = &chr.symbol_link {
-            sym_map.insert(sym_link.symbol_name.to_owned(), ItemType::Characteristic(idx));
+            sym_map.insert(
+                sym_link.symbol_name.to_owned(),
+                ItemType::Characteristic(idx),
+            );
         }
     }
     for (idx, meas) in module.measurement.iter().enumerate() {
@@ -359,7 +354,6 @@ fn build_maps(module: &&mut Module) -> (HashMap<String, ItemType>, HashMap<Strin
 
     (name_map, sym_map)
 }
-
 
 pub(crate) fn insert_many(
     a2l_file: &mut A2lFile,
@@ -418,7 +412,10 @@ pub(crate) fn insert_many(
                         address,
                     ) {
                         Ok(measurement_name) => {
-                            log_msgs.push(format!("Inserted MEASUREMENT {} (0x{:08x})", measurement_name, address));
+                            log_msgs.push(format!(
+                                "Inserted MEASUREMENT {} (0x{:08x})",
+                                measurement_name, address
+                            ));
                             measurement_list.push(measurement_name);
                             insert_meas_count += 1;
                         }
@@ -444,7 +441,10 @@ pub(crate) fn insert_many(
                         address,
                     ) {
                         Ok(characteristic_name) => {
-                            log_msgs.push(format!("Inserted CHARACTERISTIC {} (0x{:08x})", characteristic_name, address));
+                            log_msgs.push(format!(
+                                "Inserted CHARACTERISTIC {} (0x{:08x})",
+                                characteristic_name, address
+                            ));
                             characteristic_list.push(characteristic_name);
                             insert_chara_count += 1;
                         }
@@ -488,13 +488,14 @@ fn is_insert_requested(
         .any(|re| re.is_match(symbol_name))
 }
 
-
-fn create_or_update_group(module: &mut Module, group_name: &str, characteristic_list: Vec<String>, measurement_list: Vec<String>) {
+fn create_or_update_group(
+    module: &mut Module,
+    group_name: &str,
+    characteristic_list: Vec<String>,
+    measurement_list: Vec<String>,
+) {
     // try to find an existing group with the given name
-    let existing_group = module
-        .group
-        .iter_mut()
-        .find(|grp| grp.name == group_name);
+    let existing_group = module.group.iter_mut().find(|grp| grp.name == group_name);
 
     let group: &mut Group = if let Some(grp) = existing_group {
         grp

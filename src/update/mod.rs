@@ -34,7 +34,6 @@ pub(crate) struct UpdateSumary {
     pub(crate) instance_not_updated: u32,
 }
 
-
 // perform an address update.
 // This update can be destructive (any object that cannot be updated will be discarded)
 // or non-destructive (addresses of invalid objects will be set to zero).
@@ -42,7 +41,7 @@ pub(crate) fn update_addresses(
     a2l_file: &mut A2lFile,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
-    preserve_unknown: bool
+    preserve_unknown: bool,
 ) -> UpdateSumary {
     let use_new_matrix_dim = check_version_1_70(a2l_file);
 
@@ -56,7 +55,7 @@ pub(crate) fn update_addresses(
             debug_data,
             log_msgs,
             preserve_unknown,
-            &mut reclayout_info
+            &mut reclayout_info,
         );
         summary.measurement_updated += updated;
         summary.measurement_not_updated += not_updated;
@@ -67,7 +66,7 @@ pub(crate) fn update_addresses(
             debug_data,
             log_msgs,
             preserve_unknown,
-            use_new_matrix_dim
+            use_new_matrix_dim,
         );
         summary.measurement_updated += updated;
         summary.measurement_not_updated += not_updated;
@@ -78,35 +77,26 @@ pub(crate) fn update_addresses(
             debug_data,
             log_msgs,
             preserve_unknown,
-            &mut reclayout_info
+            &mut reclayout_info,
         );
         summary.characteristic_updated += updated;
         summary.characteristic_not_updated += not_updated;
 
         // update all BLOBs
-        let (updated, not_updated) = update_module_blobs(
-            module,
-            debug_data,
-            log_msgs,
-            preserve_unknown
-        );
+        let (updated, not_updated) =
+            update_module_blobs(module, debug_data, log_msgs, preserve_unknown);
         summary.blob_updated += updated;
         summary.blob_not_updated += not_updated;
 
         // update all INSTANCEs
-        let (updated, not_updated) = update_module_instances(
-            module,
-            debug_data,
-            log_msgs,
-            preserve_unknown
-        );
+        let (updated, not_updated) =
+            update_module_instances(module, debug_data, log_msgs, preserve_unknown);
         summary.blob_updated += updated;
         summary.blob_not_updated += not_updated;
     }
 
     summary
 }
-
 
 // check if the file version is >= 1.70
 fn check_version_1_70(a2l_file: &A2lFile) -> bool {
@@ -117,13 +107,12 @@ fn check_version_1_70(a2l_file: &A2lFile) -> bool {
     }
 }
 
-
 // try to get the symbol name used in the elf file, and find its address and type
 fn get_symbol_info<'a>(
     name: &str,
     opt_symbol_link: &Option<SymbolLink>,
     ifdata_vec: &[IfData],
-    debug_data: &'a DebugData
+    debug_data: &'a DebugData,
 ) -> Result<(u64, &'a TypeInfo, String), Vec<String>> {
     let mut symbol_link_errmsg = None;
     let mut ifdata_errmsg = None;
@@ -131,10 +120,8 @@ fn get_symbol_info<'a>(
     // preferred: get symbol information from a SYMBOL_LINK attribute
     if let Some(symbol_link) = opt_symbol_link {
         match find_symbol(&symbol_link.symbol_name, debug_data) {
-            Ok((addr, typeinfo)) => {
-                return Ok((addr, typeinfo, symbol_link.symbol_name.clone()))
-            }
-            Err(errmsg) => symbol_link_errmsg = Some(errmsg)
+            Ok((addr, typeinfo)) => return Ok((addr, typeinfo, symbol_link.symbol_name.clone())),
+            Err(errmsg) => symbol_link_errmsg = Some(errmsg),
         };
     }
 
@@ -143,20 +130,16 @@ fn get_symbol_info<'a>(
     // by the Vector tools are understood by some other software.
     if let Some(ifdata_symbol_name) = get_symbol_name_from_ifdata(ifdata_vec) {
         match find_symbol(&ifdata_symbol_name, debug_data) {
-            Ok((addr, typeinfo)) => {
-                return Ok((addr, typeinfo, ifdata_symbol_name))
-            }
-            Err(errmsg) => ifdata_errmsg = Some(errmsg)
+            Ok((addr, typeinfo)) => return Ok((addr, typeinfo, ifdata_symbol_name)),
+            Err(errmsg) => ifdata_errmsg = Some(errmsg),
         };
     }
 
     // If there is no SYMBOL_LINK and no (usable) IF_DATA, then maybe the object name is also the symbol name
     if opt_symbol_link.is_none() {
         match find_symbol(name, debug_data) {
-            Ok((addr, typeinfo)) => {
-                return Ok((addr, typeinfo, name.to_string()))
-            }
-            Err(errmsg) => object_name_errmsg = Some(errmsg)
+            Ok((addr, typeinfo)) => return Ok((addr, typeinfo, name.to_string())),
+            Err(errmsg) => object_name_errmsg = Some(errmsg),
         };
     }
 
@@ -181,13 +164,14 @@ fn get_symbol_info<'a>(
     Err(errorstrings)
 }
 
-
 fn log_update_errors(errorlog: &mut Vec<String>, errmsgs: Vec<String>, blockname: &str, line: u32) {
     for msg in errmsgs {
-        errorlog.push(format!("Error updating {} on line {}: {}", blockname, line, msg));
+        errorlog.push(format!(
+            "Error updating {} on line {}: {}",
+            blockname, line, msg
+        ));
     }
 }
-
 
 // update or create a SYMBOL_LINK for the given symbol name
 fn set_symbol_link(opt_symbol_link: &mut Option<SymbolLink>, symbol_name: String) {
@@ -197,7 +181,6 @@ fn set_symbol_link(opt_symbol_link: &mut Option<SymbolLink>, symbol_name: String
         *opt_symbol_link = Some(SymbolLink::new(symbol_name, 0));
     }
 }
-
 
 // MEASUREMENT objects put the address in an optional keyword, ECU_ADDRESS.
 // this is created or updated here
@@ -209,11 +192,15 @@ fn set_measurement_ecu_address(opt_ecu_address: &mut Option<EcuAddress>, address
     }
 }
 
-
 // A MEASUREMENT object contains a BITMASK for bitfield elements
 // it will be created/updated/deleted here, depending on the new data type of the variable
 fn set_measurement_bitmask(opt_bitmask: &mut Option<BitMask>, datatype: &TypeInfo) {
-    if let TypeInfo::Bitfield { bit_offset, bit_size, ..} = datatype {
+    if let TypeInfo::Bitfield {
+        bit_offset,
+        bit_size,
+        ..
+    } = datatype
+    {
         let mask = ((1 << bit_size) - 1) << bit_offset;
         if let Some(bit_mask) = opt_bitmask {
             bit_mask.mask = mask;
@@ -224,7 +211,6 @@ fn set_measurement_bitmask(opt_bitmask: &mut Option<BitMask>, datatype: &TypeInf
         *opt_bitmask = None;
     }
 }
-
 
 // Try to get a symbol name from an IF_DATA object.
 // specifically the pseudo-standard CANAPE_EXT could be present and contain symbol information
@@ -241,14 +227,12 @@ fn get_symbol_name_from_ifdata(ifdata_vec: &[IfData]) -> Option<String> {
     None
 }
 
-
-
-
 // generate adjuste min and max limits based on the datatype.
 // since the updater code has no knowledge how the data is handled in the application it
 // is only possible to shrink existing limits, but not expand them
 fn adjust_limits(typeinfo: &TypeInfo, old_lower_limit: f64, old_upper_limit: f64) -> (f64, f64) {
-    let (mut new_lower_limit, mut new_upper_limit) = get_type_limits(typeinfo, old_lower_limit, old_upper_limit);
+    let (mut new_lower_limit, mut new_upper_limit) =
+        get_type_limits(typeinfo, old_lower_limit, old_upper_limit);
 
     // if non-zero limits exist, then the limits can only shrink, but not grow
     // if the limits are both zero, then the maximum range allowed by the datatype is used
@@ -264,7 +248,6 @@ fn adjust_limits(typeinfo: &TypeInfo, old_lower_limit: f64, old_upper_limit: f64
     (new_lower_limit, new_upper_limit)
 }
 
-
 // remove the identifiers in removed_items from the item_list
 fn cleanup_item_list(item_list: &mut Vec<String>, removed_items: &HashSet<String>) {
     let mut new_list = Vec::<String>::new();
@@ -276,7 +259,6 @@ fn cleanup_item_list(item_list: &mut Vec<String>, removed_items: &HashSet<String
         }
     }
 }
-
 
 impl UpdateSumary {
     fn new() -> Self {
@@ -290,8 +272,7 @@ impl UpdateSumary {
             measurement_not_updated: 0,
             measurement_updated: 0,
             instance_not_updated: 0,
-            instance_updated: 0
+            instance_updated: 0,
         }
     }
 }
-

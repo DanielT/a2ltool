@@ -1,16 +1,15 @@
-use std::collections::HashSet;
-use a2lfile::*;
 use crate::dwarf::*;
+use a2lfile::*;
+use std::collections::HashSet;
 
 use super::ifdata_update::*;
 use super::*;
-
 
 pub(crate) fn update_module_blobs(
     module: &mut Module,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
-    preserve_unknown: bool
+    preserve_unknown: bool,
 ) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
     let mut blob_list = Vec::new();
@@ -44,9 +43,11 @@ pub(crate) fn update_module_blobs(
     (blob_updated, blob_not_updated)
 }
 
-
 // update the address of a BLOB object
-fn update_blob_address<'a>(blob: &mut Blob, debug_data: &'a DebugData) -> Result<&'a TypeInfo, Vec<String>> {
+fn update_blob_address<'a>(
+    blob: &mut Blob,
+    debug_data: &'a DebugData,
+) -> Result<&'a TypeInfo, Vec<String>> {
     match get_symbol_info(&blob.name, &blob.symbol_link, &blob.if_data, debug_data) {
         Ok((address, symbol_datatype, symbol_name)) => {
             // make sure a valid SYMBOL_LINK exists
@@ -56,10 +57,9 @@ fn update_blob_address<'a>(blob: &mut Blob, debug_data: &'a DebugData) -> Result
 
             Ok(symbol_datatype)
         }
-        Err(errmsgs) => Err(errmsgs)
+        Err(errmsgs) => Err(errmsgs),
     }
 }
-
 
 pub(crate) fn cleanup_removed_blobs(module: &mut Module, removed_items: &HashSet<String>) {
     for transformer in &mut module.transformer {

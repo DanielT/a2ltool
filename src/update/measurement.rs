@@ -1,19 +1,18 @@
+use crate::dwarf::*;
+use a2lfile::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use a2lfile::*;
-use crate::dwarf::*;
 
 use super::enums::*;
 use super::ifdata_update::*;
 use super::*;
-
 
 pub(crate) fn update_module_measurements(
     module: &mut Module,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
-    use_new_matrix_dim: bool
+    use_new_matrix_dim: bool,
 ) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
@@ -28,7 +27,13 @@ pub(crate) fn update_module_measurements(
             match update_measurement_address(&mut measurement, debug_data) {
                 Ok(typeinfo) => {
                     // update all the information instide a MEASUREMENT
-                    update_measurement_information(module, &mut measurement, typeinfo, &mut enum_convlist, use_new_matrix_dim);
+                    update_measurement_information(
+                        module,
+                        &mut measurement,
+                        typeinfo,
+                        &mut enum_convlist,
+                        use_new_matrix_dim,
+                    );
 
                     module.measurement.push(measurement);
                     measurement_updated += 1;
@@ -61,16 +66,20 @@ pub(crate) fn update_module_measurements(
     (measurement_updated, measurement_not_updated)
 }
 
-
 // update datatype, limits and dimension of a MEASURMENT
 fn update_measurement_information<'enumlist, 'typeinfo: 'enumlist>(
     module: &mut Module,
     measurement: &mut Measurement,
     typeinfo: &'typeinfo TypeInfo,
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
-    use_new_matrix_dim: bool
+    use_new_matrix_dim: bool,
 ) {
-    if let TypeInfo::Enum{typename, enumerators, ..} = typeinfo {
+    if let TypeInfo::Enum {
+        typename,
+        enumerators,
+        ..
+    } = typeinfo
+    {
         if measurement.conversion == "NO_COMPU_METHOD" {
             measurement.conversion = typename.to_owned();
         }
@@ -86,17 +95,16 @@ fn update_measurement_information<'enumlist, 'typeinfo: 'enumlist>(
     measurement.array_size = None;
 }
 
-
 // update the address of a MEASUREMENT object
 fn update_measurement_address<'a>(
     measurement: &mut Measurement,
-    debug_data: &'a DebugData
+    debug_data: &'a DebugData,
 ) -> Result<&'a TypeInfo, Vec<String>> {
     match get_symbol_info(
         &measurement.name,
         &measurement.symbol_link,
         &measurement.if_data,
-        debug_data
+        debug_data,
     ) {
         Ok((address, symbol_datatype, symbol_name)) => {
             // make sure a valid SYMBOL_LINK exists
@@ -104,20 +112,24 @@ fn update_measurement_address<'a>(
             set_measurement_ecu_address(&mut measurement.ecu_address, address);
             measurement.datatype = get_a2l_datatype(symbol_datatype);
             set_measurement_bitmask(&mut measurement.bit_mask, symbol_datatype);
-            update_ifdata(&mut measurement.if_data, symbol_name, symbol_datatype, address);
+            update_ifdata(
+                &mut measurement.if_data,
+                symbol_name,
+                symbol_datatype,
+                address,
+            );
 
             Ok(symbol_datatype)
         }
-        Err(errmsgs) => Err(errmsgs)
+        Err(errmsgs) => Err(errmsgs),
     }
 }
-
 
 // update the MATRIX_DIM of a MEASUREMENT
 fn update_matrix_dim(
     opt_matrix_dim: &mut Option<MatrixDim>,
     typeinfo: &TypeInfo,
-    new_format: bool
+    new_format: bool,
 ) {
     let mut matrix_dim_values = Vec::new();
     let mut cur_typeinfo = typeinfo;
@@ -146,7 +158,6 @@ fn update_matrix_dim(
         matrix_dim.dim_list = matrix_dim_values;
     }
 }
-
 
 // when update runs without preserve some MEASUREMENTs could be removed
 // these items should also be removed from the identifier lists in GROUPs, FUNCTIONs, etc

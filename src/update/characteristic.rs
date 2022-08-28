@@ -7,13 +7,12 @@ use super::enums::*;
 use super::ifdata_update::*;
 use super::*;
 
-
 pub(crate) fn update_module_characteristics(
     module: &mut Module,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
-    recordlayout_info: &mut RecordLayoutInfo
+    recordlayout_info: &mut RecordLayoutInfo,
 ) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
     let mut removed_items = HashSet::<String>::new();
@@ -22,7 +21,8 @@ pub(crate) fn update_module_characteristics(
     let mut characteristic_not_updated: u32 = 0;
 
     // store the max_axis_points of each AXIS_PTS, so that the AXIS_DESCRs inside of CHARACTERISTICS can be updated to match
-    let axis_pts_dim: HashMap::<String, u16> = module.axis_pts
+    let axis_pts_dim: HashMap<String, u16> = module
+        .axis_pts
         .iter()
         .map(|item| (item.name.to_owned(), item.max_axis_points))
         .collect();
@@ -40,14 +40,19 @@ pub(crate) fn update_module_characteristics(
                         &mut characteristic,
                         typeinfo,
                         &mut enum_convlist,
-                        &axis_pts_dim
+                        &axis_pts_dim,
                     );
 
                     module.characteristic.push(characteristic);
                     characteristic_updated += 1;
                 }
                 Err(errmsgs) => {
-                    log_update_errors(log_msgs, errmsgs, "CHARACTERISTIC", characteristic.get_line());
+                    log_update_errors(
+                        log_msgs,
+                        errmsgs,
+                        "CHARACTERISTIC",
+                        characteristic.get_line(),
+                    );
 
                     if preserve_unknown {
                         characteristic.address = 0;
@@ -73,7 +78,6 @@ pub(crate) fn update_module_characteristics(
     (characteristic_updated, characteristic_not_updated)
 }
 
-
 // update as much as possible of the information inside the CHARACTERISTIC
 fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
     module: &mut Module,
@@ -81,11 +85,16 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
     characteristic: &mut Characteristic,
     typeinfo: &'typeinfo TypeInfo,
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
-    axis_pts_dim: &HashMap<String, u16>
+    axis_pts_dim: &HashMap<String, u16>,
 ) {
     let member_id = get_fnc_values_memberid(module, recordlayout_info, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
-        if let TypeInfo::Enum{typename, enumerators, ..} = inner_typeinfo {
+        if let TypeInfo::Enum {
+            typename,
+            enumerators,
+            ..
+        } = inner_typeinfo
+        {
             if characteristic.conversion == "NO_COMPU_METHOD" {
                 characteristic.conversion = typename.to_owned();
             }
@@ -96,7 +105,7 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
         let (ll, ul) = adjust_limits(
             inner_typeinfo,
             characteristic.lower_limit,
-            characteristic.upper_limit
+            characteristic.upper_limit,
         );
         characteristic.lower_limit = ll;
         characteristic.upper_limit = ul;
@@ -110,19 +119,19 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
         &mut characteristic.axis_descr,
         record_layout,
         axis_pts_dim,
-        typeinfo
+        typeinfo,
     );
-    characteristic.deposit = update_record_layout(module, recordlayout_info, &characteristic.deposit, typeinfo);
+    characteristic.deposit =
+        update_record_layout(module, recordlayout_info, &characteristic.deposit, typeinfo);
 }
-
 
 // update all the AXIS_DESCRs inside a CHARACTERISTIC
 // for the list of AXIS_DESCR the ordering matters: the first AXIS_DESCR describes the x axis, the second describes the y axis, etc.
 fn update_characteristic_axis(
-    axis_descr: &mut Vec<AxisDescr>,
+    axis_descr: &mut [AxisDescr],
     record_layout: Option<&RecordLayout>,
     axis_pts_dim: &HashMap<String, u16>,
-    typeinfo: &TypeInfo
+    typeinfo: &TypeInfo,
 ) {
     let mut axis_positions = Vec::<Option<u16>>::new();
     // record_layout can only be None if the file is damaged. The spec requires a reference to a valid RECORD_LAYOUT
@@ -132,7 +141,7 @@ fn update_characteristic_axis(
             &rl.axis_pts_y,
             &rl.axis_pts_z,
             &rl.axis_pts_4,
-            &rl.axis_pts_5
+            &rl.axis_pts_5,
         ];
         for itemref in &itemrefs {
             // the record_layout only describes axes that are internal, i.e. part of the characteristic data structure
@@ -155,7 +164,7 @@ fn update_characteristic_axis(
         } else if idx <= 5 {
             // an internal axis, using info from the typeinfo and the record layout
             if let Some(position) = axis_positions[idx] {
-                if let Some(TypeInfo::Array{dim, ..}) = get_inner_type(typeinfo, position) {
+                if let Some(TypeInfo::Array { dim, .. }) = get_inner_type(typeinfo, position) {
                     axis_descr.max_axis_points = dim[0] as u16;
                 }
             }
@@ -163,37 +172,40 @@ fn update_characteristic_axis(
     }
 }
 
-
 // update the address of a CHARACTERISTIC
 fn update_characteristic_address<'a>(
     characteristic: &mut Characteristic,
-    debug_data: &'a DebugData
+    debug_data: &'a DebugData,
 ) -> Result<&'a TypeInfo, Vec<String>> {
     match get_symbol_info(
         &characteristic.name,
         &characteristic.symbol_link,
         &characteristic.if_data,
-        debug_data
+        debug_data,
     ) {
         Ok((address, symbol_datatype, symbol_name)) => {
             // make sure a valid SYMBOL_LINK exists
             set_symbol_link(&mut characteristic.symbol_link, symbol_name.clone());
             characteristic.address = address as u32;
             set_measurement_bitmask(&mut characteristic.bit_mask, symbol_datatype);
-            update_ifdata(&mut characteristic.if_data, symbol_name, symbol_datatype, address);
+            update_ifdata(
+                &mut characteristic.if_data,
+                symbol_name,
+                symbol_datatype,
+                address,
+            );
 
             Ok(symbol_datatype)
         }
-        Err(errmsgs) => Err(errmsgs)
+        Err(errmsgs) => Err(errmsgs),
     }
 }
-
 
 // when update runs without preserve, CHARACTERISTICs could be removed from the module
 // these items should also be removed from the identifier lists in GROUPs and FUNCTIONs
 pub(crate) fn cleanup_removed_characteristics(
     module: &mut Module,
-    removed_items: &HashSet<String>
+    removed_items: &HashSet<String>,
 ) {
     if removed_items.is_empty() {
         return;

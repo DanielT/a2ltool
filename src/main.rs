@@ -1,17 +1,16 @@
-use clap::{App, Arg, ArgGroup, ArgMatches, crate_version};
+use clap::{crate_version, App, Arg, ArgGroup, ArgMatches};
 
-use dwarf::DebugData;
-use std::{time::Instant, ffi::OsStr};
 use a2lfile::A2lObject;
+use dwarf::DebugData;
+use std::{ffi::OsStr, time::Instant};
 
-mod ifdata;
-mod dwarf;
-mod update;
-mod insert;
-mod xcp;
 mod datatype;
+mod dwarf;
+mod ifdata;
+mod insert;
 mod symbol;
-
+mod update;
+mod xcp;
 
 macro_rules! cond_print {
     ($verbose:ident, $now:ident, $formatexp:expr) => {
@@ -29,7 +28,6 @@ macro_rules! cond_print {
     };
 }
 
-
 macro_rules! ext_println {
     ($verbose:ident, $now:ident, $formatexp:expr) => {
         if $verbose <= 1 {
@@ -46,14 +44,12 @@ macro_rules! ext_println {
     };
 }
 
-
 fn main() {
     match core() {
-        Ok(_) => {},
-        Err(err) => println!("{}", err)
+        Ok(_) => {}
+        Err(err) => println!("{}", err),
     }
 }
-
 
 // Implement all the operations supported by a2ltool
 // They will always be performed in this order:
@@ -92,23 +88,49 @@ fn core() -> Result<(), String> {
 
     // additional consistency checks
     if arg_matches.is_present("CHECK") {
-        cond_print!(verbose, now, format!("Performing consistency check for {}.", input_filename.to_string_lossy()));
+        cond_print!(
+            verbose,
+            now,
+            format!(
+                "Performing consistency check for {}.",
+                input_filename.to_string_lossy()
+            )
+        );
         let mut log_msgs = Vec::<String>::new();
         a2l_file.check(&mut log_msgs);
         if log_msgs.is_empty() {
-            ext_println!(verbose, now, "Consistency check complete. No problems found.".to_string());
+            ext_println!(
+                verbose,
+                now,
+                "Consistency check complete. No problems found.".to_string()
+            );
         } else {
-            for  msg in &log_msgs {
+            for msg in &log_msgs {
                 ext_println!(verbose, now, format!("    {}", msg));
             }
-            ext_println!(verbose, now, format!("Consistency check complete. {} problems reported.", log_msgs.len()));
+            ext_println!(
+                verbose,
+                now,
+                format!(
+                    "Consistency check complete. {} problems reported.",
+                    log_msgs.len()
+                )
+            );
         }
     }
 
     // load elf
     let elf_info = if let Some(elffile) = arg_matches.value_of_os("ELFFILE") {
         let elf_info = DebugData::load(elffile, verbose > 0)?;
-        cond_print!(verbose, now, format!("Variables and types loaded from \"{}\": {} variables available", elffile.to_string_lossy(), elf_info.variables.len()));
+        cond_print!(
+            verbose,
+            now,
+            format!(
+                "Variables and types loaded from \"{}\": {} variables available",
+                elffile.to_string_lossy(),
+                elf_info.variables.len()
+            )
+        );
         if debugprint {
             println!("================\n{:#?}\n================\n", elf_info);
         }
@@ -121,10 +143,17 @@ fn core() -> Result<(), String> {
     if let Some(merge_modules) = arg_matches.values_of_os("MERGEMODULE") {
         for mergemodule in merge_modules {
             let mut merge_log_msgs = Vec::<String>::new();
-            let mut merge_a2l= a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict)?;
-            
+            let mut merge_a2l = a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict)?;
+
             a2l_file.merge_modules(&mut merge_a2l);
-            cond_print!(verbose, now, format!("Merged A2l objects from \"{}\"\n", mergemodule.to_string_lossy()));
+            cond_print!(
+                verbose,
+                now,
+                format!(
+                    "Merged A2l objects from \"{}\"\n",
+                    mergemodule.to_string_lossy()
+                )
+            );
         }
     }
 
@@ -132,17 +161,29 @@ fn core() -> Result<(), String> {
     if let Some(merge_projects) = arg_matches.values_of_os("MERGEPROJECT") {
         for mergeproject in merge_projects {
             let mut merge_log_msgs = Vec::<String>::new();
-            let merge_a2l= a2lfile::load(mergeproject, None, &mut merge_log_msgs, strict)?;
-    
+            let merge_a2l = a2lfile::load(mergeproject, None, &mut merge_log_msgs, strict)?;
+
             a2l_file.project.module.extend(merge_a2l.project.module);
-            cond_print!(verbose, now, format!("Project level merge with \"{}\". There are now {} modules.\n", mergeproject.to_string_lossy(), a2l_file.project.module.len()));
+            cond_print!(
+                verbose,
+                now,
+                format!(
+                    "Project level merge with \"{}\". There are now {} modules.\n",
+                    mergeproject.to_string_lossy(),
+                    a2l_file.project.module.len()
+                )
+            );
         }
     }
 
     // merge includes
     if arg_matches.is_present("MERGEINCLUDES") {
         a2l_file.merge_includes();
-        cond_print!(verbose, now, "Include directives have been merged\n".to_string());
+        cond_print!(
+            verbose,
+            now,
+            "Include directives have been merged\n".to_string()
+        );
     }
 
     if let Some(debugdata) = &elf_info {
@@ -150,18 +191,54 @@ fn core() -> Result<(), String> {
         if arg_matches.is_present("UPDATE") || arg_matches.is_present("SAFE_UPDATE") {
             let preserve_unknown = arg_matches.is_present("SAFE_UPDATE");
             let mut log_msgs = Vec::<String>::new();
-            let summary = update::update_addresses(&mut a2l_file, debugdata, &mut log_msgs, preserve_unknown);
+            let summary =
+                update::update_addresses(&mut a2l_file, debugdata, &mut log_msgs, preserve_unknown);
 
             for msg in log_msgs {
                 cond_print!(verbose, now, msg);
             }
 
             cond_print!(verbose, now, "Address update done\nSummary:".to_string());
-            cond_print!(verbose, now, format!("   characteristic: {} updated, {} not found", summary.characteristic_updated, summary.characteristic_not_updated));
-            cond_print!(verbose, now, format!("   measurement: {} updated, {} not found", summary.measurement_updated, summary.measurement_not_updated));
-            cond_print!(verbose, now, format!("   axis_pts: {} updated, {} not found", summary.axis_pts_updated, summary.axis_pts_not_updated));
-            cond_print!(verbose, now, format!("   blob: {} updated, {} not found", summary.blob_updated, summary.blob_not_updated));
-            cond_print!(verbose, now, format!("   instance: {} updated, {} not found", summary.instance_updated, summary.instance_not_updated));
+            cond_print!(
+                verbose,
+                now,
+                format!(
+                    "   characteristic: {} updated, {} not found",
+                    summary.characteristic_updated, summary.characteristic_not_updated
+                )
+            );
+            cond_print!(
+                verbose,
+                now,
+                format!(
+                    "   measurement: {} updated, {} not found",
+                    summary.measurement_updated, summary.measurement_not_updated
+                )
+            );
+            cond_print!(
+                verbose,
+                now,
+                format!(
+                    "   axis_pts: {} updated, {} not found",
+                    summary.axis_pts_updated, summary.axis_pts_not_updated
+                )
+            );
+            cond_print!(
+                verbose,
+                now,
+                format!(
+                    "   blob: {} updated, {} not found",
+                    summary.blob_updated, summary.blob_not_updated
+                )
+            );
+            cond_print!(
+                verbose,
+                now,
+                format!(
+                    "   instance: {} updated, {} not found",
+                    summary.instance_updated, summary.instance_not_updated
+                )
+            );
         }
 
         // create new items
@@ -233,14 +310,16 @@ fn core() -> Result<(), String> {
                 cond_print!(verbose, now, msg);
             }
         }
-
     }
-
 
     // remove unknown IF_DATA
     if arg_matches.is_present("CLEANUP") {
         a2l_file.cleanup();
-        cond_print!(verbose, now, "Cleanup of unused items and empty groups is complete".to_string());
+        cond_print!(
+            verbose,
+            now,
+            "Cleanup of unused items and empty groups is complete".to_string()
+        );
     }
 
     // remove unknown IF_DATA
@@ -261,35 +340,61 @@ fn core() -> Result<(), String> {
         if let Some(out_filename) = arg_matches.value_of_os("OUTPUT") {
             let banner = &*format!("a2ltool {}", crate_version!());
             a2l_file.write(out_filename, Some(banner))?;
-            cond_print!(verbose, now, format!("Output written to \"{}\"", out_filename.to_string_lossy()));
+            cond_print!(
+                verbose,
+                now,
+                format!("Output written to \"{}\"", out_filename.to_string_lossy())
+            );
         }
     }
 
-
-    cond_print!(verbose, now, "\nRun complete. Have a nice day!\n\n".to_string());
+    cond_print!(
+        verbose,
+        now,
+        "\nRun complete. Have a nice day!\n\n".to_string()
+    );
 
     Ok(())
 }
 
 // load or create an a2l file, depending on the command line
 // return the file name (a dummy value if it is created) as well as the a2l data
-fn load_or_create_a2l<'a>(arg_matches: &'a ArgMatches<'a>, strict: bool, verbose: u64, now: Instant) -> Result<(&'a std::ffi::OsStr, a2lfile::A2lFile), String> {
-    if let Some(input_filename) = arg_matches.value_of_os("INPUT")
-    {
+fn load_or_create_a2l<'a>(
+    arg_matches: &'a ArgMatches<'a>,
+    strict: bool,
+    verbose: u64,
+    now: Instant,
+) -> Result<(&'a std::ffi::OsStr, a2lfile::A2lFile), String> {
+    if let Some(input_filename) = arg_matches.value_of_os("INPUT") {
         let mut log_msgs = Vec::<String>::new();
-        let a2lresult = a2lfile::load(input_filename, Some(ifdata::A2MLVECTOR_TEXT.to_string()), &mut log_msgs, strict);
+        let a2lresult = a2lfile::load(
+            input_filename,
+            Some(ifdata::A2MLVECTOR_TEXT.to_string()),
+            &mut log_msgs,
+            strict,
+        );
         for msg in log_msgs {
             cond_print!(verbose, now, msg);
         }
         let a2l_file = a2lresult?;
-        cond_print!(verbose, now, format!("Input \"{}\" loaded", input_filename.to_string_lossy()));
+        cond_print!(
+            verbose,
+            now,
+            format!("Input \"{}\" loaded", input_filename.to_string_lossy())
+        );
         Ok((input_filename, a2l_file))
     } else if arg_matches.is_present("CREATE") {
         // dummy file name
         let input_filename = OsStr::new("<newly created>");
         // a minimal a2l file needs only a PROJECT containing a MODULE
-        let mut project = a2lfile::Project::new("new_project".to_string(), "description of project".to_string());
-        project.module = vec![a2lfile::Module::new("new_module".to_string(), "".to_string())];
+        let mut project = a2lfile::Project::new(
+            "new_project".to_string(),
+            "description of project".to_string(),
+        );
+        project.module = vec![a2lfile::Module::new(
+            "new_module".to_string(),
+            "".to_string(),
+        )];
         let mut a2l_file = a2lfile::A2lFile::new(project);
         // only one line break for PROJECT (after ASAP2_VERSION) instead of the default 2
         a2l_file.project.get_layout_mut().start_offset = 1;
@@ -303,7 +408,6 @@ fn load_or_create_a2l<'a>(arg_matches: &'a ArgMatches<'a>, strict: bool, verbose
         Err("impossible: no input filename and no --create".to_string())
     }
 }
-
 
 // set up the entire command line handling.
 // fortunately clap makes this painless
@@ -515,35 +619,34 @@ fn get_args<'a>() -> ArgMatches<'a> {
     .get_matches()
 }
 
-
 fn range_arg_validator(arg: String) -> Result<(), String> {
     if let Some(hexnumber) = arg.strip_prefix("0x") {
         match u64::from_str_radix(hexnumber, 16) {
             Ok(_) => Ok(()),
-            Err(error) => Err(format!("\"{}\" is not a valid address: {}", arg, error))
+            Err(error) => Err(format!("\"{}\" is not a valid address: {}", arg, error)),
         }
     } else {
         match arg.parse::<u64>() {
             Ok(_) => Ok(()),
-            Err(error) => Err(format!("\"{}\" is not a valid address: {}", arg, error))
+            Err(error) => Err(format!("\"{}\" is not a valid address: {}", arg, error)),
         }
     }
 }
 
-
 fn range_args_to_ranges(args: Option<clap::Values>) -> Vec<(u64, u64)> {
     if let Some(values) = args {
-        let rangevals: Vec<u64> = values.map(
-            |arg| {
+        let rangevals: Vec<u64> = values
+            .map(|arg| {
                 if let Some(hexnumber) = arg.strip_prefix("0x") {
                     u64::from_str_radix(hexnumber, 16).unwrap()
                 } else {
                     arg.parse::<u64>().unwrap()
                 }
-            }).collect();
+            })
+            .collect();
         let mut addr_ranges: Vec<(u64, u64)> = Vec::new();
         for idx in (1..rangevals.len()).step_by(2) {
-            addr_ranges.push( (rangevals[idx-1], rangevals[idx]) );
+            addr_ranges.push((rangevals[idx - 1], rangevals[idx]));
         }
         addr_ranges
     } else {

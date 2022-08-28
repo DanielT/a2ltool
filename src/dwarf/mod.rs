@@ -1,11 +1,10 @@
-use std::ffi::OsStr;
-use std::{collections::HashMap, fs::File};
-use object::Object;
+use gimli::{Abbreviations, DebuggingInformationEntry, UnitHeader};
+use gimli::{EndianSlice, RunTimeEndian};
 use object::read::ObjectSection;
-use gimli::{Abbreviations, UnitHeader, DebuggingInformationEntry};
-use gimli::{RunTimeEndian, EndianSlice};
+use object::Object;
+use std::ffi::OsStr;
 use std::ops::Index;
-
+use std::{collections::HashMap, fs::File};
 
 type SliceType<'a> = EndianSlice<'a, RunTimeEndian>;
 
@@ -15,13 +14,11 @@ mod typereader;
 use typereader::load_types;
 mod iter;
 
-
 #[derive(Debug)]
 pub(crate) struct VarInfo {
     pub(crate) address: u64,
-    pub(crate) typeref: usize
+    pub(crate) typeref: usize,
 }
-
 
 #[derive(Debug)]
 pub(crate) enum TypeInfo {
@@ -38,53 +35,52 @@ pub(crate) enum TypeInfo {
     Bitfield {
         basetype: Box<TypeInfo>,
         bit_offset: u16,
-        bit_size: u16
+        bit_size: u16,
     },
     Pointer(u64),
     Other(u64),
     Struct {
         // typename: String,
         size: u64,
-        members: HashMap<String, (TypeInfo, u64)>
+        members: HashMap<String, (TypeInfo, u64)>,
     },
     Class {
         // typename: String,
         size: u64,
-        members: HashMap<String, (TypeInfo, u64)>
+        members: HashMap<String, (TypeInfo, u64)>,
     },
     Union {
         size: u64,
-        members: HashMap<String, (TypeInfo, u64)>
+        members: HashMap<String, (TypeInfo, u64)>,
     },
     Enum {
         typename: String,
         size: u64,
-        enumerators: Vec<(String, i64)>
+        enumerators: Vec<(String, i64)>,
     },
     Array {
         size: u64,
         dim: Vec<u64>,
         stride: u64,
-        arraytype: Box<TypeInfo>
-    }
+        arraytype: Box<TypeInfo>,
+    },
 }
 
 pub(crate) struct UnitList<'a> {
-    list: Vec<(UnitHeader<SliceType<'a>>, gimli::Abbreviations)>
+    list: Vec<(UnitHeader<SliceType<'a>>, gimli::Abbreviations)>,
 }
 
 #[derive(Debug)]
 pub(crate) struct DebugData {
     pub(crate) variables: HashMap<String, VarInfo>,
-    pub(crate) types: HashMap<usize, TypeInfo>
+    pub(crate) types: HashMap<usize, TypeInfo>,
 }
-
 
 impl DebugData {
     // load the debug info from an elf file
     pub(crate) fn load(filename: &OsStr, verbose: bool) -> Result<Self, String> {
         let filedata = load_filedata(filename)?;
-        let elffile = load_elf_file(&filename.to_string_lossy(), &*filedata)?;
+        let elffile = load_elf_file(&filename.to_string_lossy(), &filedata)?;
         let dwarf = load_dwarf(&elffile)?;
 
         Ok(read_debug_info_entries(&dwarf, verbose))
@@ -95,63 +91,69 @@ impl DebugData {
     }
 }
 
-
 // open a file and mmap its content
 fn load_filedata(filename: &OsStr) -> Result<memmap::Mmap, String> {
     let file = match File::open(filename) {
         Ok(file) => file,
-        Err(error) => return Err(format!("Error: could not open file {}: {}", filename.to_string_lossy(), error))
+        Err(error) => {
+            return Err(format!(
+                "Error: could not open file {}: {}",
+                filename.to_string_lossy(),
+                error
+            ))
+        }
     };
 
     match unsafe { memmap::Mmap::map(&file) } {
         Ok(mmap) => Ok(mmap),
         Err(err) => {
-            return Err(format!("Error: Failed to map file '{}': {}", filename.to_string_lossy(), err));
+            Err(format!(
+                "Error: Failed to map file '{}': {}",
+                filename.to_string_lossy(),
+                err
+            ))
         }
     }
 }
-
 
 // read the headers and sections of an elf/object file
 fn load_elf_file<'data>(
     filename: &str,
-    filedata: &'data [u8]
+    filedata: &'data [u8],
 ) -> Result<object::read::File<'data>, String> {
-    match object::File::parse(&*filedata) {
+    match object::File::parse(filedata) {
         Ok(file) => Ok(file),
-        Err(err) => {
-            Err(format!("Error: Failed to parse file '{}': {}", filename, err))
-        }
+        Err(err) => Err(format!(
+            "Error: Failed to parse file '{}': {}",
+            filename, err
+        )),
     }
 }
 
-
 // load the SWARF debug info from the .debug_<xyz> sections
 fn load_dwarf<'data>(
-    elffile: &object::read::File<'data>
+    elffile: &object::read::File<'data>,
 ) -> Result<gimli::Dwarf<SliceType<'data>>, String> {
     // Dwarf::load takes two closures / functions and uses them to load all the required debug sections
-    let loader = |section: gimli::SectionId| { get_file_section_reader(elffile, section.name()) };
+    let loader = |section: gimli::SectionId| get_file_section_reader(elffile, section.name());
     gimli::Dwarf::load(loader)
 }
-
 
 // get a section from the elf file.
 // returns a slice referencing the section data if it exists, or an empty slice otherwise
 fn get_file_section_reader<'data>(
     elffile: &object::read::File<'data>,
-    section_name: &str
+    section_name: &str,
 ) -> Result<SliceType<'data>, String> {
     if let Some(dbginfo) = elffile.section_by_name(section_name) {
         match dbginfo.data() {
             Ok(val) => Ok(EndianSlice::new(val, get_endian(elffile))),
-            Err(e) => Err(e.to_string())
+            Err(e) => Err(e.to_string()),
         }
     } else {
         Ok(EndianSlice::new(&[], get_endian(elffile)))
     }
 }
-
 
 // get the endianity of the elf file
 fn get_endian(elffile: &object::read::File) -> RunTimeEndian {
@@ -162,24 +164,23 @@ fn get_endian(elffile: &object::read::File) -> RunTimeEndian {
     }
 }
 
-
 // read the debug information entries in the DWAF data to get all the global variables and their types
 fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>, verbose: bool) -> DebugData {
     let (variables, typedefs, units) = load_variables(dwarf, verbose);
     let types = load_types(&variables, typedefs, units, dwarf, verbose);
 
-    DebugData {
-        variables,
-        types
-    }
+    DebugData { variables, types }
 }
-
 
 // load all global variables from the dwarf data
 fn load_variables<'a>(
     dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>,
-    verbose: bool
-) -> (HashMap<String, VarInfo>, HashMap<usize, String>, UnitList<'a>) {
+    verbose: bool,
+) -> (
+    HashMap<String, VarInfo>,
+    HashMap<usize, String>,
+    UnitList<'a>,
+) {
     let mut variables = HashMap::<String, VarInfo>::new();
     let mut typedefs = HashMap::<usize, String>::new();
     let mut unit_list = UnitList::new();
@@ -197,21 +198,25 @@ fn load_variables<'a>(
             if entry.tag() == gimli::constants::DW_TAG_variable {
                 match get_global_variable(entry, &unit, &abbreviations, dwarf) {
                     Ok(Some((name, typeref, address))) => {
-                        variables.insert(name, VarInfo{address, typeref});
+                        variables.insert(name, VarInfo { address, typeref });
                     }
                     Ok(None) => {
                         // unremarkable, the variable is not a global variable
                     }
                     Err(errmsg) => {
                         if verbose {
-                            let offset = entry.offset().to_debug_info_offset(&unit).unwrap_or(gimli::DebugInfoOffset(0)).0;
+                            let offset = entry
+                                .offset()
+                                .to_debug_info_offset(&unit)
+                                .unwrap_or(gimli::DebugInfoOffset(0))
+                                .0;
                             println!("Error loading variable @{:x}: {}", offset, errmsg);
                         }
                     }
                 }
             } else if entry.tag() == gimli::constants::DW_TAG_typedef {
                 // collect information about all typedefs
-                if let Ok(name) = get_name_attribute(&entry, dwarf) {
+                if let Ok(name) = get_name_attribute(entry, dwarf) {
                     if let Ok(typeref) = get_typeref_attribute(entry, &unit) {
                         // build a reverse map from the referenced type to the typedef name
                         // it's possible that a type has multiple typedefs, in which case we only keep the last one
@@ -227,14 +232,13 @@ fn load_variables<'a>(
     (variables, typedefs, unit_list)
 }
 
-
 // an entry of the type DW_TAG_variable only describes a global variable if there is a name, a type and an address
 // this function tries to get all three and returns them
 fn get_global_variable(
     entry: &DebuggingInformationEntry<SliceType, usize>,
     unit: &UnitHeader<SliceType>,
     abbrev: &gimli::Abbreviations,
-    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>
+    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
 ) -> Result<Option<(String, usize, u64)>, String> {
     match get_location_attribute(entry, unit.encoding()) {
         Some(address) => {
@@ -245,21 +249,23 @@ fn get_global_variable(
                 let name = get_name_attribute(&specification_entry, dwarf)?;
                 let typeref = get_typeref_attribute(&specification_entry, unit)?;
 
-                Ok(Some( (name, typeref, address) ))
-            } else if let Some(abstract_origin_entry) = get_abstract_origin_attribute(entry, unit, abbrev) {
+                Ok(Some((name, typeref, address)))
+            } else if let Some(abstract_origin_entry) =
+                get_abstract_origin_attribute(entry, unit, abbrev)
+            {
                 // the entry refers to an abstract origin, which should also be considered when getting the name and type ref
                 let name = get_name_attribute(entry, dwarf)
                     .or_else(|_| get_name_attribute(&abstract_origin_entry, dwarf))?;
                 let typeref = get_typeref_attribute(entry, unit)
                     .or_else(|_| get_typeref_attribute(&abstract_origin_entry, unit))?;
 
-                Ok(Some( (name, typeref, address) ))
+                Ok(Some((name, typeref, address)))
             } else {
                 // usual case: there is no specification or abstract origin and all info is part of this entry
                 let name = get_name_attribute(entry, dwarf)?;
                 let typeref = get_typeref_attribute(entry, unit)?;
 
-                Ok(Some( (name, typeref, address) ))
+                Ok(Some((name, typeref, address)))
             }
         }
         None => {
@@ -269,13 +275,10 @@ fn get_global_variable(
     }
 }
 
-
 // UnitList holds a list of all UnitHeaders in the Dwarf data for convenient access
 impl<'a> UnitList<'a> {
     fn new() -> Self {
-        Self {
-            list: Vec::new()
-        }
+        Self { list: Vec::new() }
     }
 
     fn add(&mut self, unit: UnitHeader<SliceType<'a>>, abbrev: Abbreviations) {
@@ -302,7 +305,6 @@ impl<'a> Index<usize> for UnitList<'a> {
     }
 }
 
-
 impl TypeInfo {
     pub(crate) fn get_size(&self) -> u64 {
         match self {
@@ -316,14 +318,14 @@ impl TypeInfo {
             TypeInfo::Sint64 => 8,
             TypeInfo::Float => 4,
             TypeInfo::Double => 8,
-            TypeInfo::Bitfield {basetype, ..} => basetype.get_size(),
-            TypeInfo::Pointer(size) |
-            TypeInfo::Other(size) |
-            TypeInfo::Struct { size, .. } |
-            TypeInfo::Class { size, .. } |
-            TypeInfo::Union { size, .. } |
-            TypeInfo::Enum { size, .. } |
-            TypeInfo::Array { size, .. } => *size
+            TypeInfo::Bitfield { basetype, .. } => basetype.get_size(),
+            TypeInfo::Pointer(size)
+            | TypeInfo::Other(size)
+            | TypeInfo::Struct { size, .. }
+            | TypeInfo::Class { size, .. }
+            | TypeInfo::Union { size, .. }
+            | TypeInfo::Enum { size, .. }
+            | TypeInfo::Array { size, .. } => *size,
         }
     }
 }

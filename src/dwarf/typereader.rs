@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-use gimli::{EndianSlice, EntriesTreeNode, RunTimeEndian};
-use super::{UnitList, TypeInfo, VarInfo};
 use super::attributes::*;
-
+use super::{TypeInfo, UnitList, VarInfo};
+use gimli::{EndianSlice, EntriesTreeNode, RunTimeEndian};
+use std::collections::HashMap;
 
 // load all the types referenced by variables in given HashMap
 pub(crate) fn load_types(
@@ -10,11 +9,11 @@ pub(crate) fn load_types(
     typedefs: HashMap<usize, String>,
     units: UnitList,
     dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
-    verbose: bool
+    verbose: bool,
 ) -> HashMap<usize, TypeInfo> {
     let mut types = HashMap::<usize, TypeInfo>::new();
     // for each variable
-    for (_name, VarInfo { typeref, ..}) in variables {
+    for (_name, VarInfo { typeref, .. }) in variables {
         // check if the type was already loaded
         if types.get(typeref).is_none() {
             if let Some(unit_idx) = units.get_unit(*typeref) {
@@ -25,7 +24,14 @@ pub(crate) fn load_types(
                 let mut entries_tree = unit.entries_tree(abbrev, Some(unit_offset)).unwrap();
 
                 // load one type and add it to the collection (always succeeds for correctly structured DWARF debug info)
-                match get_type(&units, unit_idx, entries_tree.root().unwrap(), None, &typedefs, dwarf) {
+                match get_type(
+                    &units,
+                    unit_idx,
+                    entries_tree.root().unwrap(),
+                    None,
+                    &typedefs,
+                    dwarf,
+                ) {
                     Ok(vartype) => {
                         types.insert(*typeref, vartype);
                     }
@@ -42,7 +48,6 @@ pub(crate) fn load_types(
     types
 }
 
-
 // get one type from the debug info
 fn get_type(
     unit_list: &UnitList,
@@ -50,13 +55,11 @@ fn get_type(
     entries_tree: EntriesTreeNode<EndianSlice<RunTimeEndian>>,
     typedef_name: Option<String>,
     typedefs: &HashMap<usize, String>,
-    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>
+    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
 ) -> Result<TypeInfo, String> {
     let entry = entries_tree.entry();
     match entry.tag() {
-        gimli::constants::DW_TAG_base_type => {
-            get_base_type(entry, &unit_list[current_unit].0)
-        }
+        gimli::constants::DW_TAG_base_type => get_base_type(entry, &unit_list[current_unit].0),
         gimli::constants::DW_TAG_pointer_type => {
             let (unit, _) = &unit_list[current_unit];
             Ok(TypeInfo::Pointer(unit.encoding().address_size as u64))
@@ -66,12 +69,14 @@ fn get_type(
                 .ok_or_else(|| "error decoding array info: missing size attribute".to_string())?;
             let (new_cur_unit, mut new_entries_tree) =
                 get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
-            let arraytype = get_type(unit_list,
+            let arraytype = get_type(
+                unit_list,
                 new_cur_unit,
                 new_entries_tree.root().unwrap(),
                 None,
                 typedefs,
-                dwarf)?;
+                dwarf,
+            )?;
 
             let mut dim = Vec::<u64>::new();
 
@@ -89,12 +94,17 @@ fn get_type(
             let mut iter = entries_tree.children();
             while let Ok(Some(child_node)) = iter.next() {
                 let child_entry = child_node.entry();
-                if child_entry.tag() ==  gimli::constants::DW_TAG_subrange_type {
+                if child_entry.tag() == gimli::constants::DW_TAG_subrange_type {
                     let ubound = get_upper_bound_attribute(child_entry).unwrap_or(default_ubound);
                     dim.push(ubound + 1);
                 }
             }
-            Ok(TypeInfo::Array { dim, arraytype: Box::new(arraytype), size, stride })
+            Ok(TypeInfo::Array {
+                dim,
+                arraytype: Box::new(arraytype),
+                size,
+                stride,
+            })
         }
         gimli::constants::DW_TAG_enumeration_type => {
             let size = get_byte_size_attribute(entry)
@@ -124,75 +134,96 @@ fn get_type(
             // get all the enumerators
             while let Ok(Some(child_node)) = iter.next() {
                 let child_entry = child_node.entry();
-                if child_entry.tag() ==  gimli::constants::DW_TAG_enumerator {
+                if child_entry.tag() == gimli::constants::DW_TAG_enumerator {
                     let name = get_name_attribute(child_entry, dwarf)
-                        .map_err(|_| "missing enum item name".to_string() )?;
+                        .map_err(|_| "missing enum item name".to_string())?;
                     let value = get_const_value_attribute(child_entry)
                         .ok_or_else(|| "missing enum item value".to_string())?;
                     enumerators.push((name, value));
                 }
             }
-            Ok(TypeInfo::Enum { typename, size, enumerators })
+            Ok(TypeInfo::Enum {
+                typename,
+                size,
+                enumerators,
+            })
         }
         gimli::constants::DW_TAG_structure_type => {
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing struct byte size attribute".to_string())?;
-            let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, typedefs, dwarf)?;
-            Ok(TypeInfo::Struct {size, members})
+            let members = get_struct_or_union_members(
+                entries_tree,
+                unit_list,
+                current_unit,
+                typedefs,
+                dwarf,
+            )?;
+            Ok(TypeInfo::Struct { size, members })
         }
         gimli::constants::DW_TAG_class_type => {
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing class byte size attribute".to_string())?;
-            let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, typedefs, dwarf)?;
-            Ok(TypeInfo::Class {size, members})
+            let members = get_struct_or_union_members(
+                entries_tree,
+                unit_list,
+                current_unit,
+                typedefs,
+                dwarf,
+            )?;
+            Ok(TypeInfo::Class { size, members })
         }
         gimli::constants::DW_TAG_union_type => {
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing union byte size attribute".to_string())?;
-            let members = get_struct_or_union_members(entries_tree, unit_list, current_unit, typedefs, dwarf)?;
-            Ok(TypeInfo::Union {size, members})
+            let members = get_struct_or_union_members(
+                entries_tree,
+                unit_list,
+                current_unit,
+                typedefs,
+                dwarf,
+            )?;
+            Ok(TypeInfo::Union { size, members })
         }
         gimli::constants::DW_TAG_typedef => {
             let name = get_name_attribute(entry, dwarf)?;
-            let (new_cur_unit, mut new_entries_tree) = get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
+            let (new_cur_unit, mut new_entries_tree) =
+                get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
             get_type(
                 unit_list,
                 new_cur_unit,
                 new_entries_tree.root().unwrap(),
                 Some(name),
                 typedefs,
-                dwarf
+                dwarf,
             )
         }
-        gimli::constants::DW_TAG_const_type |
-        gimli::constants::DW_TAG_volatile_type => {
-            let (new_cur_unit, mut new_entries_tree) = get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
+        gimli::constants::DW_TAG_const_type | gimli::constants::DW_TAG_volatile_type => {
+            let (new_cur_unit, mut new_entries_tree) =
+                get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
             get_type(
                 unit_list,
                 new_cur_unit,
                 new_entries_tree.root().unwrap(),
                 typedef_name,
                 typedefs,
-                dwarf
+                dwarf,
             )
         }
-        other_tag => {
-            Err(format!("unexpected DWARF tag {} in type definition", other_tag))
-        }
+        other_tag => Err(format!(
+            "unexpected DWARF tag {} in type definition",
+            other_tag
+        )),
     }
 }
 
-
 fn get_base_type(
     entry: &gimli::DebuggingInformationEntry<EndianSlice<RunTimeEndian>, usize>,
-    unit: &gimli::UnitHeader<EndianSlice<RunTimeEndian>>
+    unit: &gimli::UnitHeader<EndianSlice<RunTimeEndian>>,
 ) -> Result<TypeInfo, String> {
     let byte_size = get_byte_size_attribute(entry).unwrap_or(1u64);
     let encoding = get_encoding_attribute(entry).unwrap_or(gimli::constants::DW_ATE_unsigned);
     Ok(match encoding {
-        gimli::constants::DW_ATE_address => {
-            TypeInfo::Pointer(unit.encoding().address_size as u64)
-        }
+        gimli::constants::DW_ATE_address => TypeInfo::Pointer(unit.encoding().address_size as u64),
         gimli::constants::DW_ATE_float => {
             if byte_size == 8 {
                 TypeInfo::Double
@@ -200,37 +231,35 @@ fn get_base_type(
                 TypeInfo::Float
             }
         }
-        gimli::constants::DW_ATE_signed |
-        gimli::constants::DW_ATE_signed_char => {
-            match byte_size {
-                1 => TypeInfo::Sint8,
-                2 => TypeInfo::Sint16,
-                4 => TypeInfo::Sint32,
-                8 => TypeInfo::Sint64,
-                val => {
-                    return Err(format!("error loading data type: signed int of size {}", val));
-                }
+        gimli::constants::DW_ATE_signed | gimli::constants::DW_ATE_signed_char => match byte_size {
+            1 => TypeInfo::Sint8,
+            2 => TypeInfo::Sint16,
+            4 => TypeInfo::Sint32,
+            8 => TypeInfo::Sint64,
+            val => {
+                return Err(format!(
+                    "error loading data type: signed int of size {}",
+                    val
+                ));
             }
-        }
-        gimli::constants::DW_ATE_boolean |
-        gimli::constants::DW_ATE_unsigned |
-        gimli::constants::DW_ATE_unsigned_char => {
-            match byte_size {
-                1 => TypeInfo::Uint8,
-                2 => TypeInfo::Uint16,
-                4 => TypeInfo::Uint32,
-                8 => TypeInfo::Uint64,
-                val => {
-                    return Err(format!("error loading data type: unsigned int of size {}", val));
-                }
+        },
+        gimli::constants::DW_ATE_boolean
+        | gimli::constants::DW_ATE_unsigned
+        | gimli::constants::DW_ATE_unsigned_char => match byte_size {
+            1 => TypeInfo::Uint8,
+            2 => TypeInfo::Uint16,
+            4 => TypeInfo::Uint32,
+            8 => TypeInfo::Uint64,
+            val => {
+                return Err(format!(
+                    "error loading data type: unsigned int of size {}",
+                    val
+                ));
             }
-        }
-        _other => {
-            TypeInfo::Other(byte_size)
-        }
+        },
+        _other => TypeInfo::Other(byte_size),
     })
 }
-
 
 // get all the members of a struct or union or class
 fn get_struct_or_union_members(
@@ -260,7 +289,7 @@ fn get_struct_or_union_members(
                 new_entries_tree.root().unwrap(),
                 None,
                 typedefs,
-                dwarf
+                dwarf,
             )?;
 
             // wrap bitfield members in a TypeInfo::Bitfield to store bit_size and bit_offset
@@ -269,7 +298,7 @@ fn get_struct_or_union_members(
                     membertype = TypeInfo::Bitfield {
                         basetype: Box::new(membertype),
                         bit_size: bit_size as u16,
-                        bit_offset: bit_offset as u16
+                        bit_offset: bit_offset as u16,
                     };
                 }
             }

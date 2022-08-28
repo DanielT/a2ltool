@@ -1,19 +1,18 @@
+use crate::dwarf::*;
+use a2lfile::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use a2lfile::*;
-use crate::dwarf::*;
 
 use super::enums::*;
 use super::ifdata_update::*;
 use super::*;
-
 
 pub(crate) fn update_module_axis_pts(
     module: &mut Module,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
-    recordlayout_info: &mut RecordLayoutInfo
+    recordlayout_info: &mut RecordLayoutInfo,
 ) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
     let mut removed_items = HashSet::<String>::new();
@@ -27,36 +26,42 @@ pub(crate) fn update_module_axis_pts(
             Ok(typeinfo) => {
                 // the variable used for the axis should be a 1-dimensional array, or a struct containing a 1-dimensional array
                 // if the type is a struct, then the AXIS_PTS_X inside the referenced RECORD_LAYOUT tells us which member of the struct to use.
-                let member_id = get_axis_pts_x_memberid(module, recordlayout_info, &axis_pts.deposit_record);
+                let member_id =
+                    get_axis_pts_x_memberid(module, recordlayout_info, &axis_pts.deposit_record);
                 if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
-
                     match inner_typeinfo {
-                        TypeInfo::Array{dim, arraytype, ..} => {
+                        TypeInfo::Array { dim, arraytype, .. } => {
                             // update max_axis_points to match the size of the array
                             if !dim.is_empty() {
                                 axis_pts.max_axis_points = dim[0] as u16;
                             }
-                            if let TypeInfo::Enum{typename, enumerators, ..} = &**arraytype {
+                            if let TypeInfo::Enum {
+                                typename,
+                                enumerators,
+                                ..
+                            } = &**arraytype
+                            {
                                 // an array of enums? it could be done...
                                 if axis_pts.conversion == "NO_COMPU_METHOD" {
                                     axis_pts.conversion = typename.to_owned();
                                 }
-                                cond_create_enum_conversion(module, &axis_pts.conversion, enumerators);
+                                cond_create_enum_conversion(
+                                    module,
+                                    &axis_pts.conversion,
+                                    enumerators,
+                                );
                                 enum_convlist.insert(axis_pts.conversion.clone(), arraytype);
                             }
                         }
-                        TypeInfo::Enum{..} => {
+                        TypeInfo::Enum { .. } => {
                             // likely not useful, because what purpose would an axis consisting of a single enum value serve?
                             enum_convlist.insert(axis_pts.conversion.clone(), typeinfo);
                         }
                         _ => {}
                     }
 
-                    let (ll, ul) = adjust_limits(
-                        inner_typeinfo,
-                        axis_pts.lower_limit,
-                        axis_pts.upper_limit
-                    );
+                    let (ll, ul) =
+                        adjust_limits(inner_typeinfo, axis_pts.lower_limit, axis_pts.upper_limit);
                     axis_pts.lower_limit = ll;
                     axis_pts.upper_limit = ul;
                 }
@@ -66,7 +71,7 @@ pub(crate) fn update_module_axis_pts(
                     module,
                     recordlayout_info,
                     &axis_pts.deposit_record,
-                    typeinfo
+                    typeinfo,
                 );
 
                 // put the updated AXIS_PTS back on the module's list
@@ -96,16 +101,16 @@ pub(crate) fn update_module_axis_pts(
     (axis_pts_updated, axis_pts_not_updated)
 }
 
-
 // update the address of an AXIS_PTS object
 fn update_axis_pts_address<'a>(
     axis_pts: &mut AxisPts,
-    debug_data: &'a DebugData
+    debug_data: &'a DebugData,
 ) -> Result<&'a TypeInfo, Vec<String>> {
     match get_symbol_info(
         &axis_pts.name,
         &axis_pts.symbol_link,
-        &axis_pts.if_data, debug_data
+        &axis_pts.if_data,
+        debug_data,
     ) {
         Ok((address, symbol_datatype, symbol_name)) => {
             // make sure a valid SYMBOL_LINK exists
@@ -115,10 +120,9 @@ fn update_axis_pts_address<'a>(
 
             Ok(symbol_datatype)
         }
-        Err(errmsgs) => Err(errmsgs)
+        Err(errmsgs) => Err(errmsgs),
     }
 }
-
 
 // when update runs without preserve, AXIS_PTS be removed from the module
 // AXIS_PTS are only referenced through CHARACTERISTIC > AXIS_DESCR > AXIS_PTS_REF

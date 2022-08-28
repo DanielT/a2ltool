@@ -89,7 +89,7 @@ a2ml_specification! {
                         uchar min_st;  /// MIN_ST
                     };
                 };
-                "INTERLEAVED" uchar;  /// QUEUE_SIZE 
+                "INTERLEAVED" uchar;  /// QUEUE_SIZE
             };
             "SEED_AND_KEY_EXTERNAL_FUNCTION" char funcname[256];  /// Name of the Seed&Key function
             "MAX_DTO_STIM" uint max_dto_stim;  /// overrules MAX_DTO see above for STIM use case
@@ -252,7 +252,7 @@ a2ml_specification! {
                     block "CPU_LOAD_CONSUMPTION_DAQ" struct {
                         float daq_factor;  /// "DAQ_FACTOR"
                         float odt_factor;  /// "ODT_FACTOR"
-                        float odt_entry_factor;  /// "ODT_ENTRY_FACTOR" 
+                        float odt_entry_factor;  /// "ODT_ENTRY_FACTOR"
                         taggedstruct {
                             (block "ODT_ENTRY_SIZE_FACTOR_TABLE" struct {
                                 uint size;  /// "SIZE"
@@ -457,7 +457,7 @@ a2ml_specification! {
 
     struct SxI_Parameters {
         uint xcp_on_sxi_version;  /// XCP on SxI version, currently 0x0100
-        ulong baudrate;  /// BAUDRATE [Hz] 
+        ulong baudrate;  /// BAUDRATE [Hz]
         taggedstruct {
             "ASYNCH_FULL_DUPLEX_MODE" struct {
                 enum Parity {
@@ -546,7 +546,7 @@ a2ml_specification! {
             "ALIGNMENT_64_BIT" = 3
         };
         taggedstruct {
-            "RECOMMENDED_HOST_BUFSIZE" uint;  /// Recommended size for the host buffer size. The size is defined as multiple of wMaxPacketSize.  
+            "RECOMMENDED_HOST_BUFSIZE" uint;  /// Recommended size for the host buffer size. The size is defined as multiple of wMaxPacketSize.
         };
     };  /// end of ep_parameters
 
