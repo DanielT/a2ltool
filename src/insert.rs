@@ -88,10 +88,7 @@ fn insert_measurement_sym(
     address: u64,
 ) -> Result<String, String> {
     // Abort if a MEASUREMENT for this symbol already exists. Warn if any other reference to the symbol exists
-    let item_name = match make_unique_measurement_name(module, sym_map, measure_sym, name_map) {
-        Ok(value) => value,
-        Err(errmsg) => return Err(errmsg),
-    };
+    let item_name = make_unique_measurement_name(module, sym_map, measure_sym, name_map)?;
 
     let datatype = get_a2l_datatype(typeinfo);
     let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
@@ -161,11 +158,8 @@ fn insert_characteristic_sym(
     typeinfo: &TypeInfo,
     address: u64,
 ) -> Result<String, String> {
-    let item_name =
-        match make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map) {
-            Ok(value) => value,
-            Err(errmsg) => return Err(errmsg),
-        };
+    let item_name = make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map)?;
+
     let datatype = get_a2l_datatype(typeinfo);
     let recordlayout_name = format!("__{}_Z", datatype.to_string());
     let mut new_characteristic = match typeinfo {
@@ -429,7 +423,7 @@ pub(crate) fn insert_many(
                             insert_meas_count += 1;
                         }
                         Err(errmsg) => {
-                            log_msgs.push(format!("Error: {}", errmsg));
+                            log_msgs.push(format!("Skipped: {}", errmsg));
                         }
                     }
                 }
@@ -455,7 +449,7 @@ pub(crate) fn insert_many(
                             insert_chara_count += 1;
                         }
                         Err(errmsg) => {
-                            log_msgs.push(format!("Error: {}", errmsg));
+                            log_msgs.push(format!("Skipped: {}", errmsg));
                         }
                     }
                 }
