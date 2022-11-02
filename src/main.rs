@@ -1,8 +1,8 @@
-use clap::{crate_version, App, Arg, ArgGroup, ArgMatches};
+use clap::{builder::ValueParser, parser::ValuesRef, Arg, ArgGroup, ArgMatches, Command};
 
 use a2lfile::A2lObject;
 use dwarf::DebugData;
-use std::{ffi::OsStr, time::Instant};
+use std::{ffi::OsStr, ffi::OsString, time::Instant};
 
 mod datatype;
 mod dwarf;
@@ -66,12 +66,44 @@ fn main() {
 fn core() -> Result<(), String> {
     let arg_matches = get_args();
 
-    let strict = arg_matches.is_present("STRICT");
-    let verbose = arg_matches.occurrences_of("VERBOSE");
-    let debugprint = arg_matches.is_present("DEBUGPRINT");
+    let strict = *arg_matches
+        .get_one::<bool>("STRICT")
+        .expect("option strict must always exist");
+    let check = *arg_matches
+        .get_one::<bool>("CHECK")
+        .expect("option check must always exist");
+    let debugprint = *arg_matches
+        .get_one::<bool>("DEBUGPRINT")
+        .expect("option debugprint must always exist");
+    let show_xcp = *arg_matches
+        .get_one::<bool>("SHOW_XCP")
+        .expect("option show-xcp must always exist");
+    let update = *arg_matches
+        .get_one::<bool>("UPDATE")
+        .expect("option update must always exist");
+    let update_preserve = *arg_matches
+        .get_one::<bool>("SAFE_UPDATE")
+        .expect("option update-preserve must always exist");
+    let cleanup = *arg_matches
+        .get_one::<bool>("CLEANUP")
+        .expect("option cleanup must always exist");
+    let ifdata_cleanup = *arg_matches
+        .get_one::<bool>("IFDATA_CLEANUP")
+        .expect("option ifdata-cleanup must always exist");
+    let sort = *arg_matches
+        .get_one::<bool>("SORT")
+        .expect("option sort must always exist");
+    let merge_includes = *arg_matches
+        .get_one::<bool>("MERGEINCLUDES")
+        .expect("option merge-includes must always exist");
+    let verbose = arg_matches.get_count("VERBOSE");
 
     let now = Instant::now();
-    cond_print!(verbose, now, format!("\na2ltool {}\n", crate_version!()));
+    cond_print!(
+        verbose,
+        now,
+        format!("\na2ltool {}\n", env!("CARGO_PKG_VERSION"))
+    );
 
     // load input
     let (input_filename, mut a2l_file) = load_or_create_a2l(&arg_matches, strict, verbose, now)?;
@@ -82,12 +114,12 @@ fn core() -> Result<(), String> {
     }
 
     // show XCP settings
-    if arg_matches.is_present("SHOW_XCP") {
+    if show_xcp {
         xcp::show_settings(&a2l_file, input_filename);
     }
 
     // additional consistency checks
-    if arg_matches.is_present("CHECK") {
+    if check {
         cond_print!(
             verbose,
             now,
@@ -120,7 +152,7 @@ fn core() -> Result<(), String> {
     }
 
     // load elf
-    let elf_info = if let Some(elffile) = arg_matches.value_of_os("ELFFILE") {
+    let elf_info = if let Some(elffile) = arg_matches.get_one::<OsString>("ELFFILE") {
         let elf_info = DebugData::load(elffile, verbose > 0)?;
         cond_print!(
             verbose,
@@ -140,7 +172,7 @@ fn core() -> Result<(), String> {
     };
 
     // merge at the module level
-    if let Some(merge_modules) = arg_matches.values_of_os("MERGEMODULE") {
+    if let Some(merge_modules) = arg_matches.get_many::<OsString>("MERGEMODULE") {
         for mergemodule in merge_modules {
             let mut merge_log_msgs = Vec::<String>::new();
             let mut merge_a2l = a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict)?;
@@ -158,7 +190,7 @@ fn core() -> Result<(), String> {
     }
 
     // merge at the project level
-    if let Some(merge_projects) = arg_matches.values_of_os("MERGEPROJECT") {
+    if let Some(merge_projects) = arg_matches.get_many::<OsString>("MERGEPROJECT") {
         for mergeproject in merge_projects {
             let mut merge_log_msgs = Vec::<String>::new();
             let merge_a2l = a2lfile::load(mergeproject, None, &mut merge_log_msgs, strict)?;
@@ -177,7 +209,7 @@ fn core() -> Result<(), String> {
     }
 
     // merge includes
-    if arg_matches.is_present("MERGEINCLUDES") {
+    if merge_includes {
         a2l_file.merge_includes();
         cond_print!(
             verbose,
@@ -188,11 +220,10 @@ fn core() -> Result<(), String> {
 
     if let Some(debugdata) = &elf_info {
         // update addresses
-        if arg_matches.is_present("UPDATE") || arg_matches.is_present("SAFE_UPDATE") {
-            let preserve_unknown = arg_matches.is_present("SAFE_UPDATE");
+        if update || update_preserve {
             let mut log_msgs = Vec::<String>::new();
             let summary =
-                update::update_addresses(&mut a2l_file, debugdata, &mut log_msgs, preserve_unknown);
+                update::update_addresses(&mut a2l_file, debugdata, &mut log_msgs, update_preserve);
 
             for msg in log_msgs {
                 cond_print!(verbose, now, msg);
@@ -242,20 +273,22 @@ fn core() -> Result<(), String> {
         }
 
         // create new items
-        if arg_matches.is_present("INSERT_CHARACTERISTIC")
-            || arg_matches.is_present("INSERT_MEASUREMENT")
+        if arg_matches.contains_id("INSERT_CHARACTERISTIC")
+            || arg_matches.contains_id("INSERT_MEASUREMENT")
         {
-            let target_group = arg_matches.value_of("TARGET_GROUP");
+            let target_group = arg_matches
+                .get_one::<String>("TARGET_GROUP")
+                .map(|group| &**group);
 
             let measurement_symbols: Vec<&str> =
-                if let Some(values) = arg_matches.values_of("INSERT_MEASUREMENT") {
-                    values.into_iter().collect()
+                if let Some(values) = arg_matches.get_many::<String>("INSERT_MEASUREMENT") {
+                    values.into_iter().map(|x| &**x).collect()
                 } else {
                     Vec::new()
                 };
             let characteristic_symbols: Vec<&str> =
-                if let Some(values) = arg_matches.values_of("INSERT_CHARACTERISTIC") {
-                    values.into_iter().collect()
+                if let Some(values) = arg_matches.get_many::<String>("INSERT_CHARACTERISTIC") {
+                    values.into_iter().map(|x| &**x).collect()
                 } else {
                     Vec::new()
                 };
@@ -274,26 +307,34 @@ fn core() -> Result<(), String> {
             }
         }
 
-        if arg_matches.is_present("INSERT_CHARACTERISTIC_RANGE")
-            || arg_matches.is_present("INSERT_MEASUREMENT_RANGE")
-            || arg_matches.is_present("INSERT_CHARACTERISTIC_REGEX")
-            || arg_matches.is_present("INSERT_MEASUREMENT_REGEX")
+        if arg_matches.contains_id("INSERT_CHARACTERISTIC_RANGE")
+            || arg_matches.contains_id("INSERT_MEASUREMENT_RANGE")
+            || arg_matches.contains_id("INSERT_CHARACTERISTIC_REGEX")
+            || arg_matches.contains_id("INSERT_MEASUREMENT_REGEX")
         {
-            let target_group = arg_matches.value_of("TARGET_GROUP");
+            cond_print!(
+                verbose,
+                now,
+                "Inserting new items from range/regex".to_string()
+            );
+            let target_group = arg_matches
+                .get_one::<String>("TARGET_GROUP")
+                .map(|group| &**group);
 
             let meas_ranges =
-                range_args_to_ranges(arg_matches.values_of("INSERT_MEASUREMENT_RANGE"));
+                range_args_to_ranges(arg_matches.get_many::<u64>("INSERT_MEASUREMENT_RANGE"));
             let char_ranges =
-                range_args_to_ranges(arg_matches.values_of("INSERT_CHARACTERISTIC_RANGE"));
-            let meas_regexes: Vec<&str> = match arg_matches.values_of("INSERT_MEASUREMENT_REGEX") {
-                Some(values) => values.collect(),
-                None => Vec::new(),
-            };
-            let char_regexes: Vec<&str> = match arg_matches.values_of("INSERT_CHARACTERISTIC_REGEX")
-            {
-                Some(values) => values.collect(),
-                None => Vec::new(),
-            };
+                range_args_to_ranges(arg_matches.get_many::<u64>("INSERT_CHARACTERISTIC_RANGE"));
+            let meas_regexes: Vec<&str> =
+                match arg_matches.get_many::<String>("INSERT_MEASUREMENT_REGEX") {
+                    Some(values) => values.map(|x| &**x).collect(),
+                    None => Vec::new(),
+                };
+            let char_regexes: Vec<&str> =
+                match arg_matches.get_many::<String>("INSERT_CHARACTERISTIC_REGEX") {
+                    Some(values) => values.map(|x| &**x).collect(),
+                    None => Vec::new(),
+                };
 
             let mut log_msgs: Vec<String> = Vec::new();
             insert::insert_many(
@@ -312,8 +353,8 @@ fn core() -> Result<(), String> {
         }
     }
 
-    // remove unknown IF_DATA
-    if arg_matches.is_present("CLEANUP") {
+    // clean up unreferenced items
+    if cleanup {
         a2l_file.cleanup();
         cond_print!(
             verbose,
@@ -323,22 +364,22 @@ fn core() -> Result<(), String> {
     }
 
     // remove unknown IF_DATA
-    if arg_matches.is_present("IFDATA_CLEANUP") {
+    if ifdata_cleanup {
         a2l_file.ifdata_cleanup();
         cond_print!(verbose, now, "Unknown ifdata removal is done".to_string());
     }
 
     // sort all elements in the file
-    if arg_matches.is_present("SORT") {
+    if sort {
         a2l_file.sort();
         cond_print!(verbose, now, "All objects have been sorted".to_string());
     }
 
     // output
-    if arg_matches.is_present("OUTPUT") {
+    if arg_matches.contains_id("OUTPUT") {
         a2l_file.sort_new_items();
-        if let Some(out_filename) = arg_matches.value_of_os("OUTPUT") {
-            let banner = &*format!("a2ltool {}", crate_version!());
+        if let Some(out_filename) = arg_matches.get_one::<OsString>("OUTPUT") {
+            let banner = &*format!("a2ltool {}", env!("CARGO_PKG_VERSION"));
             a2l_file.write(out_filename, Some(banner))?;
             cond_print!(
                 verbose,
@@ -359,13 +400,13 @@ fn core() -> Result<(), String> {
 
 // load or create an a2l file, depending on the command line
 // return the file name (a dummy value if it is created) as well as the a2l data
-fn load_or_create_a2l<'a>(
-    arg_matches: &'a ArgMatches<'a>,
+fn load_or_create_a2l(
+    arg_matches: &ArgMatches,
     strict: bool,
-    verbose: u64,
+    verbose: u8,
     now: Instant,
-) -> Result<(&'a std::ffi::OsStr, a2lfile::A2lFile), String> {
-    if let Some(input_filename) = arg_matches.value_of_os("INPUT") {
+) -> Result<(&std::ffi::OsStr, a2lfile::A2lFile), String> {
+    if let Some(input_filename) = arg_matches.get_one::<OsString>("INPUT") {
         let mut log_msgs = Vec::<String>::new();
         let a2lresult = a2lfile::load(
             input_filename,
@@ -383,7 +424,7 @@ fn load_or_create_a2l<'a>(
             format!("Input \"{}\" loaded", input_filename.to_string_lossy())
         );
         Ok((input_filename, a2l_file))
-    } else if arg_matches.is_present("CREATE") {
+    } else if arg_matches.contains_id("CREATE") {
         // dummy file name
         let input_filename = OsStr::new("<newly created>");
         // a minimal a2l file needs only a PROJECT containing a MODULE
@@ -411,239 +452,215 @@ fn load_or_create_a2l<'a>(
 
 // set up the entire command line handling.
 // fortunately clap makes this painless
-fn get_args<'a>() -> ArgMatches<'a> {
-    App::new("a2ltool")
-    .version(crate_version!())
+fn get_args() -> ArgMatches {
+    Command::new("a2ltool")
+    .version(env!("CARGO_PKG_VERSION"))
     .about("Reads, writes and modifies A2L files")
-    .arg(Arg::with_name("INPUT")
+    .arg(Arg::new("INPUT")
         .help("Input A2L file")
         .index(1)
+        .value_parser(ValueParser::os_string())
     )
-    .arg(Arg::with_name("CREATE")
+    .arg(Arg::new("CREATE")
         .help("Create a new A2L file instead of loading an existing one")
         .long("create")
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::with_name("ELFFILE")
+    .arg(Arg::new("ELFFILE")
         .help("Elf file containing symbols and address information")
-        .short("e")
+        .short('e')
         .long("elffile")
-        .takes_value(true)
+        .number_of_values(1)
         .value_name("ELFFILE")
+        .value_parser(ValueParser::os_string())
     )
-    .arg(Arg::with_name("CHECK")
+    .arg(Arg::new("CHECK")
         .help("Perform additional consistency checks")
         .long("check")
-        .takes_value(false)
-        .multiple(false)
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::with_name("CLEANUP")
+    .arg(Arg::new("CLEANUP")
         .help("Remove empty or unreferenced items")
         .long("cleanup")
-        .takes_value(false)
-        .multiple(false)
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::with_name("MERGEMODULE")
+    .arg(Arg::new("MERGEMODULE")
         .help("Merge another a2l file on the MODULE level.\nThe input file and the merge file must each contain exactly one MODULE.\nThe contents will be merged so that there is one merged MODULE in the output.")
-        .short("m")
+        .short('m')
         .long("merge")
-        .takes_value(true)
+        .number_of_values(1)
         .value_name("A2LFILE")
         .number_of_values(1)
-        .multiple(true)
+        .value_parser(ValueParser::os_string())
+        .action(clap::ArgAction::Append)
     )
-    .arg(Arg::with_name("MERGEPROJECT")
+    .arg(Arg::new("MERGEPROJECT")
         .help("Merge another a2l file on the PROJECT level.\nIf the input file contains m MODULES and the merge file contains n MODULES, then there will be m + n MODULEs in the output.")
-        .short("p")
+        .short('p')
         .long("merge-project")
-        .takes_value(true)
+        .number_of_values(1)
         .value_name("A2LFILE")
         .number_of_values(1)
-        .multiple(true)
+        .value_parser(ValueParser::os_string())
+        .action(clap::ArgAction::Append)
     )
-    .arg(Arg::with_name("MERGEINCLUDES")
+    .arg(Arg::new("MERGEINCLUDES")
         .help("Merge the content of all included files. The output file will contain no /include commands.")
-        .short("i")
+        .short('i')
         .long("merge-includes")
-        .takes_value(false)
-        .multiple(false)
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::with_name("UPDATE")
+    .arg(Arg::new("UPDATE")
         .help("Update the addresses of all objects in the A2L file based on the elf file.\nObjects that cannot be found in the elf file will be deleted.\nThe arg --elffile must be present.")
-        .short("u")
+        .short('u')
         .long("update")
-        .takes_value(false)
-        .multiple(false)
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
         .requires("ELFFILE")
     )
-    .arg(Arg::with_name("SAFE_UPDATE")
+    .arg(Arg::new("SAFE_UPDATE")
         .help("Update the addresses of all objects in the A2L file based on the elf file.\nObjects that cannot be found in the elf file will be preserved; their adresses will be set to zero.\nThe arg --elffile must be present.")
         .long("update-preserve")
-        .takes_value(false)
-        .multiple(false)
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
         .requires("ELFFILE")
     )
-    .arg(Arg::with_name("OUTPUT")
+    .arg(Arg::new("OUTPUT")
         .help("Write to the given output file. If this flag is not present, no output will be written.")
-        .short("o")
+        .short('o')
         .long("output")
-        .takes_value(true)
+        .number_of_values(1)
         .value_name("A2LFILE")
-        .multiple(false)
+        .value_parser(ValueParser::os_string())
     )
-    .arg(Arg::with_name("STRICT")
+    .arg(Arg::new("STRICT")
         .help("Parse all input in strict mode. An error wil be reported if the file has any inconsistency.")
-        .short("s")
+        .short('s')
         .long("strict")
-        .takes_value(false)
-        .multiple(false)
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::with_name("VERBOSE")
+    .arg(Arg::new("VERBOSE")
         .help("Display additional information")
-        .short("v")
+        .short('v')
         .long("verbose")
-        .takes_value(false)
-        .multiple(true)
+        .number_of_values(0)
+        .action(clap::ArgAction::Count)
     )
-    .arg(Arg::with_name("DEBUGPRINT")
+    .arg(Arg::new("DEBUGPRINT")
         .help("Display internal data for debugging")
         .long("debug-print")
-        .takes_value(false)
-        .multiple(false)
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::with_name("SORT")
+    .arg(Arg::new("SORT")
         .help("Sort all the elements in the file")
         .long("sort")
-        .takes_value(false)
-        .multiple(false)
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::with_name("IFDATA_CLEANUP")
+    .arg(Arg::new("IFDATA_CLEANUP")
         .help("Remove all IF_DATA blocks that cannot be parsed according to A2ML")
         .long("ifdata-cleanup")
-        .takes_value(false)
-        .multiple(false)
+        .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::with_name("SHOW_XCP")
+    .arg(Arg::new("SHOW_XCP")
         .help("Display the XCP settings in the a2l file, if they exist")
         .long("show-xcp")
-        .takes_value(false)
-        .multiple(false)
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::with_name("INSERT_CHARACTERISTIC")
+    .arg(Arg::new("INSERT_CHARACTERISTIC")
         .help("Insert a CHARACTERISTIC based on a variable in the elf file. The variable name can be complex, e.g. var.element[0].subelement")
         .long("characteristic")
-        .aliases(&["insert-characteristic"])
-        .takes_value(true)
+        .aliases(["insert-characteristic"])
         .number_of_values(1)
-        .multiple(true)
         .requires("ELFFILE")
         .value_name("VAR")
+        .action(clap::ArgAction::Append)
     )
-    .arg(Arg::with_name("INSERT_CHARACTERISTIC_RANGE")
-        .help("Insert multiple CHARACTERISTICs. All variables whose address is inside the given range will be inserted as CHARACTERISTICs")
+    .arg(Arg::new("INSERT_CHARACTERISTIC_RANGE")
+        .help("Insert multiple CHARACTERISTICs. All variables whose address is inside the given range will be inserted as CHARACTERISTICs.\nThis is useful in order to add all variables from a tuning data section with fixed addresses.\nExample: --characteristic-range 0x1000 0x2000")
         .long("characteristic-range")
-        .aliases(&["insert-characteristic-range"])
-        .takes_value(true)
+        .aliases(["insert-characteristic-range"])
         .number_of_values(2)
-        .multiple(true)
         .requires("ELFFILE")
         .value_name("RANGE")
-        .validator(range_arg_validator)
+        .value_parser(AddressValueParser)
+        .action(clap::ArgAction::Append)
     )
-    .arg(Arg::with_name("INSERT_CHARACTERISTIC_REGEX")
+    .arg(Arg::new("INSERT_CHARACTERISTIC_REGEX")
         .help("Compare all symbol names in the elf file to the given regex. All matching ones will be inserted as CHARACTERISTICs")
         .long("characteristic-regex")
-        .aliases(&["insert-characteristic-regex"])
-        .takes_value(true)
+        .aliases(["insert-characteristic-regex"])
         .number_of_values(1)
-        .multiple(true)
         .requires("ELFFILE")
         .value_name("REGEX")
+        .action(clap::ArgAction::Append)
     )
-    .arg(Arg::with_name("INSERT_MEASUREMENT")
+    .arg(Arg::new("INSERT_MEASUREMENT")
         .help("Insert a MEASUREMENT based on a variable in the elf file. The variable name can be complex, e.g. var.element[0].subelement")
         .long("measurement")
-        .aliases(&["insert-measurement"])
-        .takes_value(true)
+        .aliases(["insert-measurement"])
         .number_of_values(1)
-        .multiple(true)
         .requires("ELFFILE")
         .value_name("VAR")
+        .action(clap::ArgAction::Append)
     )
-    .arg(Arg::with_name("INSERT_MEASUREMENT_RANGE")
-        .help("Insert multiple MEASUREMENTs. All variables whose address is inside the given range will be inserted as MEASUREMENTs")
+    .arg(Arg::new("INSERT_MEASUREMENT_RANGE")
+        .help("Insert multiple MEASUREMENTs. All variables whose address is inside the given range will be inserted as MEASUREMENTs.\nExample: --measurement-range 0x1000 0x2000")
         .long("measurement-range")
-        .aliases(&["insert-measurement-range"])
-        .takes_value(true)
+        .aliases(["insert-measurement-range"])
         .number_of_values(2)
-        .multiple(true)
         .requires("ELFFILE")
         .value_name("RANGE")
-        .validator(range_arg_validator)
+        .value_parser(AddressValueParser)
+        .action(clap::ArgAction::Append)
     )
-    .arg(Arg::with_name("INSERT_MEASUREMENT_REGEX")
+    .arg(Arg::new("INSERT_MEASUREMENT_REGEX")
         .help("Compare all symbol names in the elf file to the given regex. All matching ones will be inserted as MEASUREMENTs")
         .long("measurement-regex")
-        .aliases(&["insert-measurement-regex"])
-        .takes_value(true)
+        .aliases(["insert-measurement-regex"])
         .number_of_values(1)
-        .multiple(true)
         .requires("ELFFILE")
         .value_name("REGEX")
+        .action(clap::ArgAction::Append)
     )
-    .arg(Arg::with_name("TARGET_GROUP")
+    .arg(Arg::new("TARGET_GROUP")
         .help("When inserting items, put them into the group named in this option. The group will be created if it doe not exist.")
         .long("target-group")
-        .takes_value(true)
         .number_of_values(1)
-        .multiple(false)
         .requires("INSERT_ARGGROUP")
         .value_name("GROUP")
     )
     .group(
-        ArgGroup::with_name("INPUT_ARGGROUP")
-            .args(&["INPUT", "CREATE"])
+        ArgGroup::new("INPUT_ARGGROUP")
+            .args(["INPUT", "CREATE"])
             .multiple(false)
             .required(true)
      )
     .group(
-        ArgGroup::with_name("UPDATE_ARGGROUP")
-            .args(&["UPDATE", "SAFE_UPDATE"])
+        ArgGroup::new("UPDATE_ARGGROUP")
+            .args(["UPDATE", "SAFE_UPDATE"])
             .multiple(false)
     )
     .group(
-        ArgGroup::with_name("INSERT_ARGGROUP")
-            .args(&["INSERT_CHARACTERISTIC", "INSERT_CHARACTERISTIC_RANGE", "INSERT_CHARACTERISTIC_REGEX",
+        ArgGroup::new("INSERT_ARGGROUP")
+            .args(["INSERT_CHARACTERISTIC", "INSERT_CHARACTERISTIC_RANGE", "INSERT_CHARACTERISTIC_REGEX",
                 "INSERT_MEASUREMENT", "INSERT_MEASUREMENT_RANGE", "INSERT_MEASUREMENT_REGEX", ])
             .multiple(true)
     )
+    .disable_colored_help(true)
     .get_matches()
 }
 
-fn range_arg_validator(arg: String) -> Result<(), String> {
-    if let Some(hexnumber) = arg.strip_prefix("0x") {
-        match u64::from_str_radix(hexnumber, 16) {
-            Ok(_) => Ok(()),
-            Err(error) => Err(format!("\"{}\" is not a valid address: {}", arg, error)),
-        }
-    } else {
-        match arg.parse::<u64>() {
-            Ok(_) => Ok(()),
-            Err(error) => Err(format!("\"{}\" is not a valid address: {}", arg, error)),
-        }
-    }
-}
-
-fn range_args_to_ranges(args: Option<clap::Values>) -> Vec<(u64, u64)> {
+fn range_args_to_ranges(args: Option<ValuesRef<u64>>) -> Vec<(u64, u64)> {
     if let Some(values) = args {
-        let rangevals: Vec<u64> = values
-            .map(|arg| {
-                if let Some(hexnumber) = arg.strip_prefix("0x") {
-                    u64::from_str_radix(hexnumber, 16).unwrap()
-                } else {
-                    arg.parse::<u64>().unwrap()
-                }
-            })
-            .collect();
+        let rangevals: Vec<u64> = values.cloned().collect();
         let mut addr_ranges: Vec<(u64, u64)> = Vec::new();
         for idx in (1..rangevals.len()).step_by(2) {
             addr_ranges.push((rangevals[idx - 1], rangevals[idx]));
@@ -651,5 +668,41 @@ fn range_args_to_ranges(args: Option<clap::Values>) -> Vec<(u64, u64)> {
         addr_ranges
     } else {
         Vec::new()
+    }
+}
+
+#[derive(Clone)]
+struct AddressValueParser;
+
+impl clap::builder::TypedValueParser for AddressValueParser {
+    type Value = u64;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        if let Some(txt) = value.to_str() {
+            if let Some(hexval) = txt.strip_prefix("0x") {
+                if let Ok(value) = u64::from_str_radix(hexval, 16) {
+                    return Ok(value);
+                }
+            }
+        }
+
+        let mut err = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+        if let Some(arg) = arg {
+            err.insert(
+                clap::error::ContextKind::InvalidArg,
+                clap::error::ContextValue::String(arg.to_string()),
+            );
+        }
+        let strval = value.to_string_lossy();
+        err.insert(
+            clap::error::ContextKind::InvalidValue,
+            clap::error::ContextValue::String(String::from(strval)),
+        );
+        Err(err)
     }
 }
