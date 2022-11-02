@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "a2lfile"
-version = "1.3.1"
+version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ce718c65b89a6571024cf826560ec75e36f9ff3f8c15b28f3efd22772c2e246"
+checksum = "8801616e3f571bf81fca450527273502f4bae908234976c71f7bc3da95209174"
 dependencies = [
  "a2lmacros",
 ]
@@ -23,7 +23,7 @@ dependencies = [
 
 [[package]]
 name = "a2ltool"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "a2lfile",
  "clap",
