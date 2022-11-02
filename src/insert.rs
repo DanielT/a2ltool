@@ -23,7 +23,7 @@ pub(crate) fn insert_items(
     log_msgs: &mut Vec<String>,
 ) {
     let module = &mut a2l_file.project.module[0];
-    let (name_map, sym_map) = build_maps(&module);
+    let (mut name_map, sym_map) = build_maps(&module);
     let mut characteristic_list = vec![];
     let mut measurement_list = vec![];
 
@@ -31,10 +31,11 @@ pub(crate) fn insert_items(
         match insert_measurement(module, debugdata, measure_sym, &name_map, &sym_map) {
             Ok(measure_name) => {
                 log_msgs.push(format!("Inserted MEASUREMENT {}", measure_name));
+                name_map.insert(measure_name.to_owned(), ItemType::Measurement(module.measurement.len() - 1));
                 measurement_list.push(measure_name);
             }
             Err(errmsg) => {
-                log_msgs.push(format!("Error: {}", errmsg));
+                log_msgs.push(format!("Insert skipped: {}", errmsg));
             }
         }
     }
@@ -43,10 +44,11 @@ pub(crate) fn insert_items(
         match insert_characteristic(module, debugdata, characteristic_sym, &name_map, &sym_map) {
             Ok(characteristic_name) => {
                 log_msgs.push(format!("Inserted CHARACTERISTIC {}", characteristic_name));
+                name_map.insert(characteristic_name.to_owned(), ItemType::Characteristic(module.characteristic.len() - 1));
                 characteristic_list.push(characteristic_name);
             }
             Err(errmsg) => {
-                log_msgs.push(format!("Error: {}", errmsg));
+                log_msgs.push(format!("Insert skipped: {}", errmsg));
             }
         }
     }
