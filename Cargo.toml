@@ -1,6 +1,6 @@
 [package]
 name = "a2ltool"
-version = "1.4.0"
+version = "1.4.1"
 authors = ["Daniel Thaler <daniel@dthaler.de>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
