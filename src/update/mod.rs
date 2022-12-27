@@ -120,7 +120,7 @@ fn get_symbol_info<'a>(
     // preferred: get symbol information from a SYMBOL_LINK attribute
     if let Some(symbol_link) = opt_symbol_link {
         match find_symbol(&symbol_link.symbol_name, debug_data) {
-            Ok((addr, typeinfo)) => return Ok((addr, typeinfo, symbol_link.symbol_name.clone())),
+            Ok((_, addr, typeinfo)) => return Ok((addr, typeinfo, symbol_link.symbol_name.clone())),
             Err(errmsg) => symbol_link_errmsg = Some(errmsg),
         };
     }
@@ -130,7 +130,7 @@ fn get_symbol_info<'a>(
     // by the Vector tools are understood by some other software.
     if let Some(ifdata_symbol_name) = get_symbol_name_from_ifdata(ifdata_vec) {
         match find_symbol(&ifdata_symbol_name, debug_data) {
-            Ok((addr, typeinfo)) => return Ok((addr, typeinfo, ifdata_symbol_name)),
+            Ok((_, addr, typeinfo)) => return Ok((addr, typeinfo, ifdata_symbol_name)),
             Err(errmsg) => ifdata_errmsg = Some(errmsg),
         };
     }
@@ -138,7 +138,7 @@ fn get_symbol_info<'a>(
     // If there is no SYMBOL_LINK and no (usable) IF_DATA, then maybe the object name is also the symbol name
     if opt_symbol_link.is_none() {
         match find_symbol(name, debug_data) {
-            Ok((addr, typeinfo)) => return Ok((addr, typeinfo, name.to_string())),
+            Ok((_, addr, typeinfo)) => return Ok((addr, typeinfo, name.to_string())),
             Err(errmsg) => object_name_errmsg = Some(errmsg),
         };
     }

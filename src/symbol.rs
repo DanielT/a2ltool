@@ -7,12 +7,29 @@ use std::collections::HashMap;
 pub(crate) fn find_symbol<'a>(
     varname: &str,
     debug_data: &'a DebugData,
-) -> Result<(u64, &'a TypeInfo), String> {
+) -> Result<(String, u64, &'a TypeInfo), String> {
     // split the a2l symbol name: e.g. "motortune.param._0_" -> ["motortune", "param", "_0_"]
     let components = split_symbol_components(varname);
 
     // find the symbol in the symbol table
-    find_symbol_from_components(&components, debug_data)
+    match find_symbol_from_components(&components, debug_data) {
+        Ok((addr, typeinfo)) => {
+            Ok((varname.to_owned(), addr, typeinfo))
+        }
+        Err(find_err) => {
+            // it was not found using the given varname; if this is name has a mangled form then try that instead
+            if let Some(mangled) = debug_data.demangled_names.get(components[0]) {
+                let mut components_mangled = components.clone();
+                components_mangled[0] = mangled;
+                if let Ok((addr, typeinfo)) = find_symbol_from_components(&components_mangled, debug_data) {
+                    let mangled_varname = mangled.to_owned() + varname.strip_prefix(components[0]).unwrap();
+                    return Ok((mangled_varname, addr, typeinfo))
+                }
+            }
+
+            Err(find_err)
+        }
+    }
 }
 
 fn find_symbol_from_components<'a>(
@@ -176,6 +193,7 @@ fn test_find_symbol_of_array() {
     let mut dbgdata = DebugData {
         types: HashMap::new(),
         variables: HashMap::new(),
+        demangled_names: HashMap::new(),
     };
     // global variable: uint32_t my_array[2]
     dbgdata.variables.insert(
@@ -219,6 +237,7 @@ fn test_find_symbol_of_array_in_struct() {
     let mut dbgdata = DebugData {
         types: HashMap::new(),
         variables: HashMap::new(),
+        demangled_names: HashMap::new(),
     };
     // global variable defined in C like this:
     // struct {

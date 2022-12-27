@@ -21,17 +21,6 @@ pub(crate) fn get_name_attribute(
         .ok_or_else(|| "failed to get name attribute".to_string())?;
     match name_attr {
         gimli::AttributeValue::String(slice) => {
-            // try to demangle a c++ symbol
-            // In theory we could look at the DW_AT_language attribute of the translation
-            // unit and only attempt this if the language is c++
-            // In practice this doesn't work, e.g. the Tasking compiler compiles C++ by
-            // translating it to C. Then it puts language = C in the DW_AT_language
-            // attribute. The names are still mangled though and should be demangled.
-            if let Ok(sym) = cpp_demangle::Symbol::new(&*slice) {
-                if let Ok(demangled) = sym.demangle(&cpp_demangle::DemangleOptions::default()) {
-                    return Ok(demangled);
-                }
-            }
             if let Ok(utf8string) = slice.to_string() {
                 // could not demangle, but successfully converted the slice to utf8
                 return Ok(utf8string.to_owned());
@@ -41,14 +30,6 @@ pub(crate) fn get_name_attribute(
         gimli::AttributeValue::DebugStrRef(str_offset) => {
             match dwarf.debug_str.get_str(str_offset) {
                 Ok(slice) => {
-                    // try to demangle a c++ symbol
-                    if let Ok(sym) = cpp_demangle::Symbol::new(&*slice) {
-                        if let Ok(demangled) =
-                            sym.demangle(&cpp_demangle::DemangleOptions::default())
-                        {
-                            return Ok(demangled);
-                        }
-                    }
                     if let Ok(utf8string) = slice.to_string() {
                         // could not demangle, but successfully converted the slice to utf8
                         return Ok(utf8string.to_owned());

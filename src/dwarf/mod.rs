@@ -74,6 +74,7 @@ pub(crate) struct UnitList<'a> {
 pub(crate) struct DebugData {
     pub(crate) variables: HashMap<String, VarInfo>,
     pub(crate) types: HashMap<usize, TypeInfo>,
+    pub(crate) demangled_names: HashMap<String, String>,
 }
 
 impl DebugData {
@@ -168,8 +169,10 @@ fn get_endian(elffile: &object::read::File) -> RunTimeEndian {
 fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>, verbose: bool) -> DebugData {
     let (variables, typedefs, units) = load_variables(dwarf, verbose);
     let types = load_types(&variables, typedefs, units, dwarf, verbose);
+    let varname_list: Vec<&String> = variables.keys().collect();
+    let demangled_names = demangle_cpp_varnames(&varname_list);
 
-    DebugData { variables, types }
+    DebugData { variables, types, demangled_names }
 }
 
 // load all global variables from the dwarf data
@@ -273,6 +276,28 @@ fn get_global_variable(
             Ok(None)
         }
     }
+}
+
+
+fn demangle_cpp_varnames(input: &[&String]) -> HashMap<String, String> {
+    let mut demangled_symbols = HashMap::<String, String>::new();
+    let demangle_opts = cpp_demangle::DemangleOptions::new().no_params().no_return_type();
+    for varname in input {
+        // some really simple strings can be processed by the demangler, e.g "c" -> "const", which is wrong here.
+        // by only processing symbols that start with _Z (variables in classes/namespaces) this problem is avoided
+        if varname.starts_with("_Z") {
+            if let Ok(sym) = cpp_demangle::Symbol::new(*varname) {
+                // exclude useless demangled names like "typeinfo for std::type_info" or "{vtable(std::type_info)}"
+                if let Ok(demangled) = sym.demangle(&demangle_opts) {
+                    if !demangled.contains(' ') && !demangled.starts_with("{vtable") {
+                        demangled_symbols.insert(demangled, (*varname).clone());
+                    }
+                }
+            }
+        }
+    }
+
+    demangled_symbols
 }
 
 // UnitList holds a list of all UnitHeaders in the Dwarf data for convenient access

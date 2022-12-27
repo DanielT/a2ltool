@@ -68,8 +68,8 @@ fn insert_measurement(
 ) -> Result<String, String> {
     // get info about the symbol from the debug data
     match crate::symbol::find_symbol(measure_sym, debugdata) {
-        Ok((address, typeinfo)) => {
-            insert_measurement_sym(module, measure_sym, name_map, sym_map, typeinfo, address)
+        Ok((true_name, address, typeinfo)) => {
+            insert_measurement_sym(module, measure_sym, true_name, name_map, sym_map, typeinfo, address)
         }
         Err(errmsg) => Err(format!(
             "Symbol {} could not be added: {}",
@@ -81,6 +81,7 @@ fn insert_measurement(
 fn insert_measurement_sym(
     module: &mut Module,
     measure_sym: &str,
+    true_name: String,
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, ItemType>,
     typeinfo: &TypeInfo,
@@ -106,7 +107,7 @@ fn insert_measurement_sym(
     ecu_address.get_layout_mut().item_location.0 .1 = true;
     new_measurement.ecu_address = Some(ecu_address);
     // create a SYMBOL_LINK attribute
-    new_measurement.symbol_link = Some(SymbolLink::new(measure_sym.to_string(), 0));
+    new_measurement.symbol_link = Some(SymbolLink::new(true_name, 0));
     // create a conversion table for enums
     if let TypeInfo::Enum {
         typename,
@@ -132,9 +133,10 @@ fn insert_characteristic(
 ) -> Result<String, String> {
     // get info about the symbol from the debug data
     match crate::symbol::find_symbol(characteristic_sym, debugdata) {
-        Ok((address, typeinfo)) => insert_characteristic_sym(
+        Ok((true_name, address, typeinfo)) => insert_characteristic_sym(
             module,
             characteristic_sym,
+            true_name,
             name_map,
             sym_map,
             typeinfo,
@@ -150,12 +152,14 @@ fn insert_characteristic(
 fn insert_characteristic_sym(
     module: &mut Module,
     characteristic_sym: &str,
+    true_name: String,
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, ItemType>,
     typeinfo: &TypeInfo,
     address: u64,
 ) -> Result<String, String> {
     let item_name = make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map)?;
+    println!("insert_characteristic_sym: characteristic_sym:{characteristic_sym}, true_name:{true_name}, item_name:{item_name}");
 
     let datatype = get_a2l_datatype(typeinfo);
     let recordlayout_name = format!("__{}_Z", datatype);
@@ -229,7 +233,7 @@ fn insert_characteristic_sym(
     new_characteristic.get_layout_mut().item_location.3 .1 = true;
 
     // create a SYMBOL_LINK
-    new_characteristic.symbol_link = Some(SymbolLink::new(characteristic_sym.to_string(), 0));
+    new_characteristic.symbol_link = Some(SymbolLink::new(true_name, 0));
 
     // insert the CHARACTERISTIC into the module's list
     module.characteristic.push(new_characteristic);
@@ -264,8 +268,11 @@ fn make_unique_measurement_name(
     name_map: &HashMap<String, ItemType>,
 ) -> Result<String, String> {
     // ideally the item name is the symbol name.
+    // if the symbol is a demangled c++ symbol, then it might contain a "::", e.g. namespace::variable
+    let cleaned_sym = measure_sym.replace("::", "__");
+
     // If an object of a different type already has this name, add the prefix "CHARACTERISTIC."
-    let item_name = match sym_map.get(measure_sym) {
+    let item_name = match sym_map.get(&cleaned_sym) {
         Some(ItemType::Measurement(idx)) => {
             return Err(format!(
                 "MEASUREMENT {} already references symbol {}.",
@@ -276,9 +283,9 @@ fn make_unique_measurement_name(
         | Some(ItemType::Instance(_))
         | Some(ItemType::Blob(_))
         | Some(ItemType::AxisPts(_)) => {
-            format!("MEASUREMENT.{}", measure_sym)
+            format!("MEASUREMENT.{}", cleaned_sym)
         }
-        None => measure_sym.to_string(),
+        None => cleaned_sym,
     };
     // fail if the name still isn't unique
     if name_map.get(&item_name).is_some() {
@@ -294,8 +301,11 @@ fn make_unique_characteristic_name(
     name_map: &HashMap<String, ItemType>,
 ) -> Result<String, String> {
     // ideally the item name is the symbol name.
+    // if the symbol is a demangled c++ symbol, then it might contain a "::", e.g. namespace::variable
+    let cleaned_sym = characteristic_sym.replace("::", "__");
+
     // If an object of a different type already has this name, add the prefix "CHARACTERISTIC."
-    let item_name = match sym_map.get(characteristic_sym) {
+    let item_name = match sym_map.get(&cleaned_sym) {
         Some(ItemType::Characteristic(idx)) => {
             return Err(format!(
                 "CHARACTERISTIC {} already references symbol {}.",
@@ -306,9 +316,9 @@ fn make_unique_characteristic_name(
         | Some(ItemType::Instance(_))
         | Some(ItemType::Blob(_))
         | Some(ItemType::AxisPts(_)) => {
-            format!("CHARACTERISTIC.{}", characteristic_sym)
+            format!("CHARACTERISTIC.{}", cleaned_sym)
         }
-        None => characteristic_sym.to_string(),
+        None => cleaned_sym,
     };
     // fail if the name still isn't unique
     if name_map.get(&item_name).is_some() {
@@ -408,6 +418,7 @@ pub(crate) fn insert_many(
                     match insert_measurement_sym(
                         module,
                         &symbol_name,
+                        symbol_name.to_owned(),
                         &name_map,
                         &sym_map,
                         typeinfo,
@@ -437,6 +448,7 @@ pub(crate) fn insert_many(
                     match insert_characteristic_sym(
                         module,
                         &symbol_name,
+                        symbol_name.to_owned(),
                         &name_map,
                         &sym_map,
                         typeinfo,

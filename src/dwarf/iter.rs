@@ -180,7 +180,7 @@ impl<'a> Iterator for VariablesIterator<'a> {
     type Item = (String, Option<&'a TypeInfo>, u64);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((varname, VarInfo { address, typeref })) = self.current_var {
+        if let Some((varname, VarInfo { address, typeref, .. })) = self.current_var {
             if self.type_iter.is_none() {
                 // newly set current_var, should be returned before using type_iter to return its sub-elements
                 let typeinfo = self.debugdata.types.get(typeref);
@@ -290,7 +290,8 @@ fn test_varinfo_iter() {
     };
     types.insert(0, TypeInfo::Uint8);
     types.insert(1, structtype);
-    let debugdata = DebugData { variables, types };
+    let demangled_names = HashMap::new();
+    let debugdata = DebugData { variables, types, demangled_names };
 
     let iter = VariablesIterator::new(&debugdata);
     for item in iter {
