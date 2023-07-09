@@ -267,8 +267,9 @@ fn evaluate_exprloc(
                 // this means it cannot be referenced at a unique global address and is not suitable for use in a2l
                 return None;
             }
-            other => {
-                println!("evaluate_exprloc eval result is unhandled: {:#?}", other);
+            _other => {
+                // there are a lot of other types of address expressions that can only be evaluated by a debugger while a program is running
+                // none of these can be handled in the a2lfile use-case.
                 return None;
             }
         };

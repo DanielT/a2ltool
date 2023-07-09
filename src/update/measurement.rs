@@ -154,7 +154,7 @@ fn update_matrix_dim(
             }
             matrix_dim_values.truncate(3);
         }
-        let mut matrix_dim = opt_matrix_dim.get_or_insert(MatrixDim::new());
+        let matrix_dim = opt_matrix_dim.get_or_insert(MatrixDim::new());
         matrix_dim.dim_list = matrix_dim_values;
     }
 }
