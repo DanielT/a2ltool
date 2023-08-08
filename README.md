@@ -11,6 +11,20 @@ A tool to edit, merge and update a2l files
 - maintain the formatting and ordering of items in the a2l file during manipulation, so that the diff between the original and the updated/modified file is as small as possible
 - Supports files up to a2l version 1.71 (current)
 
+## Usage examples
+
+### Merge two a2l files
+
+`a2ltool file1.a2l --merge file2.a2l --output merged.a2l`
+
+### Update the addresses in an a2l file
+
+`a2ltool input.a2l --elffile input.elf --update --output updated.a2l`
+
+### Create a new a2lfile and add a characteristic from an elf file to it
+
+`a2ltool --create --ellfile input.elf --characteristic my_var --output newfile.a2l`
+
 ## About a2l Files
 
 A2l files describe measurement variables and tunable parameters of an embedded device (typically: an automotive ECU).

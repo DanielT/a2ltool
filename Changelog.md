@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 1.4.3
+
+Improve the formatting of the --help message by
+- enabling color
+- enabling automatic wrapping of the descriptons
+
+Add basic usage examples to the README, since some people seemed confused
+
 ## Version 1.4.2
 
 Upgrade to the a2lfile crate version 1.3.3. This brings:

@@ -654,7 +654,7 @@ fn get_args() -> ArgMatches {
                 "INSERT_MEASUREMENT", "INSERT_MEASUREMENT_RANGE", "INSERT_MEASUREMENT_REGEX", ])
             .multiple(true)
     )
-    .disable_colored_help(true)
+    .next_line_help(false)
     .get_matches()
 }
 
