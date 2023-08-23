@@ -1,8 +1,14 @@
 # Changelog
 
+## Version 1.4.4
+
+Upgrade to the a2lfile crate version 1.3.4, to get a fix in the a2l parser.
+Previous versions were unable to handle some strings with double "" escapes, e.g. "some ""text"" here"
+
 ## Version 1.4.3
 
 Improve the formatting of the --help message by
+
 - enabling color
 - enabling automatic wrapping of the descriptons
 
