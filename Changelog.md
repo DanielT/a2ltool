@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 1.5.0
+
+Upgrade to the a2lfile crate version 1.4.0
+Allow a2ltool to load and merge a2l fragments. An a2l fragment is a file that contains only the content of a MODULE, but none of the surrounding elements.
+Upgrade all dependencies; one of these (rustix, an indirect dependency) had a vulnerability that is fixed in the latest version.
+
 ## Version 1.4.4
 
 Upgrade to the a2lfile crate version 1.3.4, to get a fix in the a2l parser.
