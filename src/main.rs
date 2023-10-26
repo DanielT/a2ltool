@@ -1,6 +1,6 @@
 use clap::{builder::ValueParser, parser::ValuesRef, Arg, ArgGroup, ArgMatches, Command};
 
-use a2lfile::A2lObject;
+use a2lfile::{A2lError, A2lObject};
 use dwarf::DebugData;
 use std::{ffi::OsStr, ffi::OsString, time::Instant};
 
@@ -174,8 +174,9 @@ fn core() -> Result<(), String> {
     // merge at the module level
     if let Some(merge_modules) = arg_matches.get_many::<OsString>("MERGEMODULE") {
         for mergemodule in merge_modules {
-            let mut merge_log_msgs = Vec::<String>::new();
-            let mut merge_a2l = a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict)?;
+            let mut merge_log_msgs = Vec::<A2lError>::new();
+            let mut merge_a2l = a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict)
+                .map_err(|a2lerr| a2lerr.to_string())?;
 
             a2l_file.merge_modules(&mut merge_a2l);
             cond_print!(
@@ -192,8 +193,9 @@ fn core() -> Result<(), String> {
     // merge at the project level
     if let Some(merge_projects) = arg_matches.get_many::<OsString>("MERGEPROJECT") {
         for mergeproject in merge_projects {
-            let mut merge_log_msgs = Vec::<String>::new();
-            let merge_a2l = a2lfile::load(mergeproject, None, &mut merge_log_msgs, strict)?;
+            let mut merge_log_msgs = Vec::<A2lError>::new();
+            let merge_a2l = a2lfile::load(mergeproject, None, &mut merge_log_msgs, strict)
+                .map_err(|a2lerr| a2lerr.to_string())?;
 
             a2l_file.project.module.extend(merge_a2l.project.module);
             cond_print!(
@@ -407,7 +409,7 @@ fn load_or_create_a2l(
     now: Instant,
 ) -> Result<(&std::ffi::OsStr, a2lfile::A2lFile), String> {
     if let Some(input_filename) = arg_matches.get_one::<OsString>("INPUT") {
-        let mut log_msgs = Vec::<String>::new();
+        let mut log_msgs = Vec::<A2lError>::new();
         let a2lresult = a2lfile::load(
             input_filename,
             Some(ifdata::A2MLVECTOR_TEXT.to_string()),
@@ -415,9 +417,9 @@ fn load_or_create_a2l(
             strict,
         );
         for msg in log_msgs {
-            cond_print!(verbose, now, msg);
+            cond_print!(verbose, now, msg.to_string());
         }
-        let a2l_file = a2lresult?;
+        let a2l_file = a2lresult.map_err(|a2lerr| a2lerr.to_string())?;
         cond_print!(
             verbose,
             now,
