@@ -175,18 +175,34 @@ fn core() -> Result<(), String> {
     if let Some(merge_modules) = arg_matches.get_many::<OsString>("MERGEMODULE") {
         for mergemodule in merge_modules {
             let mut merge_log_msgs = Vec::<A2lError>::new();
-            let mut merge_a2l = a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict)
-                .map_err(|a2lerr| a2lerr.to_string())?;
-
-            a2l_file.merge_modules(&mut merge_a2l);
-            cond_print!(
-                verbose,
-                now,
-                format!(
-                    "Merged A2l objects from \"{}\"\n",
-                    mergemodule.to_string_lossy()
+            let mergeresult = a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict);
+            if let Ok(mut merge_a2l) = mergeresult
+            {
+                a2l_file.merge_modules(&mut merge_a2l);
+                cond_print!(
+                    verbose,
+                    now,
+                    format!(
+                        "Merged A2l objects from \"{}\"\n",
+                        mergemodule.to_string_lossy()
+                    )
+                );
+            } else if let Ok(mut other_module) = a2lfile::load_fragment_file(mergemodule) {
+                a2l_file.project.module[0].merge(&mut other_module);
+                cond_print!(
+                    verbose,
+                    now,
+                    format!(
+                        "Merged A2l objects from \"{}\"\n",
+                        mergemodule.to_string_lossy()
+                    )
                 )
-            );
+            } else {
+                return Err(format!(
+                    "Failed to load \"{}\" for merging: {}\n",
+                    mergemodule.to_string_lossy(), mergeresult.unwrap_err().to_string()
+                ));
+            }
         }
     }
 
@@ -416,10 +432,35 @@ fn load_or_create_a2l(
             &mut log_msgs,
             strict,
         );
-        for msg in log_msgs {
-            cond_print!(verbose, now, msg.to_string());
-        }
-        let a2l_file = a2lresult.map_err(|a2lerr| a2lerr.to_string())?;
+        let a2l_file = match a2lresult {
+            Ok(a2l_file) => {
+                for msg in log_msgs {
+                    cond_print!(verbose, now, msg.to_string());
+                }
+                a2l_file
+            }
+            Err(
+                ref error @ A2lError::ParserError {
+                    parser_error:
+                        a2lfile::ParserError::InvalidMultiplicityNotPresent { ref block, .. },
+                },
+            ) if block == "A2L_FILE" => {
+                // parse error in the outermost block "A2L_FILE" could indicate that this is an a2l fragment containing only the content of a MODULE
+                if let Ok(module) = a2lfile::load_fragment_file(input_filename) {
+                    // successfully loaded a module, now upgrade it to a full file
+                    let mut a2l_file = a2lfile::new();
+                    a2l_file.project.module[0] = module;
+                    a2l_file.project.module[0].get_layout_mut().start_offset = 1;
+                    a2l_file
+                } else {
+                    return Err(error.to_string());
+                }
+            }
+            Err(error) => {
+                return Err(error.to_string());
+            }
+        };
+
         cond_print!(
             verbose,
             now,
