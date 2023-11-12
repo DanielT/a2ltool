@@ -120,7 +120,9 @@ fn get_symbol_info<'a>(
     // preferred: get symbol information from a SYMBOL_LINK attribute
     if let Some(symbol_link) = opt_symbol_link {
         match find_symbol(&symbol_link.symbol_name, debug_data) {
-            Ok((_, addr, typeinfo)) => return Ok((addr, typeinfo, symbol_link.symbol_name.clone())),
+            Ok((_, addr, typeinfo)) => {
+                return Ok((addr, typeinfo, symbol_link.symbol_name.clone()))
+            }
             Err(errmsg) => symbol_link_errmsg = Some(errmsg),
         };
     }

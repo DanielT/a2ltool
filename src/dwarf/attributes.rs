@@ -5,8 +5,8 @@ type SliceType<'a> = EndianSlice<'a, RunTimeEndian>;
 type OptionalAttribute<'data> = Option<gimli::AttributeValue<SliceType<'data>>>;
 
 // try to get the attribute of the type attrtype for the DIE
-pub(crate) fn get_attr_value<'abbrev, 'unit>(
-    entry: &DebuggingInformationEntry<'abbrev, 'unit, SliceType, usize>,
+pub(crate) fn get_attr_value<'unit>(
+    entry: &DebuggingInformationEntry<'_, 'unit, SliceType, usize>,
     attrtype: gimli::DwAt,
 ) -> OptionalAttribute<'unit> {
     entry.attr_value(attrtype).unwrap_or(None)
@@ -186,14 +186,11 @@ pub(crate) fn get_bit_offset_attribute(
         } else {
             None
         }
-    } else if let Some(bit_offset_attr) = get_attr_value(entry, gimli::constants::DW_AT_bit_offset)
+    } else if let Some(gimli::AttributeValue::Udata(bit_offset)) =
+        get_attr_value(entry, gimli::constants::DW_AT_bit_offset)
     {
         // DW_AT_bit_offset: up to Dwarf 3
-        if let gimli::AttributeValue::Udata(bit_offset) = bit_offset_attr {
-            Some(bit_offset)
-        } else {
-            None
-        }
+        Some(bit_offset)
     } else {
         None
     }

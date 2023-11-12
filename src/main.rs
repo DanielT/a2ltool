@@ -176,8 +176,7 @@ fn core() -> Result<(), String> {
         for mergemodule in merge_modules {
             let mut merge_log_msgs = Vec::<A2lError>::new();
             let mergeresult = a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict);
-            if let Ok(mut merge_a2l) = mergeresult
-            {
+            if let Ok(mut merge_a2l) = mergeresult {
                 a2l_file.merge_modules(&mut merge_a2l);
                 cond_print!(
                     verbose,
@@ -200,7 +199,8 @@ fn core() -> Result<(), String> {
             } else {
                 return Err(format!(
                     "Failed to load \"{}\" for merging: {}\n",
-                    mergemodule.to_string_lossy(), mergeresult.unwrap_err().to_string()
+                    mergemodule.to_string_lossy(),
+                    mergeresult.unwrap_err()
                 ));
             }
         }
