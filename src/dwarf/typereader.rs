@@ -52,12 +52,12 @@ pub(crate) fn load_types(
 fn get_type(
     unit_list: &UnitList,
     current_unit: usize,
-    entries_tree: EntriesTreeNode<EndianSlice<RunTimeEndian>>,
+    entries_tree_node: EntriesTreeNode<EndianSlice<RunTimeEndian>>,
     typedef_name: Option<String>,
     typedefs: &HashMap<usize, String>,
     dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
 ) -> Result<TypeInfo, String> {
-    let entry = entries_tree.entry();
+    let entry = entries_tree_node.entry();
     match entry.tag() {
         gimli::constants::DW_TAG_base_type => get_base_type(entry, &unit_list[current_unit].0),
         gimli::constants::DW_TAG_pointer_type => {
@@ -91,7 +91,7 @@ fn get_type(
             let default_ubound = (size / stride) - 1; // subtract 1, because ubound is the last element, not the size
 
             // the child entries of the DW_TAG_array_type entry give the array dimensions
-            let mut iter = entries_tree.children();
+            let mut iter = entries_tree_node.children();
             while let Ok(Some(child_node)) = iter.next() {
                 let child_entry = child_node.entry();
                 if child_entry.tag() == gimli::constants::DW_TAG_subrange_type {
@@ -130,7 +130,7 @@ fn get_type(
                 format!("anonymous_enum_{}", dioffset)
             };
 
-            let mut iter = entries_tree.children();
+            let mut iter = entries_tree_node.children();
             // get all the enumerators
             while let Ok(Some(child_node)) = iter.next() {
                 let child_entry = child_node.entry();
@@ -152,7 +152,7 @@ fn get_type(
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing struct byte size attribute".to_string())?;
             let members = get_struct_or_union_members(
-                entries_tree,
+                entries_tree_node,
                 unit_list,
                 current_unit,
                 typedefs,
@@ -163,20 +163,41 @@ fn get_type(
         gimli::constants::DW_TAG_class_type => {
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing class byte size attribute".to_string())?;
-            let members = get_struct_or_union_members(
-                entries_tree,
+
+            // construct a second entries_tree_node, since both get_class_inheritance and get_struct_or_union_members need to own it
+            let (unit, abbrev) = &unit_list[current_unit];
+            let mut entries_tree2 = unit
+                .entries_tree(abbrev, Some(entries_tree_node.entry().offset()))
+                .unwrap();
+            let entries_tree_node2 = entries_tree2.root().unwrap();
+
+            // get the inheritance, i.e. the list of base classes
+            let inheritance = get_class_inheritance(
+                entries_tree_node2,
                 unit_list,
                 current_unit,
                 typedefs,
                 dwarf,
             )?;
-            Ok(TypeInfo::Class { size, members })
+            // get the list of data members
+            let members = get_struct_or_union_members(
+                entries_tree_node,
+                unit_list,
+                current_unit,
+                typedefs,
+                dwarf,
+            )?;
+            Ok(TypeInfo::Class {
+                size,
+                inheritance,
+                members,
+            })
         }
         gimli::constants::DW_TAG_union_type => {
             let size = get_byte_size_attribute(entry)
                 .ok_or_else(|| "missing union byte size attribute".to_string())?;
             let members = get_struct_or_union_members(
-                entries_tree,
+                entries_tree_node,
                 unit_list,
                 current_unit,
                 typedefs,
@@ -306,4 +327,42 @@ fn get_struct_or_union_members(
         }
     }
     Ok(members)
+}
+
+// get all the members of a struct or union or class
+fn get_class_inheritance(
+    entries_tree: EntriesTreeNode<EndianSlice<RunTimeEndian>>,
+    unit_list: &UnitList,
+    current_unit: usize,
+    typedefs: &HashMap<usize, String>,
+    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
+) -> Result<HashMap<String, (TypeInfo, u64)>, String> {
+    let (unit, _) = &unit_list[current_unit];
+    let mut inheritance = HashMap::<String, (TypeInfo, u64)>::new();
+    let mut iter = entries_tree.children();
+    while let Ok(Some(child_node)) = iter.next() {
+        let child_entry = child_node.entry();
+        if child_entry.tag() == gimli::constants::DW_TAG_inheritance {
+            let offset = get_data_member_location_attribute(child_entry, unit.encoding())
+                .ok_or_else(|| "missing byte offset for inherited class".to_string())?;
+            let (new_cur_unit, mut baseclass_tree) =
+                get_entries_tree_from_attribute(child_entry, unit_list, current_unit)?;
+
+            let baseclass_tree_node = baseclass_tree.root().unwrap();
+            let baseclass_entry = baseclass_tree_node.entry();
+            let baseclass_name = get_name_attribute(baseclass_entry, dwarf)?;
+
+            let baseclass_type = get_type(
+                unit_list,
+                new_cur_unit,
+                baseclass_tree.root().unwrap(),
+                None,
+                typedefs,
+                dwarf,
+            )?;
+
+            inheritance.insert(baseclass_name, (baseclass_type, offset));
+        }
+    }
+    Ok(inheritance)
 }

@@ -31,7 +31,10 @@ pub(crate) fn insert_items(
         match insert_measurement(module, debugdata, measure_sym, &name_map, &sym_map) {
             Ok(measure_name) => {
                 log_msgs.push(format!("Inserted MEASUREMENT {}", measure_name));
-                name_map.insert(measure_name.to_owned(), ItemType::Measurement(module.measurement.len() - 1));
+                name_map.insert(
+                    measure_name.to_owned(),
+                    ItemType::Measurement(module.measurement.len() - 1),
+                );
                 measurement_list.push(measure_name);
             }
             Err(errmsg) => {
@@ -44,7 +47,10 @@ pub(crate) fn insert_items(
         match insert_characteristic(module, debugdata, characteristic_sym, &name_map, &sym_map) {
             Ok(characteristic_name) => {
                 log_msgs.push(format!("Inserted CHARACTERISTIC {}", characteristic_name));
-                name_map.insert(characteristic_name.to_owned(), ItemType::Characteristic(module.characteristic.len() - 1));
+                name_map.insert(
+                    characteristic_name.to_owned(),
+                    ItemType::Characteristic(module.characteristic.len() - 1),
+                );
                 characteristic_list.push(characteristic_name);
             }
             Err(errmsg) => {
@@ -68,9 +74,15 @@ fn insert_measurement(
 ) -> Result<String, String> {
     // get info about the symbol from the debug data
     match crate::symbol::find_symbol(measure_sym, debugdata) {
-        Ok((true_name, address, typeinfo)) => {
-            insert_measurement_sym(module, measure_sym, true_name, name_map, sym_map, typeinfo, address)
-        }
+        Ok((true_name, address, typeinfo)) => insert_measurement_sym(
+            module,
+            measure_sym,
+            true_name,
+            name_map,
+            sym_map,
+            typeinfo,
+            address,
+        ),
         Err(errmsg) => Err(format!(
             "Symbol {} could not be added: {}",
             measure_sym, errmsg
@@ -367,6 +379,7 @@ fn build_maps(module: &&mut Module) -> (HashMap<String, ItemType>, HashMap<Strin
     (name_map, sym_map)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn insert_many(
     a2l_file: &mut A2lFile,
     debugdata: &DebugData,

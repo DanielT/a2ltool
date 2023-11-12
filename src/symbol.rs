@@ -13,17 +13,18 @@ pub(crate) fn find_symbol<'a>(
 
     // find the symbol in the symbol table
     match find_symbol_from_components(&components, debug_data) {
-        Ok((addr, typeinfo)) => {
-            Ok((varname.to_owned(), addr, typeinfo))
-        }
+        Ok((addr, typeinfo)) => Ok((varname.to_owned(), addr, typeinfo)),
         Err(find_err) => {
             // it was not found using the given varname; if this is name has a mangled form then try that instead
             if let Some(mangled) = debug_data.demangled_names.get(components[0]) {
                 let mut components_mangled = components.clone();
                 components_mangled[0] = mangled;
-                if let Ok((addr, typeinfo)) = find_symbol_from_components(&components_mangled, debug_data) {
-                    let mangled_varname = mangled.to_owned() + varname.strip_prefix(components[0]).unwrap();
-                    return Ok((mangled_varname, addr, typeinfo))
+                if let Ok((addr, typeinfo)) =
+                    find_symbol_from_components(&components_mangled, debug_data)
+                {
+                    let mangled_varname =
+                        mangled.to_owned() + varname.strip_prefix(components[0]).unwrap();
+                    return Ok((mangled_varname, addr, typeinfo));
                 }
             }
 
@@ -90,9 +91,45 @@ fn find_membertype<'a>(
         Ok((address, typeinfo))
     } else {
         match typeinfo {
-            TypeInfo::Class { members, .. }
-            | TypeInfo::Struct { members, .. }
-            | TypeInfo::Union { members, .. } => {
+            TypeInfo::Class {
+                members,
+                inheritance,
+                ..
+            } => {
+                if let Some((membertype, offset)) = members.get(components[component_index]) {
+                    find_membertype(
+                        membertype,
+                        components,
+                        component_index + 1,
+                        address + offset,
+                    )
+                } else if let Some((baseclass_type, offset)) =
+                    inheritance.get(components[component_index])
+                {
+                    let skip = if components.len() > component_index + 1
+                        && components[component_index + 1] == "_"
+                    {
+                        1
+                    } else {
+                        0
+                    };
+                    find_membertype(
+                        baseclass_type,
+                        components,
+                        component_index + 1 + skip,
+                        address + offset,
+                    )
+                } else {
+                    println!("components: {components:?}");
+                    println!("inheritance: {inheritance:?}");
+                    Err(format!(
+                        "There is no member \"{}\" in \"{}\"",
+                        components[component_index],
+                        components[..component_index].join(".")
+                    ))
+                }
+            }
+            TypeInfo::Struct { members, .. } | TypeInfo::Union { members, .. } => {
                 if let Some((membertype, offset)) = members.get(components[component_index]) {
                     find_membertype(
                         membertype,

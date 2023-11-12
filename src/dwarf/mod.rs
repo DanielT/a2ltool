@@ -47,6 +47,7 @@ pub(crate) enum TypeInfo {
     Class {
         // typename: String,
         size: u64,
+        inheritance: HashMap<String, (TypeInfo, u64)>,
         members: HashMap<String, (TypeInfo, u64)>,
     },
     Union {
@@ -107,13 +108,11 @@ fn load_filedata(filename: &OsStr) -> Result<memmap::Mmap, String> {
 
     match unsafe { memmap::Mmap::map(&file) } {
         Ok(mmap) => Ok(mmap),
-        Err(err) => {
-            Err(format!(
-                "Error: Failed to map file '{}': {}",
-                filename.to_string_lossy(),
-                err
-            ))
-        }
+        Err(err) => Err(format!(
+            "Error: Failed to map file '{}': {}",
+            filename.to_string_lossy(),
+            err
+        )),
     }
 }
 
@@ -172,7 +171,11 @@ fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>, verbose: bool) -> De
     let varname_list: Vec<&String> = variables.keys().collect();
     let demangled_names = demangle_cpp_varnames(&varname_list);
 
-    DebugData { variables, types, demangled_names }
+    DebugData {
+        variables,
+        types,
+        demangled_names,
+    }
 }
 
 // load all global variables from the dwarf data
@@ -278,10 +281,11 @@ fn get_global_variable(
     }
 }
 
-
 fn demangle_cpp_varnames(input: &[&String]) -> HashMap<String, String> {
     let mut demangled_symbols = HashMap::<String, String>::new();
-    let demangle_opts = cpp_demangle::DemangleOptions::new().no_params().no_return_type();
+    let demangle_opts = cpp_demangle::DemangleOptions::new()
+        .no_params()
+        .no_return_type();
     for varname in input {
         // some really simple strings can be processed by the demangler, e.g "c" -> "const", which is wrong here.
         // by only processing symbols that start with _Z (variables in classes/namespaces) this problem is avoided
