@@ -180,13 +180,28 @@ fn get_type(
                 dwarf,
             )?;
             // get the list of data members
-            let members = get_struct_or_union_members(
+            let mut members = get_struct_or_union_members(
                 entries_tree_node,
                 unit_list,
                 current_unit,
                 typedefs,
                 dwarf,
             )?;
+            // make inherited members visible directly
+            for (baseclass_type, baseclass_offset) in inheritance.values() {
+                if let TypeInfo::Class {
+                    members: baseclass_members,
+                    ..
+                } = baseclass_type
+                {
+                    for (name, (m_type, m_offset)) in baseclass_members {
+                        members.insert(
+                            name.to_owned(),
+                            (m_type.clone(), m_offset + baseclass_offset),
+                        );
+                    }
+                }
+            }
             Ok(TypeInfo::Class {
                 size,
                 inheritance,

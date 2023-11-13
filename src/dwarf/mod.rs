@@ -20,7 +20,7 @@ pub(crate) struct VarInfo {
     pub(crate) typeref: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TypeInfo {
     Uint8,
     Uint16,

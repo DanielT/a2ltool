@@ -7,17 +7,10 @@ use std::collections::HashMap;
 
 pub(crate) enum TypeInfoIter<'a> {
     NotIterable,
-    StructOrUnion {
+    StructLike {
         struct_iter: std::collections::hash_map::Iter<'a, String, (TypeInfo, u64)>,
         current_member: Option<(&'a String, &'a (TypeInfo, u64))>,
         member_iter: Option<Box<TypeInfoIter<'a>>>,
-    },
-    Class {
-        baseclass_iter: std::collections::hash_map::Iter<'a, String, (TypeInfo, u64)>,
-        current_baseclass: Option<(&'a String, &'a (TypeInfo, u64))>,
-        struct_iter: std::collections::hash_map::Iter<'a, String, (TypeInfo, u64)>,
-        current_member: Option<(&'a String, &'a (TypeInfo, u64))>,
-        item_iter: Option<Box<TypeInfoIter<'a>>>,
     },
     Array {
         size: u64,
@@ -40,32 +33,11 @@ impl<'a> TypeInfoIter<'a> {
     pub(crate) fn new(typeinfo: &'a TypeInfo) -> Self {
         use TypeInfo::*;
         match typeinfo {
-            Class {
-                members,
-                inheritance,
-                ..
-            } => {
-                let mut baseclass_iter = inheritance.iter();
-                let current_baseclass = baseclass_iter.next();
+            Class { members, .. } | Union { members, .. } | Struct { members, .. } => {
                 let mut struct_iter = members.iter();
                 let currentmember = struct_iter.next();
                 if currentmember.is_some() {
-                    TypeInfoIter::Class {
-                        baseclass_iter,
-                        current_baseclass,
-                        struct_iter,
-                        current_member: currentmember,
-                        item_iter: None,
-                    }
-                } else {
-                    TypeInfoIter::NotIterable
-                }
-            }
-            Union { members, .. } | Struct { members, .. } => {
-                let mut struct_iter = members.iter();
-                let currentmember = struct_iter.next();
-                if currentmember.is_some() {
-                    TypeInfoIter::StructOrUnion {
+                    TypeInfoIter::StructLike {
                         struct_iter,
                         current_member: currentmember,
                         member_iter: None,
@@ -99,7 +71,7 @@ impl<'a> Iterator for TypeInfoIter<'a> {
         match self {
             TypeInfoIter::NotIterable => None,
 
-            TypeInfoIter::StructOrUnion {
+            TypeInfoIter::StructLike {
                 struct_iter,
                 current_member,
                 member_iter,
@@ -121,59 +93,6 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                             // this struct member can't iterate or has finished iterating, move to the next struct member
                             *current_member = struct_iter.next();
                             *member_iter = None;
-                            self.next()
-                        }
-                    }
-                } else {
-                    None
-                }
-            }
-
-            TypeInfoIter::Class {
-                baseclass_iter,
-                current_baseclass,
-                struct_iter,
-                current_member,
-                item_iter,
-            } => {
-                // current_baseclass or current_member will be Some(...) while the iteration is still in progress
-                if let Some((name, (typeinfo, offset))) = current_baseclass {
-                    if item_iter.is_none() {
-                        // just switched to a new base class; set up a new item_iter and immediately use it
-                        *item_iter = Some(Box::new(TypeInfoIter::new(typeinfo)));
-                        self.next()
-                    } else {
-                        // get one meber of the base class
-                        let member = item_iter.as_deref_mut().unwrap().next();
-                        if let Some((member_name, member_typeinfo, member_offset)) = member {
-                            Some((
-                                format!(".{}._{}", name, member_name),
-                                member_typeinfo,
-                                offset + member_offset,
-                            ))
-                        } else {
-                            // go to the next base class
-                            *current_baseclass = baseclass_iter.next();
-                            *item_iter = None;
-                            self.next()
-                        }
-                    }
-                } else if let Some((name, (typeinfo, offset))) = current_member {
-                    if item_iter.is_none() {
-                        *item_iter = Some(Box::new(TypeInfoIter::new(typeinfo)));
-                        Some((format!(".{}", name), typeinfo, *offset))
-                    } else {
-                        let member = item_iter.as_deref_mut().unwrap().next();
-                        if let Some((member_name, member_typeinfo, member_offset)) = member {
-                            Some((
-                                format!(".{}{}", name, member_name),
-                                member_typeinfo,
-                                offset + member_offset,
-                            ))
-                        } else {
-                            // this struct member can't iterate or has finished iterating, move to the next struct member
-                            *current_member = struct_iter.next();
-                            *item_iter = None;
                             self.next()
                         }
                     }
