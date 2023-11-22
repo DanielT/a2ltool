@@ -1,18 +1,18 @@
 use crate::dwarf::TypeInfo;
 use crate::ifdata;
-use a2lfile::*;
+use a2lfile::IfData;
 
 // check if there is a CANAPE_EXT in the IF_DATA vec and update it if it exists
 pub(crate) fn update_ifdata(
     ifdata_vec: &mut Vec<IfData>,
-    symbol_name: String,
+    symbol_name: &str,
     datatype: &TypeInfo,
     address: u64,
 ) {
     for ifdata in ifdata_vec {
         if let Some(mut decoded_ifdata) = ifdata::A2mlVector::load_from_ifdata(ifdata) {
             if let Some(canape_ext) = &mut decoded_ifdata.canape_ext {
-                update_ifdata_canape_ext(canape_ext, address, &symbol_name, datatype);
+                update_ifdata_canape_ext(canape_ext, address, symbol_name, datatype);
                 decoded_ifdata.store_to_ifdata(ifdata);
             } else if let Some(asap1b_ccp) = &mut decoded_ifdata.asap1b_ccp {
                 update_ifdata_asap1b_ccp(asap1b_ccp, address, datatype);

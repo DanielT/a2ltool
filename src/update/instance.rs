@@ -1,8 +1,8 @@
-use crate::dwarf::*;
-use a2lfile::*;
+use crate::dwarf::{DebugData, TypeInfo};
+use a2lfile::{A2lObject, Instance, Module};
 use std::collections::HashSet;
 
-use super::ifdata_update::*;
+use super::ifdata_update::{update_ifdata, zero_if_data};
 use super::*;
 
 pub(crate) fn update_module_instances(
@@ -33,7 +33,7 @@ pub(crate) fn update_module_instances(
                     module.instance.push(instance);
                 } else {
                     // item is removed implicitly, because it is not added back to the list
-                    removed_items.insert(instance.name.to_owned());
+                    removed_items.insert(instance.name.clone());
                 }
                 instance_not_updated += 1;
             }
@@ -59,10 +59,15 @@ fn update_instance_address<'a>(
             // make sure a valid SYMBOL_LINK exists
             set_symbol_link(&mut instance.symbol_link, symbol_name.clone());
             instance.start_address = address as u32;
-            update_ifdata(&mut instance.if_data, symbol_name, symbol_typeinfo, address);
+            update_ifdata(
+                &mut instance.if_data,
+                &symbol_name,
+                symbol_typeinfo,
+                address,
+            );
 
             // return the name of the linked TYPEDEF_<x>
-            Ok((instance.type_ref.to_owned(), symbol_typeinfo))
+            Ok((instance.type_ref.clone(), symbol_typeinfo))
         }
         Err(errmsgs) => Err(errmsgs),
     }

@@ -1,6 +1,6 @@
 use super::dwarf::{DebugData, TypeInfo};
 use super::ifdata;
-use a2lfile::*;
+use a2lfile::{A2lFile, BitMask, EcuAddress, IfData, SymbolLink};
 use std::collections::HashSet;
 
 mod axis_pts;
@@ -149,18 +149,18 @@ fn get_symbol_info<'a>(
     // construct an array of (unique) error messages
     let mut errorstrings = Vec::<String>::new();
     if let Some(errmsg) = symbol_link_errmsg {
-        errorstrings.push(errmsg)
+        errorstrings.push(errmsg);
     }
     if let Some(errmsg) = ifdata_errmsg {
         // no duplicates wanted
         if !errorstrings.contains(&errmsg) {
-            errorstrings.push(errmsg)
+            errorstrings.push(errmsg);
         }
     }
     if let Some(errmsg) = object_name_errmsg {
         // no duplicates wanted
         if !errorstrings.contains(&errmsg) {
-            errorstrings.push(errmsg)
+            errorstrings.push(errmsg);
         }
     }
     Err(errorstrings)
@@ -168,10 +168,7 @@ fn get_symbol_info<'a>(
 
 fn log_update_errors(errorlog: &mut Vec<String>, errmsgs: Vec<String>, blockname: &str, line: u32) {
     for msg in errmsgs {
-        errorlog.push(format!(
-            "Error updating {} on line {}: {}",
-            blockname, line, msg
-        ));
+        errorlog.push(format!("Error updating {blockname} on line {line}: {msg}"));
     }
 }
 

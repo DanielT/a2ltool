@@ -106,13 +106,10 @@ fn find_membertype<'a>(
                 } else if let Some((baseclass_type, offset)) =
                     inheritance.get(components[component_index])
                 {
-                    let skip = if components.len() > component_index + 1
-                        && components[component_index + 1] == "_"
-                    {
-                        1
-                    } else {
-                        0
-                    };
+                    let skip = usize::from(
+                        components.len() > component_index + 1
+                            && components[component_index + 1] == "_",
+                    );
                     find_membertype(
                         baseclass_type,
                         components,
@@ -156,10 +153,7 @@ fn find_membertype<'a>(
                     let arraycomponent =
                         components.get(component_index + idx_pos).unwrap_or(&"_0_"); // default to first element if no more components are specified
                     let indexval = get_index(arraycomponent).ok_or_else(|| {
-                        format!(
-                            "could not interpret \"{}\" as an array index",
-                            arraycomponent
-                        )
+                        format!("could not interpret \"{arraycomponent}\" as an array index")
                     })?;
                     if indexval >= *current_dim as usize {
                         return Err(format!("requested array index {} in expression \"{}\", but the array only has {} elements",

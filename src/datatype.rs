@@ -58,14 +58,14 @@ pub(crate) fn get_type_limits(
             }
         }
         TypeInfo::Double => (f64::MIN, f64::MAX),
-        TypeInfo::Float => (f32::MIN as f64, f32::MAX as f64),
-        TypeInfo::Uint8 => (u8::MIN as f64, u8::MAX as f64),
-        TypeInfo::Uint16 => (u16::MIN as f64, u16::MAX as f64),
-        TypeInfo::Uint32 => (u32::MIN as f64, u32::MAX as f64),
+        TypeInfo::Float => (f64::from(f32::MIN), f64::from(f32::MAX)),
+        TypeInfo::Uint8 => (f64::from(u8::MIN), f64::from(u8::MAX)),
+        TypeInfo::Uint16 => (f64::from(u16::MIN), f64::from(u16::MAX)),
+        TypeInfo::Uint32 => (f64::from(u32::MIN), f64::from(u32::MAX)),
         TypeInfo::Uint64 => (u64::MIN as f64, u64::MAX as f64),
-        TypeInfo::Sint8 => (i8::MIN as f64, i8::MAX as f64),
-        TypeInfo::Sint16 => (i16::MIN as f64, i16::MAX as f64),
-        TypeInfo::Sint32 => (i32::MIN as f64, i32::MAX as f64),
+        TypeInfo::Sint8 => (f64::from(i8::MIN), f64::from(i8::MAX)),
+        TypeInfo::Sint16 => (f64::from(i16::MIN), f64::from(i16::MAX)),
+        TypeInfo::Sint32 => (f64::from(i32::MIN), f64::from(i32::MAX)),
         TypeInfo::Sint64 => (i64::MIN as f64, i64::MAX as f64),
         TypeInfo::Enum { enumerators, .. } => {
             let lower = enumerators.iter().map(|val| val.1).min().unwrap_or(0) as f64;

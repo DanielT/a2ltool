@@ -25,7 +25,7 @@ pub(crate) fn get_name_attribute(
                 // could not demangle, but successfully converted the slice to utf8
                 return Ok(utf8string.to_owned());
             }
-            Err(format!("could not decode {:#?} as a utf-8 string", slice))
+            Err(format!("could not decode {slice:#?} as a utf-8 string"))
         }
         gimli::AttributeValue::DebugStrRef(str_offset) => {
             match dwarf.debug_str.get_str(str_offset) {
@@ -34,12 +34,12 @@ pub(crate) fn get_name_attribute(
                         // could not demangle, but successfully converted the slice to utf8
                         return Ok(utf8string.to_owned());
                     }
-                    Err(format!("could not decode {:#?} as a utf-8 string", slice))
+                    Err(format!("could not decode {slice:#?} as a utf-8 string"))
                 }
                 Err(err) => Err(err.to_string()),
             }
         }
-        _ => Err(format!("invalid name attribute type {:#?}", name_attr)),
+        _ => Err(format!("invalid name attribute type {name_attr:#?}")),
     }
 }
 
@@ -63,7 +63,7 @@ pub(crate) fn get_typeref_attribute(
             // (for example gcc supports this, but support is only enabled if the user requests this explicitly)
             Err("unsupported referene to a .debug_types entry (Dwarf 4)".to_string())
         }
-        _ => Err(format!("unsupported type reference: {:#?}", type_attr)),
+        _ => Err(format!("unsupported type reference: {type_attr:#?}")),
     }
 }
 
@@ -91,8 +91,8 @@ pub(crate) fn get_data_member_location_attribute(
     match loc_attr {
         gimli::AttributeValue::Exprloc(expression) => evaluate_exprloc(expression, encoding),
         gimli::AttributeValue::Udata(val) => Some(val),
-        _other => {
-            println!("unexpected data_member_location attribute: {:?}", _other);
+        other => {
+            println!("unexpected data_member_location attribute: {other:?}");
             None
         }
     }

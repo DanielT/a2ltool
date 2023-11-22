@@ -1,7 +1,12 @@
 use std::ffi::OsStr;
 
-use crate::ifdata::*;
-use a2lfile::*;
+use crate::ifdata::{
+    A2mlVector, Address2, Channel, Cmd, CycleRepetition, Daq2, EvServ, FlxSlotId, HostName,
+    InitialCmdBuffer, InitialResErrBuffer, Ipv6, LpduId, MaxFlxLenBuf, Offset, PoolBuffer, ResErr,
+    Stim2, TCP_IP_Parameters, UDP_IP_Parameters, Xcp, XcpOnCan, XcpOnFlx, XcpOnTcpIp, XcpOnUdpIp,
+    XcpPacket,
+};
+use a2lfile::A2lFile;
 
 pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
     let multi_module = a2l_file.project.module.len() > 1;
@@ -53,13 +58,13 @@ fn print_xcp_on_can(xcp_on_can: &XcpOnCan) {
     if let Some(can_id_master) = &xcp_on_can.can_parameters.can_id_master {
         println!(
             "    CAN id master: 0x{:X}",
-            (can_id_master.value & 0x1fffffff)
+            (can_id_master.value & 0x1fff_ffff)
         );
     }
     if let Some(can_id_slave) = &xcp_on_can.can_parameters.can_id_slave {
         println!(
             "    CAN id slave: 0x{:X}",
-            (can_id_slave.value & 0x1fffffff)
+            (can_id_slave.value & 0x1fff_ffff)
         );
     }
     if let Some(baudrate) = &xcp_on_can.can_parameters.baudrate {
@@ -125,7 +130,7 @@ fn print_xcp_on_flx_buffer(
     lpdu_id: &Option<LpduId>,
     xcp_packet: &Option<XcpPacket>,
 ) {
-    println!("      buffer id: {}", flx_buf_id);
+    println!("      buffer id: {flx_buf_id}");
 
     if let Some(MaxFlxLenBuf {
         fixed, variable, ..
@@ -230,35 +235,35 @@ fn print_xcp_on_flx_buffer(
             ..
         }) = cmd
         {
-            println!("        Cmd: {:?}", packet_assignment_type)
+            println!("        Cmd: {packet_assignment_type:?}");
         }
         if let Some(ResErr {
             packet_assignment_type,
             ..
         }) = res_err
         {
-            println!("        Res / Err: {:?}", packet_assignment_type)
+            println!("        Res / Err: {packet_assignment_type:?}");
         }
         if let Some(EvServ {
             packet_assignment_type,
             ..
         }) = ev_serv
         {
-            println!("        EvServ: {:?}", packet_assignment_type)
+            println!("        EvServ: {packet_assignment_type:?}");
         }
         if let Some(Daq2 {
             packet_assignment_type,
             ..
         }) = daq
         {
-            println!("        Daq: {:?}", packet_assignment_type)
+            println!("        Daq: {packet_assignment_type:?}");
         }
         if let Some(Stim2 {
             packet_assignment_type,
             ..
         }) = stim
         {
-            println!("        Stim: {:?}", packet_assignment_type)
+            println!("        Stim: {packet_assignment_type:?}");
         }
     }
 }
@@ -302,13 +307,13 @@ fn print_xcp_on_ip_common(
     port: u16,
 ) {
     if let Some(HostName { hostname, .. }) = host_name {
-        println!("    hostname: {}", hostname);
+        println!("    hostname: {hostname}");
     }
     if let Some(Address2 { address_v4, .. }) = address {
-        println!("    address: {}", address_v4);
+        println!("    address: {address_v4}");
     }
     if let Some(Ipv6 { address_v6, .. }) = ipv6 {
-        println!("    address: {}", address_v6);
+        println!("    address: {address_v6}");
     }
-    println!("Port: {}", port);
+    println!("Port: {port}");
 }

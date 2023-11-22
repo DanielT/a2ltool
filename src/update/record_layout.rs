@@ -1,6 +1,6 @@
 use super::get_a2l_datatype;
 use crate::dwarf::TypeInfo;
-use a2lfile::*;
+use a2lfile::{Module, RecordLayout};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -203,7 +203,7 @@ pub(crate) fn update_record_layout(
                 // there already is a record layout with these parameters
                 recordlayout_info.refcount[idx] -= 1;
                 recordlayout_info.refcount[existing_idx] += 1;
-                existing_reclayout.name.to_owned()
+                existing_reclayout.name.clone()
             } else if recordlayout_info.refcount[idx] == 1 {
                 // the original record layout only has one reference; that means we can simply overwrite it with the modified data
                 if module.record_layout[idx].name != new_reclayout.name {
@@ -213,10 +213,10 @@ pub(crate) fn update_record_layout(
                         .remove(&module.record_layout[idx].name);
                     recordlayout_info
                         .idxmap
-                        .insert(new_reclayout.name.to_owned(), idx);
+                        .insert(new_reclayout.name.clone(), idx);
                 }
                 module.record_layout[idx] = new_reclayout;
-                module.record_layout[idx].name.to_owned()
+                module.record_layout[idx].name.clone()
             } else {
                 // the original record layout has multiple users, so it's reference count
                 // decreases by one and the new record layout is added to the list
@@ -226,9 +226,9 @@ pub(crate) fn update_record_layout(
                 recordlayout_info.refcount.push(1);
                 recordlayout_info
                     .idxmap
-                    .insert(new_reclayout.name.to_owned(), module.record_layout.len());
+                    .insert(new_reclayout.name.clone(), module.record_layout.len());
                 module.record_layout.push(new_reclayout);
-                module.record_layout.last().unwrap().name.to_owned()
+                module.record_layout.last().unwrap().name.clone()
             }
         }
     } else {
@@ -254,16 +254,16 @@ fn make_unique_reclayout_name(
             {
                 initial_name[..end_of_updated].to_string()
             } else {
-                format!("{}_UPDATED", initial_name)
+                format!("{initial_name}_UPDATED")
             }
         } else {
-            format!("{}_UPDATED", initial_name)
+            format!("{initial_name}_UPDATED")
         };
         let mut outname = basename.clone();
         let mut counter = 1;
         while recordlayout_info.idxmap.get(&outname).is_some() {
             counter += 1;
-            outname = format!("{}.{}", basename, counter);
+            outname = format!("{basename}.{counter}");
         }
         outname
     } else {
@@ -344,7 +344,7 @@ impl RecordLayoutInfo {
             .record_layout
             .iter()
             .enumerate()
-            .map(|(idx, rl)| (rl.name.to_owned(), idx))
+            .map(|(idx, rl)| (rl.name.clone(), idx))
             .collect();
         let mut refcount = vec![0; module.record_layout.len()];
         refcount.resize(module.record_layout.len(), 0);

@@ -46,8 +46,8 @@ macro_rules! ext_println {
 
 fn main() {
     match core() {
-        Ok(_) => {}
-        Err(err) => println!("{}", err),
+        Ok(()) => {}
+        Err(err) => println!("{err}"),
     }
 }
 
@@ -110,7 +110,7 @@ fn core() -> Result<(), String> {
     if debugprint {
         // why not cond_print? in that case the output string must always be
         // formatted before cond_print can decide whether to print it. This can take longer than parsing the file.
-        println!("================\n{:#?}\n================\n", a2l_file)
+        println!("================\n{a2l_file:#?}\n================\n");
     }
 
     // show XCP settings
@@ -164,7 +164,7 @@ fn core() -> Result<(), String> {
             )
         );
         if debugprint {
-            println!("================\n{:#?}\n================\n", elf_info);
+            println!("================\n{elf_info:#?}\n================\n");
         }
         Some(elf_info)
     } else {
@@ -195,7 +195,7 @@ fn core() -> Result<(), String> {
                         "Merged A2l objects from \"{}\"\n",
                         mergemodule.to_string_lossy()
                     )
-                )
+                );
             } else {
                 return Err(format!(
                     "Failed to load \"{}\" for merging: {}\n",
@@ -358,8 +358,8 @@ fn core() -> Result<(), String> {
             insert::insert_many(
                 &mut a2l_file,
                 debugdata,
-                meas_ranges,
-                char_ranges,
+                &meas_ranges,
+                &char_ranges,
                 meas_regexes,
                 char_regexes,
                 target_group,
@@ -477,7 +477,7 @@ fn load_or_create_a2l(
         );
         project.module = vec![a2lfile::Module::new(
             "new_module".to_string(),
-            "".to_string(),
+            String::new(),
         )];
         let mut a2l_file = a2lfile::A2lFile::new(project);
         // only one line break for PROJECT (after ASAP2_VERSION) instead of the default 2
@@ -703,7 +703,7 @@ fn get_args() -> ArgMatches {
 
 fn range_args_to_ranges(args: Option<ValuesRef<u64>>) -> Vec<(u64, u64)> {
     if let Some(values) = args {
-        let rangevals: Vec<u64> = values.cloned().collect();
+        let rangevals: Vec<u64> = values.copied().collect();
         let mut addr_ranges: Vec<(u64, u64)> = Vec::new();
         for idx in (1..rangevals.len()).step_by(2) {
             addr_ranges.push((rangevals[idx - 1], rangevals[idx]));

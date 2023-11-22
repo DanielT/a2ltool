@@ -1,10 +1,10 @@
-use crate::dwarf::*;
-use a2lfile::*;
+use crate::dwarf::{DebugData, TypeInfo};
+use a2lfile::{A2lObject, AxisPts, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use super::enums::*;
-use super::ifdata_update::*;
+use super::enums::{cond_create_enum_conversion, update_enum_compu_methods};
+use super::ifdata_update::{update_ifdata, zero_if_data};
 use super::*;
 
 pub(crate) fn update_module_axis_pts(
@@ -87,7 +87,7 @@ pub(crate) fn update_module_axis_pts(
                     module.axis_pts.push(axis_pts);
                 } else {
                     // item is removed implicitly, because it is not added back to the list
-                    removed_items.insert(axis_pts.name.to_owned());
+                    removed_items.insert(axis_pts.name.clone());
                 }
                 axis_pts_not_updated += 1;
             }
@@ -116,7 +116,12 @@ fn update_axis_pts_address<'a>(
             // make sure a valid SYMBOL_LINK exists
             set_symbol_link(&mut axis_pts.symbol_link, symbol_name.clone());
             axis_pts.address = address as u32;
-            update_ifdata(&mut axis_pts.if_data, symbol_name, symbol_datatype, address);
+            update_ifdata(
+                &mut axis_pts.if_data,
+                &symbol_name,
+                symbol_datatype,
+                address,
+            );
 
             Ok(symbol_datatype)
         }

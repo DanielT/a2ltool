@@ -6,14 +6,14 @@ use std::collections::HashMap;
 // load all the types referenced by variables in given HashMap
 pub(crate) fn load_types(
     variables: &HashMap<String, VarInfo>,
-    typedefs: HashMap<usize, String>,
-    units: UnitList,
+    typedefs: &HashMap<usize, String>,
+    units: &UnitList,
     dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
     verbose: bool,
 ) -> HashMap<usize, TypeInfo> {
     let mut types = HashMap::<usize, TypeInfo>::new();
     // for each variable
-    for (_name, VarInfo { typeref, .. }) in variables {
+    for (name, VarInfo { typeref, .. }) in variables {
         // check if the type was already loaded
         if types.get(typeref).is_none() {
             if let Some(unit_idx) = units.get_unit(*typeref) {
@@ -25,11 +25,11 @@ pub(crate) fn load_types(
 
                 // load one type and add it to the collection (always succeeds for correctly structured DWARF debug info)
                 match get_type(
-                    &units,
+                    units,
                     unit_idx,
                     entries_tree.root().unwrap(),
                     None,
-                    &typedefs,
+                    typedefs,
                     dwarf,
                 ) {
                     Ok(vartype) => {
@@ -37,7 +37,7 @@ pub(crate) fn load_types(
                     }
                     Err(errmsg) => {
                         if verbose {
-                            println!("Error loading type info for variable {}: {}", _name, errmsg);
+                            println!("Error loading type info for variable {name}: {errmsg}");
                         }
                     }
                 }
@@ -62,7 +62,7 @@ fn get_type(
         gimli::constants::DW_TAG_base_type => get_base_type(entry, &unit_list[current_unit].0),
         gimli::constants::DW_TAG_pointer_type => {
             let (unit, _) = &unit_list[current_unit];
-            Ok(TypeInfo::Pointer(unit.encoding().address_size as u64))
+            Ok(TypeInfo::Pointer(u64::from(unit.encoding().address_size)))
         }
         gimli::constants::DW_TAG_array_type => {
             let size = get_byte_size_attribute(entry)
@@ -127,7 +127,7 @@ fn get_type(
             } else {
                 // a truly anonymous enum. This can happen if someone writes C code that looks like this:
                 // enum { ... } varname;
-                format!("anonymous_enum_{}", dioffset)
+                format!("anonymous_enum_{dioffset}")
             };
 
             let mut iter = entries_tree_node.children();
@@ -246,8 +246,7 @@ fn get_type(
             )
         }
         other_tag => Err(format!(
-            "unexpected DWARF tag {} in type definition",
-            other_tag
+            "unexpected DWARF tag {other_tag} in type definition"
         )),
     }
 }
@@ -259,7 +258,9 @@ fn get_base_type(
     let byte_size = get_byte_size_attribute(entry).unwrap_or(1u64);
     let encoding = get_encoding_attribute(entry).unwrap_or(gimli::constants::DW_ATE_unsigned);
     Ok(match encoding {
-        gimli::constants::DW_ATE_address => TypeInfo::Pointer(unit.encoding().address_size as u64),
+        gimli::constants::DW_ATE_address => {
+            TypeInfo::Pointer(u64::from(unit.encoding().address_size))
+        }
         gimli::constants::DW_ATE_float => {
             if byte_size == 8 {
                 TypeInfo::Double
@@ -273,10 +274,7 @@ fn get_base_type(
             4 => TypeInfo::Sint32,
             8 => TypeInfo::Sint64,
             val => {
-                return Err(format!(
-                    "error loading data type: signed int of size {}",
-                    val
-                ));
+                return Err(format!("error loading data type: signed int of size {val}"));
             }
         },
         gimli::constants::DW_ATE_boolean
@@ -288,8 +286,7 @@ fn get_base_type(
             8 => TypeInfo::Uint64,
             val => {
                 return Err(format!(
-                    "error loading data type: unsigned int of size {}",
-                    val
+                    "error loading data type: unsigned int of size {val}"
                 ));
             }
         },

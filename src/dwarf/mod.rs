@@ -9,7 +9,10 @@ use std::{collections::HashMap, fs::File};
 type SliceType<'a> = EndianSlice<'a, RunTimeEndian>;
 
 mod attributes;
-use attributes::*;
+use attributes::{
+    get_abstract_origin_attribute, get_location_attribute, get_name_attribute,
+    get_specification_attribute, get_typeref_attribute,
+};
 mod typereader;
 use typereader::load_types;
 mod iter;
@@ -123,10 +126,7 @@ fn load_elf_file<'data>(
 ) -> Result<object::read::File<'data>, String> {
     match object::File::parse(filedata) {
         Ok(file) => Ok(file),
-        Err(err) => Err(format!(
-            "Error: Failed to parse file '{}': {}",
-            filename, err
-        )),
+        Err(err) => Err(format!("Error: Failed to parse file '{filename}': {err}")),
     }
 }
 
@@ -167,7 +167,7 @@ fn get_endian(elffile: &object::read::File) -> RunTimeEndian {
 // read the debug information entries in the DWAF data to get all the global variables and their types
 fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>, verbose: bool) -> DebugData {
     let (variables, typedefs, units) = load_variables(dwarf, verbose);
-    let types = load_types(&variables, typedefs, units, dwarf, verbose);
+    let types = load_types(&variables, &typedefs, &units, dwarf, verbose);
     let varname_list: Vec<&String> = variables.keys().collect();
     let demangled_names = demangle_cpp_varnames(&varname_list);
 
@@ -216,7 +216,7 @@ fn load_variables<'a>(
                                 .to_debug_info_offset(&unit)
                                 .unwrap_or(gimli::DebugInfoOffset(0))
                                 .0;
-                            println!("Error loading variable @{:x}: {}", offset, errmsg);
+                            println!("Error loading variable @{offset:x}: {errmsg}");
                         }
                     }
                 }

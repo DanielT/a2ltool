@@ -1,5 +1,8 @@
 use crate::dwarf::TypeInfo;
-use a2lfile::*;
+use a2lfile::{
+    CompuMethod, CompuTabRef, CompuVtab, ConversionType, Module, ValuePairsStruct,
+    ValueTriplesStruct,
+};
 use std::collections::HashMap;
 
 // create a COMPU_METHOD and a COMPU_VTAB for the typename of an enum
@@ -15,10 +18,10 @@ pub(crate) fn cond_create_enum_conversion(
     if compu_method_find.is_none() {
         let mut new_compu_method = CompuMethod::new(
             typename.to_string(),
-            format!("Conversion table for enum {}", typename),
+            format!("Conversion table for enum {typename}"),
             ConversionType::TabVerb,
             "%.4".to_string(),
-            "".to_string(),
+            String::new(),
         );
         new_compu_method.compu_tab_ref = Some(CompuTabRef::new(typename.to_string()));
         module.compu_method.push(new_compu_method);
@@ -32,7 +35,7 @@ pub(crate) fn cond_create_enum_conversion(
         if compu_vtab_find.is_none() && compu_vtab_range_find.is_none() {
             let mut new_compu_vtab = CompuVtab::new(
                 typename.to_string(),
-                format!("Conversion table for enum {}", typename),
+                format!("Conversion table for enum {typename}"),
                 ConversionType::TabVerb,
                 enumerators.len() as u16,
             );

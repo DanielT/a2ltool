@@ -1,10 +1,10 @@
-use crate::dwarf::*;
-use a2lfile::*;
+use crate::dwarf::{DebugData, TypeInfo};
+use a2lfile::{A2lObject, AxisDescr, Characteristic, Module, RecordLayout};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use super::enums::*;
-use super::ifdata_update::*;
+use super::enums::{cond_create_enum_conversion, update_enum_compu_methods};
+use super::ifdata_update::{update_ifdata, zero_if_data};
 use super::*;
 
 pub(crate) fn update_module_characteristics(
@@ -24,7 +24,7 @@ pub(crate) fn update_module_characteristics(
     let axis_pts_dim: HashMap<String, u16> = module
         .axis_pts
         .iter()
-        .map(|item| (item.name.to_owned(), item.max_axis_points))
+        .map(|item| (item.name.clone(), item.max_axis_points))
         .collect();
 
     std::mem::swap(&mut module.characteristic, &mut characteristic_list);
@@ -60,7 +60,7 @@ pub(crate) fn update_module_characteristics(
                         module.characteristic.push(characteristic);
                     } else {
                         // item is removed implicitly, because it is not added back to the list
-                        removed_items.insert(characteristic.name.to_owned());
+                        removed_items.insert(characteristic.name.clone());
                     }
                     characteristic_not_updated += 1;
                 }
@@ -190,7 +190,7 @@ fn update_characteristic_address<'a>(
             set_measurement_bitmask(&mut characteristic.bit_mask, symbol_datatype);
             update_ifdata(
                 &mut characteristic.if_data,
-                symbol_name,
+                &symbol_name,
                 symbol_datatype,
                 address,
             );

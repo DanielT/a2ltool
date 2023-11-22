@@ -1,9 +1,9 @@
-use crate::dwarf::*;
-use a2lfile::*;
+use crate::dwarf::{DebugData, TypeInfo};
+use a2lfile::{A2lObject, Blob, Module};
 use std::collections::HashSet;
 
-use super::ifdata_update::*;
-use super::*;
+use super::ifdata_update::{update_ifdata, zero_if_data};
+use super::{cleanup_item_list, get_symbol_info, log_update_errors, set_symbol_link};
 
 pub(crate) fn update_module_blobs(
     module: &mut Module,
@@ -32,7 +32,7 @@ pub(crate) fn update_module_blobs(
                     module.blob.push(blob);
                 } else {
                     // item is removed implicitly, because it is not added back to the list
-                    removed_items.insert(blob.name.to_owned());
+                    removed_items.insert(blob.name.clone());
                 }
                 blob_not_updated += 1;
             }
@@ -53,7 +53,7 @@ fn update_blob_address<'a>(
             // make sure a valid SYMBOL_LINK exists
             set_symbol_link(&mut blob.symbol_link, symbol_name.clone());
             blob.start_address = address as u32;
-            update_ifdata(&mut blob.if_data, symbol_name, symbol_datatype, address);
+            update_ifdata(&mut blob.if_data, &symbol_name, symbol_datatype, address);
 
             Ok(symbol_datatype)
         }

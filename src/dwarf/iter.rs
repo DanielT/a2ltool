@@ -1,6 +1,7 @@
 use super::DebugData;
 use super::TypeInfo;
 use super::VarInfo;
+use std::fmt::Write;
 
 #[cfg(test)]
 use std::collections::HashMap;
@@ -31,7 +32,7 @@ pub(crate) struct VariablesIterator<'a> {
 
 impl<'a> TypeInfoIter<'a> {
     pub(crate) fn new(typeinfo: &'a TypeInfo) -> Self {
-        use TypeInfo::*;
+        use TypeInfo::{Array, Class, Struct, Union};
         match typeinfo {
             Class { members, .. } | Union { members, .. } | Struct { members, .. } => {
                 let mut struct_iter = members.iter();
@@ -80,12 +81,12 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                 if let Some((name, (typeinfo, offset))) = current_member {
                     if member_iter.is_none() {
                         *member_iter = Some(Box::new(TypeInfoIter::new(typeinfo)));
-                        Some((format!(".{}", name), typeinfo, *offset))
+                        Some((format!(".{name}"), typeinfo, *offset))
                     } else {
                         let member = member_iter.as_deref_mut().unwrap().next();
                         if let Some((member_name, member_typeinfo, member_offset)) = member {
                             Some((
-                                format!(".{}{}", name, member_name),
+                                format!(".{name}{member_name}"),
                                 member_typeinfo,
                                 offset + member_offset,
                             ))
@@ -124,9 +125,10 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                     }
                     let idxstr = current_indices
                         .iter()
-                        .map(|val| format!("._{}_", val))
-                        .collect::<Vec<String>>()
-                        .join("");
+                        .fold(String::new(), |mut output, val| {
+                            let _ = write!(output, "._{val}_");
+                            output
+                        });
 
                     // calculate the storage offset of this array element. Each element is stride bytes wide.
                     let offset = *stride * (*position);
@@ -142,7 +144,7 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                         let item = item_iter.as_deref_mut().unwrap().next();
                         if let Some((item_name, item_typeinfo, item_offset)) = item {
                             Some((
-                                format!("{}{}", idxstr, item_name),
+                                format!("{idxstr}{item_name}"),
                                 item_typeinfo,
                                 offset + item_offset,
                             ))
@@ -202,7 +204,7 @@ impl<'a> Iterator for VariablesIterator<'a> {
                     self.type_iter.as_mut().unwrap().next()
                 {
                     Some((
-                        format!("{}{}", varname, type_name),
+                        format!("{varname}{type_name}"),
                         Some(type_info),
                         *address + offset,
                     ))

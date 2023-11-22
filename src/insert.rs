@@ -1,8 +1,12 @@
-use a2lfile::*;
+use a2lfile::{
+    A2lFile, A2lObject, AddrType, Characteristic, CharacteristicType, EcuAddress, FncValues, Group,
+    IndexMode, MatrixDim, Measurement, Module, RecordLayout, RefCharacteristic, RefMeasurement,
+    Root, SymbolLink,
+};
 use std::collections::HashMap;
 
-use crate::datatype::*;
-use crate::dwarf::*;
+use crate::datatype::{get_a2l_datatype, get_type_limits};
+use crate::dwarf::{DebugData, TypeInfo};
 use crate::update::enums;
 use regex::Regex;
 
@@ -30,15 +34,15 @@ pub(crate) fn insert_items(
     for measure_sym in measurement_symbols {
         match insert_measurement(module, debugdata, measure_sym, &name_map, &sym_map) {
             Ok(measure_name) => {
-                log_msgs.push(format!("Inserted MEASUREMENT {}", measure_name));
+                log_msgs.push(format!("Inserted MEASUREMENT {measure_name}"));
                 name_map.insert(
-                    measure_name.to_owned(),
+                    measure_name.clone(),
                     ItemType::Measurement(module.measurement.len() - 1),
                 );
                 measurement_list.push(measure_name);
             }
             Err(errmsg) => {
-                log_msgs.push(format!("Insert skipped: {}", errmsg));
+                log_msgs.push(format!("Insert skipped: {errmsg}"));
             }
         }
     }
@@ -46,15 +50,15 @@ pub(crate) fn insert_items(
     for characteristic_sym in characteristic_symbols {
         match insert_characteristic(module, debugdata, characteristic_sym, &name_map, &sym_map) {
             Ok(characteristic_name) => {
-                log_msgs.push(format!("Inserted CHARACTERISTIC {}", characteristic_name));
+                log_msgs.push(format!("Inserted CHARACTERISTIC {characteristic_name}"));
                 name_map.insert(
-                    characteristic_name.to_owned(),
+                    characteristic_name.clone(),
                     ItemType::Characteristic(module.characteristic.len() - 1),
                 );
                 characteristic_list.push(characteristic_name);
             }
             Err(errmsg) => {
-                log_msgs.push(format!("Insert skipped: {}", errmsg));
+                log_msgs.push(format!("Insert skipped: {errmsg}"));
             }
         }
     }
@@ -83,10 +87,7 @@ fn insert_measurement(
             typeinfo,
             address,
         ),
-        Err(errmsg) => Err(format!(
-            "Symbol {} could not be added: {}",
-            measure_sym, errmsg
-        )),
+        Err(errmsg) => Err(format!("Symbol {measure_sym} could not be added: {errmsg}")),
     }
 }
 
@@ -106,7 +107,7 @@ fn insert_measurement_sym(
     let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
     let mut new_measurement = Measurement::new(
         item_name.clone(),
-        format!("measurement for symbol {}", measure_sym),
+        format!("measurement for symbol {measure_sym}"),
         datatype,
         "NO_COMPU_METHOD".to_string(),
         0,
@@ -155,8 +156,7 @@ fn insert_characteristic(
             address,
         ),
         Err(errmsg) => Err(format!(
-            "Symbol {} could not be added: {}",
-            characteristic_sym, errmsg
+            "Symbol {characteristic_sym} could not be added: {errmsg}"
         )),
     }
 }
@@ -174,7 +174,7 @@ fn insert_characteristic_sym(
     println!("insert_characteristic_sym: characteristic_sym:{characteristic_sym}, true_name:{true_name}, item_name:{item_name}");
 
     let datatype = get_a2l_datatype(typeinfo);
-    let recordlayout_name = format!("__{}_Z", datatype);
+    let recordlayout_name = format!("__{datatype}_Z");
     let mut new_characteristic = match typeinfo {
         TypeInfo::Class { .. } | TypeInfo::Union { .. } | TypeInfo::Struct { .. } => {
             // Structs cannot be handled at all in this code. In some cases structs can be used by CHARACTERISTICs,
@@ -187,10 +187,10 @@ fn insert_characteristic_sym(
             let (lower_limit, upper_limit) = get_type_limits(arraytype, f64::MIN, f64::MAX);
             let mut newitem = Characteristic::new(
                 item_name.clone(),
-                format!("characterisitic for {}", characteristic_sym),
+                format!("characteristic for {characteristic_sym}"),
                 CharacteristicType::ValBlk,
                 address as u32,
-                recordlayout_name.to_owned(),
+                recordlayout_name.clone(),
                 0f64,
                 "NO_COMPU_METHOD".to_string(),
                 lower_limit,
@@ -215,10 +215,10 @@ fn insert_characteristic_sym(
             enums::cond_create_enum_conversion(module, typename, enumerators);
             Characteristic::new(
                 item_name.clone(),
-                format!("characterisitic for {}", characteristic_sym),
+                format!("characteristic for {characteristic_sym}"),
                 CharacteristicType::Value,
                 address as u32,
-                recordlayout_name.to_owned(),
+                recordlayout_name.clone(),
                 0f64,
                 typename.to_string(),
                 lower_limit,
@@ -230,10 +230,10 @@ fn insert_characteristic_sym(
             let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
             Characteristic::new(
                 item_name.clone(),
-                format!("characteristic for {}", characteristic_sym),
+                format!("characteristic for {characteristic_sym}"),
                 CharacteristicType::Value,
                 address as u32,
-                recordlayout_name.to_owned(),
+                recordlayout_name.clone(),
                 0f64,
                 "NO_COMPU_METHOD".to_string(),
                 lower_limit,
@@ -252,7 +252,7 @@ fn insert_characteristic_sym(
 
     // create a RECORD_LAYOUT for the CHARACTERISTIC if it doesn't exist yet
     // the used naming convention (__<type>_Z) matches default naming used by Vector tools
-    let mut recordlayout = RecordLayout::new(recordlayout_name.to_owned());
+    let mut recordlayout = RecordLayout::new(recordlayout_name.clone());
     // set item 0 (name) to use an offset of 0 lines, i.e. no line break after /begin RECORD_LAYOUT
     recordlayout.get_layout_mut().item_location.0 = 0;
     recordlayout.fnc_values = Some(FncValues::new(
@@ -291,17 +291,19 @@ fn make_unique_measurement_name(
                 module.measurement[*idx].name, measure_sym
             ))
         }
-        Some(ItemType::Characteristic(_))
-        | Some(ItemType::Instance(_))
-        | Some(ItemType::Blob(_))
-        | Some(ItemType::AxisPts(_)) => {
-            format!("MEASUREMENT.{}", cleaned_sym)
+        Some(
+            ItemType::Characteristic(_)
+            | ItemType::Instance(_)
+            | ItemType::Blob(_)
+            | ItemType::AxisPts(_),
+        ) => {
+            format!("MEASUREMENT.{cleaned_sym}")
         }
         None => cleaned_sym,
     };
     // fail if the name still isn't unique
     if name_map.get(&item_name).is_some() {
-        return Err(format!("MEASUREMENT {} already exists.", item_name));
+        return Err(format!("MEASUREMENT {item_name} already exists."));
     }
     Ok(item_name)
 }
@@ -324,17 +326,19 @@ fn make_unique_characteristic_name(
                 module.characteristic[*idx].name, characteristic_sym
             ))
         }
-        Some(ItemType::Measurement(_))
-        | Some(ItemType::Instance(_))
-        | Some(ItemType::Blob(_))
-        | Some(ItemType::AxisPts(_)) => {
-            format!("CHARACTERISTIC.{}", cleaned_sym)
+        Some(
+            ItemType::Measurement(_)
+            | ItemType::Instance(_)
+            | ItemType::Blob(_)
+            | ItemType::AxisPts(_),
+        ) => {
+            format!("CHARACTERISTIC.{cleaned_sym}")
         }
         None => cleaned_sym,
     };
     // fail if the name still isn't unique
     if name_map.get(&item_name).is_some() {
-        return Err(format!("CHARACTERISTIC {} already exists.", item_name));
+        return Err(format!("CHARACTERISTIC {item_name} already exists."));
     }
     Ok(item_name)
 }
@@ -343,36 +347,33 @@ fn build_maps(module: &&mut Module) -> (HashMap<String, ItemType>, HashMap<Strin
     let mut name_map = HashMap::<String, ItemType>::new();
     let mut sym_map = HashMap::<String, ItemType>::new();
     for (idx, chr) in module.characteristic.iter().enumerate() {
-        name_map.insert(chr.name.to_owned(), ItemType::Characteristic(idx));
+        name_map.insert(chr.name.clone(), ItemType::Characteristic(idx));
         if let Some(sym_link) = &chr.symbol_link {
-            sym_map.insert(
-                sym_link.symbol_name.to_owned(),
-                ItemType::Characteristic(idx),
-            );
+            sym_map.insert(sym_link.symbol_name.clone(), ItemType::Characteristic(idx));
         }
     }
     for (idx, meas) in module.measurement.iter().enumerate() {
-        name_map.insert(meas.name.to_owned(), ItemType::Measurement(idx));
+        name_map.insert(meas.name.clone(), ItemType::Measurement(idx));
         if let Some(sym_link) = &meas.symbol_link {
-            sym_map.insert(sym_link.symbol_name.to_owned(), ItemType::Measurement(idx));
+            sym_map.insert(sym_link.symbol_name.clone(), ItemType::Measurement(idx));
         }
     }
     for (idx, inst) in module.instance.iter().enumerate() {
-        name_map.insert(inst.name.to_owned(), ItemType::Instance(idx));
+        name_map.insert(inst.name.clone(), ItemType::Instance(idx));
         if let Some(sym_link) = &inst.symbol_link {
-            sym_map.insert(sym_link.symbol_name.to_owned(), ItemType::Instance(idx));
+            sym_map.insert(sym_link.symbol_name.clone(), ItemType::Instance(idx));
         }
     }
     for (idx, blob) in module.blob.iter().enumerate() {
-        name_map.insert(blob.name.to_owned(), ItemType::Blob(idx));
+        name_map.insert(blob.name.clone(), ItemType::Blob(idx));
         if let Some(sym_link) = &blob.symbol_link {
-            sym_map.insert(sym_link.symbol_name.to_owned(), ItemType::Blob(idx));
+            sym_map.insert(sym_link.symbol_name.clone(), ItemType::Blob(idx));
         }
     }
     for (idx, axis_pts) in module.axis_pts.iter().enumerate() {
-        name_map.insert(axis_pts.name.to_owned(), ItemType::AxisPts(idx));
+        name_map.insert(axis_pts.name.clone(), ItemType::AxisPts(idx));
         if let Some(sym_link) = &axis_pts.symbol_link {
-            sym_map.insert(sym_link.symbol_name.to_owned(), ItemType::AxisPts(idx));
+            sym_map.insert(sym_link.symbol_name.clone(), ItemType::AxisPts(idx));
         }
     }
 
@@ -383,8 +384,8 @@ fn build_maps(module: &&mut Module) -> (HashMap<String, ItemType>, HashMap<Strin
 pub(crate) fn insert_many(
     a2l_file: &mut A2lFile,
     debugdata: &DebugData,
-    measurement_ranges: Vec<(u64, u64)>,
-    characteristic_ranges: Vec<(u64, u64)>,
+    measurement_ranges: &[(u64, u64)],
+    characteristic_ranges: &[(u64, u64)],
     measurement_regexes: Vec<&str>,
     characteristic_regexes: Vec<&str>,
     target_group: Option<&str>,
@@ -396,13 +397,13 @@ pub(crate) fn insert_many(
     for expr in measurement_regexes {
         match Regex::new(expr) {
             Ok(compiled_re) => compiled_meas_re.push(compiled_re),
-            Err(error) => println!("Invalid regex \"{}\": {}", expr, error),
+            Err(error) => println!("Invalid regex \"{expr}\": {error}"),
         }
     }
     for expr in characteristic_regexes {
         match Regex::new(expr) {
             Ok(compiled_re) => compiled_char_re.push(compiled_re),
-            Err(error) => println!("Invalid regex \"{}\": {}", expr, error),
+            Err(error) => println!("Invalid regex \"{expr}\": {error}"),
         }
     }
     let module = &mut a2l_file.project.module[0];
@@ -414,24 +415,22 @@ pub(crate) fn insert_many(
 
     for (symbol_name, symbol_type, address) in debugdata.iter() {
         match symbol_type {
-            Some(TypeInfo::Array { .. })
-            | Some(TypeInfo::Struct { .. })
-            | Some(TypeInfo::Union { .. })
-            | Some(TypeInfo::Class { .. }) => {
+            Some(
+                TypeInfo::Array { .. }
+                | TypeInfo::Struct { .. }
+                | TypeInfo::Union { .. }
+                | TypeInfo::Class { .. },
+            ) => {
                 // don't insert complex types directly. Their individual members will be inserted instead
             }
             Some(typeinfo) => {
                 // insert if the address is inside a given range, or if a regex matches the symbol name
-                if is_insert_requested(
-                    address,
-                    &symbol_name,
-                    &measurement_ranges,
-                    &compiled_meas_re,
-                ) {
+                if is_insert_requested(address, &symbol_name, measurement_ranges, &compiled_meas_re)
+                {
                     match insert_measurement_sym(
                         module,
                         &symbol_name,
-                        symbol_name.to_owned(),
+                        symbol_name.clone(),
                         &name_map,
                         &sym_map,
                         typeinfo,
@@ -439,14 +438,13 @@ pub(crate) fn insert_many(
                     ) {
                         Ok(measurement_name) => {
                             log_msgs.push(format!(
-                                "Inserted MEASUREMENT {} (0x{:08x})",
-                                measurement_name, address
+                                "Inserted MEASUREMENT {measurement_name} (0x{address:08x})"
                             ));
                             measurement_list.push(measurement_name);
                             insert_meas_count += 1;
                         }
                         Err(errmsg) => {
-                            log_msgs.push(format!("Skipped: {}", errmsg));
+                            log_msgs.push(format!("Skipped: {errmsg}"));
                         }
                     }
                 }
@@ -455,13 +453,13 @@ pub(crate) fn insert_many(
                 if is_insert_requested(
                     address,
                     &symbol_name,
-                    &characteristic_ranges,
+                    characteristic_ranges,
                     &compiled_char_re,
                 ) {
                     match insert_characteristic_sym(
                         module,
                         &symbol_name,
-                        symbol_name.to_owned(),
+                        symbol_name.clone(),
                         &name_map,
                         &sym_map,
                         typeinfo,
@@ -469,14 +467,13 @@ pub(crate) fn insert_many(
                     ) {
                         Ok(characteristic_name) => {
                             log_msgs.push(format!(
-                                "Inserted CHARACTERISTIC {} (0x{:08x})",
-                                characteristic_name, address
+                                "Inserted CHARACTERISTIC {characteristic_name} (0x{address:08x})"
                             ));
                             characteristic_list.push(characteristic_name);
                             insert_chara_count += 1;
                         }
                         Err(errmsg) => {
-                            log_msgs.push(format!("Skipped: {}", errmsg));
+                            log_msgs.push(format!("Skipped: {errmsg}"));
                         }
                     }
                 }
@@ -492,10 +489,10 @@ pub(crate) fn insert_many(
     }
 
     if insert_meas_count > 0 {
-        log_msgs.push(format!("Inserted {} MEASUREMENTs", insert_meas_count));
+        log_msgs.push(format!("Inserted {insert_meas_count} MEASUREMENTs"));
     }
     if insert_chara_count > 0 {
-        log_msgs.push(format!("Inserted {} CHARACTERISTICs", insert_chara_count));
+        log_msgs.push(format!("Inserted {insert_chara_count} CHARACTERISTICs"));
     }
 }
 
@@ -528,7 +525,7 @@ fn create_or_update_group(
         grp
     } else {
         // create a new group
-        let mut group = Group::new(group_name.to_string(), "".to_string());
+        let mut group = Group::new(group_name.to_string(), String::new());
         // the group is not a sub-group of some other group, so it gets the ROOT attribute
         group.root = Some(Root::new());
         module.group.push(group);
