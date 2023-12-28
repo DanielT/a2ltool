@@ -65,8 +65,7 @@ fn get_type(
             Ok(TypeInfo::Pointer(u64::from(unit.encoding().address_size)))
         }
         gimli::constants::DW_TAG_array_type => {
-            let size = get_byte_size_attribute(entry)
-                .ok_or_else(|| "error decoding array info: missing size attribute".to_string())?;
+            let maybe_size = get_byte_size_attribute(entry);
             let (new_cur_unit, mut new_entries_tree) =
                 get_entries_tree_from_attribute(entry, unit_list, current_unit)?;
             let arraytype = get_type(
@@ -88,17 +87,24 @@ fn get_type(
                 arraytype.get_size()
             };
 
-            let default_ubound = (size / stride) - 1; // subtract 1, because ubound is the last element, not the size
+            let default_ubound = maybe_size.map(|s| s / stride - 1); // subtract 1, because ubound is the last element, not the size
 
             // the child entries of the DW_TAG_array_type entry give the array dimensions
             let mut iter = entries_tree_node.children();
             while let Ok(Some(child_node)) = iter.next() {
                 let child_entry = child_node.entry();
                 if child_entry.tag() == gimli::constants::DW_TAG_subrange_type {
-                    let ubound = get_upper_bound_attribute(child_entry).unwrap_or(default_ubound);
+                    let ubound = get_upper_bound_attribute(child_entry)
+                        .or(default_ubound)
+                        .ok_or_else(|| {
+                            "error decoding array info: neither size nor ubound available".to_string()
+                        })?;
                     dim.push(ubound + 1);
                 }
             }
+
+            // Use parsed size or determine the size from the array dimensions
+            let size = maybe_size.unwrap_or_else(|| dim.iter().fold(1, |acc, num| acc * num));
             Ok(TypeInfo::Array {
                 dim,
                 arraytype: Box::new(arraytype),
