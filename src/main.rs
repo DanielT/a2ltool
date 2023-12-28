@@ -398,7 +398,7 @@ fn core() -> Result<(), String> {
         a2l_file.sort_new_items();
         if let Some(out_filename) = arg_matches.get_one::<OsString>("OUTPUT") {
             let banner = &*format!("a2ltool {}", env!("CARGO_PKG_VERSION"));
-            a2l_file.write(out_filename, Some(banner))?;
+            a2l_file.write(out_filename, Some(banner)).map_err(|err| err.to_string())?;
             cond_print!(
                 verbose,
                 now,
