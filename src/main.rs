@@ -10,7 +10,18 @@ mod ifdata;
 mod insert;
 mod symbol;
 mod update;
+mod version;
 mod xcp;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum A2lVersion {
+    V1_5_0,
+    V1_5_1,
+    V1_6_0,
+    V1_6_1,
+    V1_7_0,
+    V1_7_1,
+}
 
 macro_rules! cond_print {
     ($verbose:ident, $now:ident, $formatexp:expr) => {
@@ -149,6 +160,11 @@ fn core() -> Result<(), String> {
                 )
             );
         }
+    }
+
+    // convert/downgrade the file to some version
+    if let Some(new_a2l_version) = arg_matches.get_one::<A2lVersion>("A2LVERSION") {
+        version::convert(&mut a2l_file, *new_a2l_version);
     }
 
     // load elf
@@ -398,7 +414,9 @@ fn core() -> Result<(), String> {
         a2l_file.sort_new_items();
         if let Some(out_filename) = arg_matches.get_one::<OsString>("OUTPUT") {
             let banner = &*format!("a2ltool {}", env!("CARGO_PKG_VERSION"));
-            a2l_file.write(out_filename, Some(banner)).map_err(|err| err.to_string())?;
+            a2l_file
+                .write(out_filename, Some(banner))
+                .map_err(|err| err.to_string())?;
             cond_print!(
                 verbose,
                 now,
@@ -526,6 +544,7 @@ fn get_args() -> ArgMatches {
     )
     .arg(Arg::new("CLEANUP")
         .help("Remove empty or unreferenced items")
+        .short('c')
         .long("cleanup")
         .number_of_values(0)
         .action(clap::ArgAction::SetTrue)
@@ -571,6 +590,14 @@ fn get_args() -> ArgMatches {
         .number_of_values(0)
         .action(clap::ArgAction::SetTrue)
         .requires("ELFFILE")
+    )
+    .arg(Arg::new("A2LVERSION")
+        .help("Convert the input file to the given version (e.g. \"1.5.1\", \"1.6.0\", etc.). This is a lossy operation, which deletes incompatible information.")
+        .short('a')
+        .long("a2lversion")
+        .number_of_values(1)
+        .value_name("A2L_VERSION")
+        .value_parser(A2lVersionParser)
     )
     .arg(Arg::new("OUTPUT")
         .help("Write to the given output file. If this flag is not present, no output will be written.")
@@ -619,6 +646,7 @@ fn get_args() -> ArgMatches {
     )
     .arg(Arg::new("INSERT_CHARACTERISTIC")
         .help("Insert a CHARACTERISTIC based on a variable in the elf file. The variable name can be complex, e.g. var.element[0].subelement")
+        .short('C')
         .long("characteristic")
         .aliases(["insert-characteristic"])
         .number_of_values(1)
@@ -647,6 +675,7 @@ fn get_args() -> ArgMatches {
     )
     .arg(Arg::new("INSERT_MEASUREMENT")
         .help("Insert a MEASUREMENT based on a variable in the elf file. The variable name can be complex, e.g. var.element[0].subelement")
+        .short('M')
         .long("measurement")
         .aliases(["insert-measurement"])
         .number_of_values(1)
@@ -747,5 +776,45 @@ impl clap::builder::TypedValueParser for AddressValueParser {
             clap::error::ContextValue::String(String::from(strval)),
         );
         Err(err)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct A2lVersionParser;
+
+impl clap::builder::TypedValueParser for A2lVersionParser {
+    type Value = A2lVersion;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        let value_str = value.to_string_lossy();
+        match &*value_str {
+            "1.50" | "1.5.0" => Ok(A2lVersion::V1_5_0),
+            "1.51" | "1.5.1" => Ok(A2lVersion::V1_5_1),
+            "1.60" | "1.6.0" => Ok(A2lVersion::V1_6_0),
+            "1.61" | "1.6.1" => Ok(A2lVersion::V1_6_1),
+            "1.70" | "1.7.0" => Ok(A2lVersion::V1_7_0),
+            "1.71" | "1.7.1" => Ok(A2lVersion::V1_7_1),
+            _ => {
+                let mut err =
+                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                if let Some(arg) = arg {
+                    err.insert(
+                        clap::error::ContextKind::InvalidArg,
+                        clap::error::ContextValue::String(arg.to_string()),
+                    );
+                }
+                let strval = value.to_string_lossy();
+                err.insert(
+                    clap::error::ContextKind::InvalidValue,
+                    clap::error::ContextValue::String(String::from(strval)),
+                );
+                Err(err)
+            }
+        }
     }
 }
