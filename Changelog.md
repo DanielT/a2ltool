@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 1.6.0
+
+- Upgrade to a2lfile version 1.5.0
+  - Ensure that the components of a RECORD_LAYOUT are written in the correct order
+  - fix the definitions if the OVERWRITE and REF_MEMORY_SEGMENT elements
+  - be more strict about a2l versions, and reject unknown ones
+  - improved error handling for invalid identifiers
+- Bugfix: handle inherited members of C++ classes correctly
+- Correctly read array information from the DWARF debug data even if it does not have a size attribute
+  Contributed by @oleid
+- reduce clap and regex versions in order to be compatible with rustc 1.63 on Debian stable
+  Contributed by @oleid
+- add an option to change the a2l file version. This option deletes any elements that are unsupported in the target version.
+
 ## Version 1.5.0
 
 Upgrade to the a2lfile crate version 1.4.0
