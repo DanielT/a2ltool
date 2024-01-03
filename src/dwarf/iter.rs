@@ -196,6 +196,7 @@ impl<'a> Iterator for VariablesIterator<'a> {
                     self.type_iter = Some(TypeInfoIter::new(ti));
                 } else {
                     self.type_iter = None;
+                    self.current_var = self.var_iter.next();
                 }
                 Some((varname.to_string(), typeinfo, *address))
             } else {
@@ -288,6 +289,14 @@ fn test_varinfo_iter() {
             typeref: 1,
         },
     );
+    variables.insert(
+        "var_d_wo_type_info".to_string(),
+        VarInfo {
+            address: 4,
+            typeref: 404, // some number with no correspondence in the types hash map
+        },
+    );
+
     let mut types = HashMap::<usize, TypeInfo>::new();
     let mut structmembers: HashMap<String, (TypeInfo, u64)> = HashMap::new();
     structmembers.insert("member_1".to_string(), (TypeInfo::Uint8, 0));
@@ -309,5 +318,5 @@ fn test_varinfo_iter() {
     for item in iter {
         println!("{}", item.0);
     }
-    assert_eq!(VariablesIterator::new(&debugdata).count(), 5);
+    assert_eq!(VariablesIterator::new(&debugdata).count(), 6);
 }
