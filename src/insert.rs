@@ -171,7 +171,6 @@ fn insert_characteristic_sym(
     address: u64,
 ) -> Result<String, String> {
     let item_name = make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map)?;
-    println!("insert_characteristic_sym: characteristic_sym:{characteristic_sym}, true_name:{true_name}, item_name:{item_name}");
 
     let datatype = get_a2l_datatype(typeinfo);
     let recordlayout_name = format!("__{datatype}_Z");
