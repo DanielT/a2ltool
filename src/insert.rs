@@ -115,7 +115,7 @@ fn insert_measurement_sym(
         lower_limit,
         upper_limit,
     );
-    // create an ECU_ADDRESS attribute, and set it tot hex display mode
+    // create an ECU_ADDRESS attribute, and set it to hex display mode
     let mut ecu_address = EcuAddress::new(address as u32);
     ecu_address.get_layout_mut().item_location.0 .1 = true;
     new_measurement.ecu_address = Some(ecu_address);
@@ -422,7 +422,10 @@ pub(crate) fn insert_many(
             ) => {
                 // don't insert complex types directly. Their individual members will be inserted instead
             }
-            Some(typeinfo) => {
+            _ => {
+                // get the type of the symbol, or default to uint8 if no type could be loaded for this symbol
+                let typeinfo = symbol_type.unwrap_or(&TypeInfo::Uint8);
+
                 // insert if the address is inside a given range, or if a regex matches the symbol name
                 if is_insert_requested(address, &symbol_name, measurement_ranges, &compiled_meas_re)
                 {
@@ -476,9 +479,6 @@ pub(crate) fn insert_many(
                         }
                     }
                 }
-            }
-            None => {
-                // no type info, can't insert this symbol
             }
         }
     }
