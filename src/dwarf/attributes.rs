@@ -1,5 +1,5 @@
-use super::UnitList;
-use gimli::{DebuggingInformationEntry, EndianSlice, RunTimeEndian, UnitHeader};
+use super::{DebugDataReader, UnitList};
+use gimli::{DebugAddrBase, DebuggingInformationEntry, EndianSlice, RunTimeEndian, UnitHeader};
 
 type SliceType<'a> = EndianSlice<'a, RunTimeEndian>;
 type OptionalAttribute<'data> = Option<gimli::AttributeValue<SliceType<'data>>>;
@@ -16,6 +16,7 @@ pub(crate) fn get_attr_value<'unit>(
 pub(crate) fn get_name_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
     dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
+    unit_header: &gimli::UnitHeader<EndianSlice<RunTimeEndian>>,
 ) -> Result<String, String> {
     let name_attr = get_attr_value(entry, gimli::constants::DW_AT_name)
         .ok_or_else(|| "failed to get name attribute".to_string())?;
@@ -29,6 +30,23 @@ pub(crate) fn get_name_attribute(
         }
         gimli::AttributeValue::DebugStrRef(str_offset) => {
             match dwarf.debug_str.get_str(str_offset) {
+                Ok(slice) => {
+                    if let Ok(utf8string) = slice.to_string() {
+                        // could not demangle, but successfully converted the slice to utf8
+                        return Ok(utf8string.to_owned());
+                    }
+                    Err(format!("could not decode {slice:#?} as a utf-8 string"))
+                }
+                Err(err) => Err(err.to_string()),
+            }
+        }
+        gimli::AttributeValue::DebugStrOffsetsIndex(index) => {
+            let unit = dwarf.unit(*unit_header).unwrap();
+            let offset = dwarf
+                .debug_str_offsets
+                .get_str_offset(unit.encoding().format, unit.str_offsets_base, index)
+                .unwrap();
+            match dwarf.debug_str.get_str(offset) {
                 Ok(slice) => {
                     if let Ok(utf8string) = slice.to_string() {
                         // could not demangle, but successfully converted the slice to utf8
@@ -61,7 +79,7 @@ pub(crate) fn get_typeref_attribute(
             // silently ignore references to the .debug_types section
             // this is unlikely to matter as few compilers ever bothered with .debug_types
             // (for example gcc supports this, but support is only enabled if the user requests this explicitly)
-            Err("unsupported referene to a .debug_types entry (Dwarf 4)".to_string())
+            Err("unsupported reference to a .debug_types entry (Dwarf 4)".to_string())
         }
         _ => Err(format!("unsupported type reference: {type_attr:#?}")),
     }
@@ -71,12 +89,14 @@ pub(crate) fn get_typeref_attribute(
 // The DW_AT_location contains an Exprloc expression that allows the address to be calculated
 // in complex ways, so the expression must be evaluated in order to get the address
 pub(crate) fn get_location_attribute(
+    debug_data_reader: &DebugDataReader,
     entry: &DebuggingInformationEntry<SliceType, usize>,
     encoding: gimli::Encoding,
+    current_unit: usize,
 ) -> Option<u64> {
     let loc_attr = get_attr_value(entry, gimli::constants::DW_AT_location)?;
     if let gimli::AttributeValue::Exprloc(expression) = loc_attr {
-        evaluate_exprloc(expression, encoding)
+        evaluate_exprloc(debug_data_reader, expression, encoding, current_unit)
     } else {
         None
     }
@@ -84,12 +104,16 @@ pub(crate) fn get_location_attribute(
 
 // get the address offset of a struct member from a DW_AT_data_member_location attribute
 pub(crate) fn get_data_member_location_attribute(
+    debug_data_reader: &DebugDataReader,
     entry: &DebuggingInformationEntry<SliceType, usize>,
     encoding: gimli::Encoding,
+    current_unit: usize,
 ) -> Option<u64> {
     let loc_attr = get_attr_value(entry, gimli::constants::DW_AT_data_member_location)?;
     match loc_attr {
-        gimli::AttributeValue::Exprloc(expression) => evaluate_exprloc(expression, encoding),
+        gimli::AttributeValue::Exprloc(expression) => {
+            evaluate_exprloc(debug_data_reader, expression, encoding, current_unit)
+        }
         gimli::AttributeValue::Udata(val) => Some(val),
         other => {
             println!("unexpected data_member_location attribute: {other:?}");
@@ -172,25 +196,47 @@ pub(crate) fn get_bit_size_attribute(
     }
 }
 
-// get the bit offset of a variable from the DW_AT_data_bit_offset attribute
+// get the bit offset of a variable from the DW_AT_bit_offset attribute
 // this attribute is only present if the variable is in a bitfield
 pub(crate) fn get_bit_offset_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
 ) -> Option<u64> {
     if let Some(data_bit_offset_attr) =
-        get_attr_value(entry, gimli::constants::DW_AT_data_bit_offset)
-    {
-        // DW_AT_data_bit_offset: Dwarf 4 and following
-        if let gimli::AttributeValue::Udata(bit_offset) = data_bit_offset_attr {
-            Some(bit_offset)
-        } else {
-            None
-        }
-    } else if let Some(gimli::AttributeValue::Udata(bit_offset)) =
         get_attr_value(entry, gimli::constants::DW_AT_bit_offset)
     {
         // DW_AT_bit_offset: up to Dwarf 3
-        Some(bit_offset)
+        // DW_AT_data_bit_offset: Dwarf 4 and following
+        match data_bit_offset_attr {
+            gimli::AttributeValue::Udata(bit_offset) => Some(bit_offset),
+            gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as u64),
+            gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as u64),
+            gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as u64),
+            gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset),
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
+// get the bit offset of a variable from the DW_AT_data_bit_offset attribute
+// this attribute is only present if the variable is in a bitfield
+pub(crate) fn get_data_bit_offset_attribute(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+) -> Option<u64> {
+    if let Some(data_bit_offset_attr) =
+        get_attr_value(entry, gimli::constants::DW_AT_data_bit_offset)
+    {
+        // DW_AT_bit_offset: up to Dwarf 3
+        // DW_AT_data_bit_offset: Dwarf 4 and following
+        match data_bit_offset_attr {
+            gimli::AttributeValue::Udata(bit_offset) => Some(bit_offset),
+            gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as u64),
+            gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as u64),
+            gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as u64),
+            gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset),
+            _ => None,
+        }
     } else {
         None
     }
@@ -238,10 +284,22 @@ pub(crate) fn get_abstract_origin_attribute<'data, 'abbrev, 'unit>(
     }
 }
 
+pub(crate) fn get_addr_base_attribute(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+) -> Option<DebugAddrBase> {
+    let origin_attr = get_attr_value(entry, gimli::constants::DW_AT_addr_base)?;
+    match origin_attr {
+        gimli::AttributeValue::DebugAddrBase(addr_base) => Some(addr_base),
+        _ => None,
+    }
+}
+
 // evaluate an exprloc expression to get a variable address or struct member offset
 fn evaluate_exprloc(
+    debug_data_reader: &DebugDataReader,
     expression: gimli::Expression<EndianSlice<RunTimeEndian>>,
     encoding: gimli::Encoding,
+    current_unit: usize,
 ) -> Option<u64> {
     let mut evaluation = expression.evaluation(encoding);
     evaluation.set_object_address(0);
@@ -264,6 +322,19 @@ fn evaluate_exprloc(
                 // this means it cannot be referenced at a unique global address and is not suitable for use in a2l
                 return None;
             }
+            gimli::EvaluationResult::RequiresIndexedAddress { index, .. } => {
+                let (unit_header, abbrev) = &debug_data_reader.units[current_unit];
+                let address_size = unit_header.address_size();
+                let mut entries = unit_header.entries(abbrev);
+                let (_, entry) = entries.next_dfs().ok()??;
+                let base = get_addr_base_attribute(entry)?;
+                let addr = debug_data_reader
+                    .dwarf
+                    .debug_addr
+                    .get_address(address_size, base, index)
+                    .ok()?;
+                eval_result = evaluation.resume_with_indexed_address(addr).unwrap();
+            }
             _other => {
                 // there are a lot of other types of address expressions that can only be evaluated by a debugger while a program is running
                 // none of these can be handled in the a2lfile use-case.
@@ -285,34 +356,22 @@ fn evaluate_exprloc(
 
 // get a DW_AT_type attribute and return the number of the unit in which the type is located
 // as well as an entries_tree iterator that can iterate over the DIEs of the type
-pub(crate) fn get_entries_tree_from_attribute<'input, 'b>(
+pub(crate) fn get_type_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
-    unit_list: &'b UnitList<'input>,
+    unit_list: &UnitList<'_>,
     current_unit: usize,
-) -> Result<
-    (
-        usize,
-        gimli::EntriesTree<'b, 'b, EndianSlice<'input, RunTimeEndian>>,
-    ),
-    String,
-> {
+) -> Result<(usize, gimli::UnitOffset), String> {
     match get_attr_value(entry, gimli::constants::DW_AT_type) {
         Some(gimli::AttributeValue::DebugInfoRef(dbginfo_offset)) => {
             if let Some(unit_idx) = unit_list.get_unit(dbginfo_offset.0) {
-                let (unit, abbrev) = &unit_list[unit_idx];
+                let (unit, _) = &unit_list[unit_idx];
                 let unit_offset = dbginfo_offset.to_unit_offset(unit).unwrap();
-                if let Ok(entries_tree) = unit.entries_tree(abbrev, Some(unit_offset)) {
-                    return Ok((current_unit, entries_tree));
-                }
+                Ok((unit_idx, unit_offset))
+            } else {
+                Err("invalid debug info ref".to_string())
             }
         }
-        Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
-            let (unit, abbrev) = &unit_list[current_unit];
-            if let Ok(entries_tree) = unit.entries_tree(abbrev, Some(unit_offset)) {
-                return Ok((current_unit, entries_tree));
-            }
-        }
-        _ => {}
+        Some(gimli::AttributeValue::UnitRef(unit_offset)) => Ok((current_unit, unit_offset)),
+        _ => Err("failed to get DIE tree".to_string()),
     }
-    Err("failed to get DIE tree".to_string())
 }

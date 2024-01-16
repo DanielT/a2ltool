@@ -191,9 +191,9 @@ fn set_measurement_ecu_address(opt_ecu_address: &mut Option<EcuAddress>, address
     }
 }
 
-// A MEASUREMENT object contains a BITMASK for bitfield elements
+// CHARACTERISTIC and MEASUREMENT objects contain a BIT_MASK for bitfield elements
 // it will be created/updated/deleted here, depending on the new data type of the variable
-fn set_measurement_bitmask(opt_bitmask: &mut Option<BitMask>, datatype: &TypeInfo) {
+fn set_bitmask(opt_bitmask: &mut Option<BitMask>, datatype: &TypeInfo) {
     if let TypeInfo::Bitfield {
         bit_offset,
         bit_size,

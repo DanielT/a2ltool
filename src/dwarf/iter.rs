@@ -9,7 +9,7 @@ use std::collections::HashMap;
 pub(crate) enum TypeInfoIter<'a> {
     NotIterable,
     StructLike {
-        struct_iter: std::collections::hash_map::Iter<'a, String, (TypeInfo, u64)>,
+        struct_iter: indexmap::map::Iter<'a, String, (TypeInfo, u64)>,
         current_member: Option<(&'a String, &'a (TypeInfo, u64))>,
         member_iter: Option<Box<TypeInfoIter<'a>>>,
     },
@@ -25,7 +25,7 @@ pub(crate) enum TypeInfoIter<'a> {
 
 pub(crate) struct VariablesIterator<'a> {
     debugdata: &'a DebugData,
-    var_iter: std::collections::hash_map::Iter<'a, String, VarInfo>,
+    var_iter: indexmap::map::Iter<'a, String, VarInfo>,
     current_var: Option<(&'a String, &'a VarInfo)>,
     type_iter: Option<TypeInfoIter<'a>>,
 }
@@ -223,100 +223,106 @@ impl<'a> Iterator for VariablesIterator<'a> {
     }
 }
 
-#[test]
-fn test_typeinfo_iter() {
-    // basic types, e.g. Sint<x> and Uint<x> cannot be iterated over
-    // a TypeInfoIter for these immediately returns None
-    let typeinfo = TypeInfo::Sint16;
-    let mut iter = TypeInfoIter::new(&typeinfo);
-    let result = iter.next();
-    assert!(result.is_none());
+#[cfg(test)]
+mod test {
+    use super::*;
+    use indexmap::IndexMap;
 
-    // a struct iterates over all of its members
-    let mut structmembers_a: HashMap<String, (TypeInfo, u64)> = HashMap::new();
-    structmembers_a.insert("structmember_1".to_string(), (TypeInfo::Uint64, 0));
-    structmembers_a.insert("structmember_2".to_string(), (TypeInfo::Uint64, 0));
-    structmembers_a.insert("structmember_3".to_string(), (TypeInfo::Uint64, 0));
-    structmembers_a.insert("structmember_4".to_string(), (TypeInfo::Uint64, 0));
-    structmembers_a.insert("structmember_5".to_string(), (TypeInfo::Uint64, 0));
-    let typeinfo_inner_1 = TypeInfo::Struct {
-        size: 64,
-        members: structmembers_a,
-    };
-    let mut structmembers_b: HashMap<String, (TypeInfo, u64)> = HashMap::new();
-    structmembers_b.insert("foobar_1".to_string(), (TypeInfo::Sint8, 0));
-    structmembers_b.insert("foobar_2".to_string(), (TypeInfo::Sint8, 0));
-    structmembers_b.insert("foobar_3".to_string(), (TypeInfo::Sint8, 0));
-    let typeinfo_inner_2 = TypeInfo::Struct {
-        size: 64,
-        members: structmembers_b,
-    };
-    let mut structmembers: HashMap<String, (TypeInfo, u64)> = HashMap::new();
-    structmembers.insert("inner_a".to_string(), (typeinfo_inner_1, 0));
-    structmembers.insert("inner_b".to_string(), (typeinfo_inner_2, 0));
-    let typeinfo = TypeInfo::Struct {
-        size: 64,
-        members: structmembers,
-    };
-    // for (displaystring, element_type, offset) in TypeInfoIter::new(&typeinfo) {
-    //     println!("name: {}, \toffset: {}", displaystring, offset);
-    // }
-    let iter = TypeInfoIter::new(&typeinfo);
-    assert_eq!(iter.count(), 10);
-}
+    #[test]
+    fn test_typeinfo_iter() {
+        // basic types, e.g. Sint<x> and Uint<x> cannot be iterated over
+        // a TypeInfoIter for these immediately returns None
+        let typeinfo = TypeInfo::Sint16;
+        let mut iter = TypeInfoIter::new(&typeinfo);
+        let result = iter.next();
+        assert!(result.is_none());
 
-#[test]
-fn test_varinfo_iter() {
-    let mut variables = HashMap::<String, VarInfo>::new();
-    variables.insert(
-        "var_a".to_string(),
-        VarInfo {
-            address: 1,
-            typeref: 0,
-        },
-    );
-    variables.insert(
-        "var_b".to_string(),
-        VarInfo {
-            address: 2,
-            typeref: 0,
-        },
-    );
-    variables.insert(
-        "var_c".to_string(),
-        VarInfo {
-            address: 3,
-            typeref: 1,
-        },
-    );
-    variables.insert(
-        "var_d_wo_type_info".to_string(),
-        VarInfo {
-            address: 4,
-            typeref: 404, // some number with no correspondence in the types hash map
-        },
-    );
-
-    let mut types = HashMap::<usize, TypeInfo>::new();
-    let mut structmembers: HashMap<String, (TypeInfo, u64)> = HashMap::new();
-    structmembers.insert("member_1".to_string(), (TypeInfo::Uint8, 0));
-    structmembers.insert("member_2".to_string(), (TypeInfo::Uint8, 1));
-    let structtype = TypeInfo::Struct {
-        size: 64,
-        members: structmembers,
-    };
-    types.insert(0, TypeInfo::Uint8);
-    types.insert(1, structtype);
-    let demangled_names = HashMap::new();
-    let debugdata = DebugData {
-        variables,
-        types,
-        demangled_names,
-    };
-
-    let iter = VariablesIterator::new(&debugdata);
-    for item in iter {
-        println!("{}", item.0);
+        // a struct iterates over all of its members
+        let mut structmembers_a: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
+        structmembers_a.insert("structmember_1".to_string(), (TypeInfo::Uint64, 0));
+        structmembers_a.insert("structmember_2".to_string(), (TypeInfo::Uint64, 0));
+        structmembers_a.insert("structmember_3".to_string(), (TypeInfo::Uint64, 0));
+        structmembers_a.insert("structmember_4".to_string(), (TypeInfo::Uint64, 0));
+        structmembers_a.insert("structmember_5".to_string(), (TypeInfo::Uint64, 0));
+        let typeinfo_inner_1 = TypeInfo::Struct {
+            size: 64,
+            members: structmembers_a,
+        };
+        let mut structmembers_b: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
+        structmembers_b.insert("foobar_1".to_string(), (TypeInfo::Sint8, 0));
+        structmembers_b.insert("foobar_2".to_string(), (TypeInfo::Sint8, 0));
+        structmembers_b.insert("foobar_3".to_string(), (TypeInfo::Sint8, 0));
+        let typeinfo_inner_2 = TypeInfo::Struct {
+            size: 64,
+            members: structmembers_b,
+        };
+        let mut structmembers: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
+        structmembers.insert("inner_a".to_string(), (typeinfo_inner_1, 0));
+        structmembers.insert("inner_b".to_string(), (typeinfo_inner_2, 0));
+        let typeinfo = TypeInfo::Struct {
+            size: 64,
+            members: structmembers,
+        };
+        // for (displaystring, element_type, offset) in TypeInfoIter::new(&typeinfo) {
+        //     println!("name: {}, \toffset: {}", displaystring, offset);
+        // }
+        let iter = TypeInfoIter::new(&typeinfo);
+        assert_eq!(iter.count(), 10);
     }
-    assert_eq!(VariablesIterator::new(&debugdata).count(), 6);
+
+    #[test]
+    fn test_varinfo_iter() {
+        let mut variables = IndexMap::<String, VarInfo>::new();
+        variables.insert(
+            "var_a".to_string(),
+            VarInfo {
+                address: 1,
+                typeref: 0,
+            },
+        );
+        variables.insert(
+            "var_b".to_string(),
+            VarInfo {
+                address: 2,
+                typeref: 0,
+            },
+        );
+        variables.insert(
+            "var_c".to_string(),
+            VarInfo {
+                address: 3,
+                typeref: 1,
+            },
+        );
+        variables.insert(
+            "var_d_wo_type_info".to_string(),
+            VarInfo {
+                address: 4,
+                typeref: 404, // some number with no correspondence in the types hash map
+            },
+        );
+
+        let mut types = HashMap::<usize, TypeInfo>::new();
+        let mut structmembers: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
+        structmembers.insert("member_1".to_string(), (TypeInfo::Uint8, 0));
+        structmembers.insert("member_2".to_string(), (TypeInfo::Uint8, 1));
+        let structtype = TypeInfo::Struct {
+            size: 64,
+            members: structmembers,
+        };
+        types.insert(0, TypeInfo::Uint8);
+        types.insert(1, structtype);
+        let demangled_names = HashMap::new();
+        let debugdata = DebugData {
+            variables,
+            types,
+            demangled_names,
+        };
+
+        let iter = VariablesIterator::new(&debugdata);
+        for item in iter {
+            println!("{}", item.0);
+        }
+        assert_eq!(VariablesIterator::new(&debugdata).count(), 6);
+    }
 }

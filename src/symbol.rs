@@ -202,114 +202,120 @@ fn get_index(idxstr: &str) -> Option<usize> {
     }
 }
 
-#[test]
-fn test_split_symbol_components() {
-    let result = split_symbol_components("my_struct.array_field[5][1]");
-    assert_eq!(result.len(), 4);
-    assert_eq!(result[0], "my_struct");
-    assert_eq!(result[1], "array_field");
-    assert_eq!(result[2], "[5]");
-    assert_eq!(result[3], "[1]");
+#[cfg(test)]
+mod test {
+    use super::*;
+    use indexmap::IndexMap;
 
-    let result2 = split_symbol_components("my_struct.array_field._5_._1_");
-    assert_eq!(result2.len(), 4);
-    assert_eq!(result2[0], "my_struct");
-    assert_eq!(result2[1], "array_field");
-    assert_eq!(result2[2], "_5_");
-    assert_eq!(result2[3], "_1_");
-}
+    #[test]
+    fn test_split_symbol_components() {
+        let result = split_symbol_components("my_struct.array_field[5][1]");
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0], "my_struct");
+        assert_eq!(result[1], "array_field");
+        assert_eq!(result[2], "[5]");
+        assert_eq!(result[3], "[1]");
 
-#[test]
-fn test_find_symbol_of_array() {
-    let mut dbgdata = DebugData {
-        types: HashMap::new(),
-        variables: HashMap::new(),
-        demangled_names: HashMap::new(),
-    };
-    // global variable: uint32_t my_array[2]
-    dbgdata.variables.insert(
-        "my_array".to_string(),
-        crate::dwarf::VarInfo {
-            address: 0x1234,
-            typeref: 1,
-        },
-    );
-    dbgdata.types.insert(
-        1,
-        TypeInfo::Array {
-            arraytype: Box::new(TypeInfo::Uint32),
-            dim: vec![2],
-            size: 8, // total size of the array
-            stride: 4,
-        },
-    );
+        let result2 = split_symbol_components("my_struct.array_field._5_._1_");
+        assert_eq!(result2.len(), 4);
+        assert_eq!(result2[0], "my_struct");
+        assert_eq!(result2[1], "array_field");
+        assert_eq!(result2[2], "_5_");
+        assert_eq!(result2[3], "_1_");
+    }
 
-    // try the different array indexing notations
-    let result1 = find_symbol("my_array._0_", &dbgdata);
-    assert!(result1.is_ok());
-    // C-style notation is only allowed starting with ASAP2 version 1.7, before that the '[' and ']' are not allowed in names
-    let result2 = find_symbol("my_array[0]", &dbgdata);
-    assert!(result2.is_ok());
-
-    // it should also be possible to get a typeref for the entire array
-    let result3 = find_symbol("my_array", &dbgdata);
-    assert!(result3.is_ok());
-
-    // there should not be a result if the symbol name contains extra unmatched components
-    let result4 = find_symbol("my_array._0_.lalala", &dbgdata);
-    assert!(result4.is_err());
-    // going past the end of the array is also not permitted
-    let result5 = find_symbol("my_array._2_", &dbgdata);
-    assert!(result5.is_err());
-}
-
-#[test]
-fn test_find_symbol_of_array_in_struct() {
-    let mut dbgdata = DebugData {
-        types: HashMap::new(),
-        variables: HashMap::new(),
-        demangled_names: HashMap::new(),
-    };
-    // global variable defined in C like this:
-    // struct {
-    //        uint32_t array_item[2];
-    // } my_struct;
-    let mut structmembers: HashMap<String, (TypeInfo, u64)> = HashMap::new();
-    structmembers.insert(
-        "array_item".to_string(),
-        (
+    #[test]
+    fn test_find_symbol_of_array() {
+        let mut dbgdata = DebugData {
+            types: HashMap::new(),
+            variables: IndexMap::new(),
+            demangled_names: HashMap::new(),
+        };
+        // global variable: uint32_t my_array[2]
+        dbgdata.variables.insert(
+            "my_array".to_string(),
+            crate::dwarf::VarInfo {
+                address: 0x1234,
+                typeref: 1,
+            },
+        );
+        dbgdata.types.insert(
+            1,
             TypeInfo::Array {
                 arraytype: Box::new(TypeInfo::Uint32),
                 dim: vec![2],
-                size: 8,
+                size: 8, // total size of the array
                 stride: 4,
             },
-            0,
-        ),
-    );
-    dbgdata.variables.insert(
-        "my_struct".to_string(),
-        crate::dwarf::VarInfo {
-            address: 0xcafe00,
-            typeref: 2,
-        },
-    );
-    dbgdata.types.insert(
-        2,
-        TypeInfo::Struct {
-            members: structmembers,
-            size: 4,
-        },
-    );
+        );
 
-    // try the different array indexing notations
-    let result1 = find_symbol("my_struct.array_item._0_", &dbgdata);
-    assert!(result1.is_ok());
-    // C-style notation is only allowed starting with ASAP2 version 1.7, before that the '[' and ']' are not allowed in names
-    let result2 = find_symbol("my_struct.array_item[0]", &dbgdata);
-    assert!(result2.is_ok());
+        // try the different array indexing notations
+        let result1 = find_symbol("my_array._0_", &dbgdata);
+        assert!(result1.is_ok());
+        // C-style notation is only allowed starting with ASAP2 version 1.7, before that the '[' and ']' are not allowed in names
+        let result2 = find_symbol("my_array[0]", &dbgdata);
+        assert!(result2.is_ok());
 
-    // theres should not be a result if the symbol name contains extra unmatched components
-    let result3 = find_symbol("my_struct.array_item._0_.extra.unused", &dbgdata);
-    assert!(result3.is_err());
+        // it should also be possible to get a typeref for the entire array
+        let result3 = find_symbol("my_array", &dbgdata);
+        assert!(result3.is_ok());
+
+        // there should not be a result if the symbol name contains extra unmatched components
+        let result4 = find_symbol("my_array._0_.lalala", &dbgdata);
+        assert!(result4.is_err());
+        // going past the end of the array is also not permitted
+        let result5 = find_symbol("my_array._2_", &dbgdata);
+        assert!(result5.is_err());
+    }
+
+    #[test]
+    fn test_find_symbol_of_array_in_struct() {
+        let mut dbgdata = DebugData {
+            types: HashMap::new(),
+            variables: IndexMap::new(),
+            demangled_names: HashMap::new(),
+        };
+        // global variable defined in C like this:
+        // struct {
+        //        uint32_t array_item[2];
+        // } my_struct;
+        let mut structmembers: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
+        structmembers.insert(
+            "array_item".to_string(),
+            (
+                TypeInfo::Array {
+                    arraytype: Box::new(TypeInfo::Uint32),
+                    dim: vec![2],
+                    size: 8,
+                    stride: 4,
+                },
+                0,
+            ),
+        );
+        dbgdata.variables.insert(
+            "my_struct".to_string(),
+            crate::dwarf::VarInfo {
+                address: 0xcafe00,
+                typeref: 2,
+            },
+        );
+        dbgdata.types.insert(
+            2,
+            TypeInfo::Struct {
+                members: structmembers,
+                size: 4,
+            },
+        );
+
+        // try the different array indexing notations
+        let result1 = find_symbol("my_struct.array_item._0_", &dbgdata);
+        assert!(result1.is_ok());
+        // C-style notation is only allowed starting with ASAP2 version 1.7, before that the '[' and ']' are not allowed in names
+        let result2 = find_symbol("my_struct.array_item[0]", &dbgdata);
+        assert!(result2.is_ok());
+
+        // theres should not be a result if the symbol name contains extra unmatched components
+        let result3 = find_symbol("my_struct.array_item._0_.extra.unused", &dbgdata);
+        assert!(result3.is_err());
+    }
 }

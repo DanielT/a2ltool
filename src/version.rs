@@ -60,8 +60,8 @@ pub fn convert(a2l_file: &mut A2lFile, new_version: A2lVersion) {
 // =================== 1.61 -> 1.51 ================================
 
 fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
-    for module in a2l_file.project.module.iter_mut() {
-        for axis_pts in module.axis_pts.iter_mut() {
+    for module in &mut a2l_file.project.module {
+        for axis_pts in &mut module.axis_pts {
             if axis_pts.monotony.is_some() {
                 match axis_pts.monotony.as_ref().unwrap().monotony {
                     a2lfile::MonotonyType::Monotonous
@@ -77,8 +77,8 @@ fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
             ch.characteristic_type != CharacteristicType::Cube4
                 && ch.characteristic_type != CharacteristicType::Cube5
         });
-        for characteristic in module.characteristic.iter_mut() {
-            for axis_descr in characteristic.axis_descr.iter_mut() {
+        for characteristic in &mut module.characteristic {
+            for axis_descr in &mut characteristic.axis_descr {
                 if axis_descr.monotony.is_some() {
                     match axis_descr.monotony.as_ref().unwrap().monotony {
                         a2lfile::MonotonyType::Monotonous
@@ -95,7 +95,7 @@ fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
             characteristic.step_size = None;
             characteristic.symbol_link = None;
         }
-        for compu_method in module.compu_method.iter_mut() {
+        for compu_method in &mut module.compu_method {
             if compu_method.conversion_type == ConversionType::Identical {
                 compu_method.conversion_type = ConversionType::RatFunc;
                 // RatFunc: (a*x^2 + b*x + c) / (d*x^2 + e*x + f) -> for RatFunc to behave like Identical, b = 1.0, f = 1.0, all others = 0
@@ -109,16 +109,16 @@ fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
             }
             compu_method.coeffs_linear = None;
         }
-        for compu_tab in module.compu_tab.iter_mut() {
+        for compu_tab in &mut module.compu_tab {
             compu_tab.default_value_numeric = None;
         }
-        for function in module.function.iter_mut() {
+        for function in &mut module.function {
             function.if_data.truncate(0);
         }
-        for group in module.group.iter_mut() {
+        for group in &mut module.group {
             group.if_data.truncate(0);
         }
-        for measurement in module.measurement.iter_mut() {
+        for measurement in &mut module.measurement {
             measurement.discrete = None;
             measurement.layout = None;
             measurement.phys_unit = None;
@@ -128,13 +128,13 @@ fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
             mod_common.alignment_int64 = None;
         }
         if let Some(mod_par) = module.mod_par.as_mut() {
-            for calmethod in mod_par.calibration_method.iter_mut() {
+            for calmethod in &mut mod_par.calibration_method {
                 if let Some(calhandle) = calmethod.calibration_handle.as_mut() {
                     calhandle.calibration_handle_text = None;
                 }
             }
         }
-        for rl in module.record_layout.iter_mut() {
+        for rl in &mut module.record_layout {
             rl.static_record_layout = None;
         }
     }
@@ -143,24 +143,24 @@ fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
 // =================== 1.70 -> 1.61 ================================
 
 fn downgrade_v1_70_to_1_61(a2l_file: &mut A2lFile) {
-    for module in a2l_file.project.module.iter_mut() {
-        for axis_pts in module.axis_pts.iter_mut() {
+    for module in &mut a2l_file.project.module {
+        for axis_pts in &mut module.axis_pts {
             axis_pts.max_refresh = None;
             axis_pts.model_link = None;
         }
         module.blob.truncate(0);
-        for characteristic in module.characteristic.iter_mut() {
+        for characteristic in &mut module.characteristic {
             characteristic.encoding = None;
             characteristic.model_link = None;
             if let Some(matrix_dim) = characteristic.matrix_dim.as_mut() {
                 downgrade_matrix_dim(matrix_dim);
             }
         }
-        for function in module.function.iter_mut() {
+        for function in &mut module.function {
             function.ar_component = None;
         }
         module.instance.truncate(0);
-        for measurement in module.measurement.iter_mut() {
+        for measurement in &mut module.measurement {
             measurement.address_type = None;
             if let Some(matrix_dim) = measurement.matrix_dim.as_mut() {
                 downgrade_matrix_dim(matrix_dim);
@@ -173,7 +173,7 @@ fn downgrade_v1_70_to_1_61(a2l_file: &mut A2lFile) {
                 .memory_segment
                 .retain(|memseg| memseg.memory_type != MemoryType::NotInEcu);
         }
-        for rl in module.record_layout.iter_mut() {
+        for rl in &mut module.record_layout {
             rl.static_address_offsets = None;
         }
         module.transformer.truncate(0);
@@ -192,9 +192,7 @@ fn downgrade_matrix_dim(matrix_dim: &mut MatrixDim) {
     }
     if matrix_dim.dim_list.len() > 3 {
         // flatten all extra dimensions, e.g. [2, 3, 4, 5, 6] -> [2, 3, (4 * 5 * 6)]
-        let last_dim = matrix_dim.dim_list[2..]
-            .iter()
-            .fold(1u16, |acc, dimval| acc * dimval);
+        let last_dim = matrix_dim.dim_list[2..].iter().product::<u16>();
         matrix_dim.dim_list.truncate(2);
         matrix_dim.dim_list.push(last_dim);
     }
@@ -203,11 +201,11 @@ fn downgrade_matrix_dim(matrix_dim: &mut MatrixDim) {
 // =================== 1.71 -> 1.70 ================================
 
 fn downgrade_v1_71_to_1_70(a2l_file: &mut A2lFile) {
-    for module in a2l_file.project.module.iter_mut() {
+    for module in &mut a2l_file.project.module {
         if let Some(mod_common) = module.mod_common.as_mut() {
             mod_common.alignment_float16_ieee = None;
         }
-        for rl in module.record_layout.iter_mut() {
+        for rl in &mut module.record_layout {
             rl.alignment_float16_ieee = None;
             //axis_pts
             if let Some(axis_pts_x) = rl.axis_pts_x.as_mut() {
@@ -365,20 +363,20 @@ fn downgrade_v1_71_to_1_70(a2l_file: &mut A2lFile) {
                 datatype_float16_compat(&mut src_addr_5.datatype);
             }
         }
-        for meas in module.measurement.iter_mut() {
+        for meas in &mut module.measurement {
             datatype_float16_compat(&mut meas.datatype);
         }
-        for tmeas in module.typedef_measurement.iter_mut() {
+        for tmeas in &mut module.typedef_measurement {
             datatype_float16_compat(&mut tmeas.datatype);
         }
-        for inst in module.instance.iter_mut() {
+        for inst in &mut module.instance {
             inst.address_type = None;
         }
-        for tblob in module.typedef_blob.iter_mut() {
+        for tblob in &mut module.typedef_blob {
             tblob.address_type = None;
         }
-        for tstruct in module.typedef_structure.iter_mut() {
-            for sc in tstruct.structure_component.iter_mut() {
+        for tstruct in &mut module.typedef_structure {
+            for sc in &mut tstruct.structure_component {
                 sc.address_type = None;
             }
         }

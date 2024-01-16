@@ -111,7 +111,7 @@ fn update_measurement_address<'a>(
             set_symbol_link(&mut measurement.symbol_link, symbol_name.clone());
             set_measurement_ecu_address(&mut measurement.ecu_address, address);
             measurement.datatype = get_a2l_datatype(symbol_datatype);
-            set_measurement_bitmask(&mut measurement.bit_mask, symbol_datatype);
+            set_bitmask(&mut measurement.bit_mask, symbol_datatype);
             update_ifdata(
                 &mut measurement.if_data,
                 &symbol_name,

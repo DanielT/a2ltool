@@ -1,5 +1,5 @@
 use a2lfile::{
-    A2lFile, A2lObject, AddrType, Characteristic, CharacteristicType, EcuAddress, FncValues, Group,
+    A2lFile, A2lObject, AddrType, BitMask, Characteristic, CharacteristicType, EcuAddress, FncValues, Group,
     IndexMode, MatrixDim, Measurement, Module, RecordLayout, RefCharacteristic, RefMeasurement,
     Root, SymbolLink,
 };
@@ -121,15 +121,28 @@ fn insert_measurement_sym(
     new_measurement.ecu_address = Some(ecu_address);
     // create a SYMBOL_LINK attribute
     new_measurement.symbol_link = Some(SymbolLink::new(true_name, 0));
-    // create a conversion table for enums
-    if let TypeInfo::Enum {
-        typename,
-        enumerators,
-        ..
-    } = typeinfo
-    {
-        new_measurement.conversion = typename.to_owned();
-        enums::cond_create_enum_conversion(module, typename, enumerators);
+    match typeinfo {
+        TypeInfo::Enum {
+            typename,
+            enumerators,
+            ..
+        } => {
+            // create a conversion table for enums
+            new_measurement.conversion = typename.to_owned();
+            enums::cond_create_enum_conversion(module, typename, enumerators);
+        }
+        TypeInfo::Bitfield {
+            bit_offset,
+            bit_size,
+            ..
+        } => {
+            // create a BIT_MASK for bitfields
+            let bitmask = ((1 << bit_size) - 1) << bit_offset;
+            let mut bm = BitMask::new(bitmask);
+            bm.get_layout_mut().item_location.0.1 = true;
+            new_measurement.bit_mask = Some(bm);
+        }
+        _ => {}
     }
     module.measurement.push(new_measurement);
 
@@ -223,6 +236,26 @@ fn insert_characteristic_sym(
                 lower_limit,
                 upper_limit,
             )
+        }
+        TypeInfo::Bitfield { bit_offset, bit_size, .. } => {
+            let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
+            let mut new_characteristic = Characteristic::new(
+                item_name.clone(),
+                format!("characteristic for {characteristic_sym}"),
+                CharacteristicType::Value,
+                address as u32,
+                recordlayout_name.clone(),
+                0f64,
+                "NO_COMPU_METHOD".to_string(),
+                lower_limit,
+                upper_limit,
+            );
+            // create a BIT_MASK
+            let bitmask = ((1 << bit_size) - 1) << bit_offset;
+            let mut bm = BitMask::new(bitmask);
+            bm.get_layout_mut().item_location.0.1 = true;
+            new_characteristic.bit_mask = Some(bm);
+            new_characteristic
         }
         _ => {
             // any other data type: create a basic CHARACTERISTIC

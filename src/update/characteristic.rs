@@ -187,7 +187,7 @@ fn update_characteristic_address<'a>(
             // make sure a valid SYMBOL_LINK exists
             set_symbol_link(&mut characteristic.symbol_link, symbol_name.clone());
             characteristic.address = address as u32;
-            set_measurement_bitmask(&mut characteristic.bit_mask, symbol_datatype);
+            set_bitmask(&mut characteristic.bit_mask, symbol_datatype);
             update_ifdata(
                 &mut characteristic.if_data,
                 &symbol_name,

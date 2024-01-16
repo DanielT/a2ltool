@@ -1,7 +1,8 @@
-use gimli::{Abbreviations, DebuggingInformationEntry, UnitHeader};
+use gimli::{Abbreviations, DebuggingInformationEntry, Dwarf, UnitHeader};
 use gimli::{EndianSlice, RunTimeEndian};
+use indexmap::IndexMap;
 use object::read::ObjectSection;
-use object::Object;
+use object::{Object, Endianness};
 use std::ffi::OsStr;
 use std::ops::Index;
 use std::{collections::HashMap, fs::File};
@@ -13,9 +14,8 @@ use attributes::{
     get_abstract_origin_attribute, get_location_attribute, get_name_attribute,
     get_specification_attribute, get_typeref_attribute,
 };
-mod typereader;
-use typereader::load_types;
 mod iter;
+mod typereader;
 
 #[derive(Debug)]
 pub(crate) struct VarInfo {
@@ -45,17 +45,17 @@ pub(crate) enum TypeInfo {
     Struct {
         // typename: String,
         size: u64,
-        members: HashMap<String, (TypeInfo, u64)>,
+        members: IndexMap<String, (TypeInfo, u64)>,
     },
     Class {
         // typename: String,
         size: u64,
-        inheritance: HashMap<String, (TypeInfo, u64)>,
-        members: HashMap<String, (TypeInfo, u64)>,
+        inheritance: IndexMap<String, (TypeInfo, u64)>,
+        members: IndexMap<String, (TypeInfo, u64)>,
     },
     Union {
         size: u64,
-        members: HashMap<String, (TypeInfo, u64)>,
+        members: IndexMap<String, (TypeInfo, u64)>,
     },
     Enum {
         typename: String,
@@ -76,9 +76,17 @@ pub(crate) struct UnitList<'a> {
 
 #[derive(Debug)]
 pub(crate) struct DebugData {
-    pub(crate) variables: HashMap<String, VarInfo>,
+    pub(crate) variables: IndexMap<String, VarInfo>,
     pub(crate) types: HashMap<usize, TypeInfo>,
     pub(crate) demangled_names: HashMap<String, String>,
+}
+
+struct DebugDataReader<'elffile> {
+    dwarf: Dwarf<EndianSlice<'elffile, RunTimeEndian>>,
+    verbose: bool,
+    typedefs: HashMap<usize, String>,
+    units: UnitList<'elffile>,
+    endian: Endianness,
 }
 
 impl DebugData {
@@ -88,7 +96,15 @@ impl DebugData {
         let elffile = load_elf_file(&filename.to_string_lossy(), &filedata)?;
         let dwarf = load_dwarf(&elffile)?;
 
-        Ok(read_debug_info_entries(&dwarf, verbose))
+        let mut dbg_reader = DebugDataReader {
+            dwarf,
+            verbose,
+            typedefs: HashMap::new(),
+            units: UnitList::new(),
+            endian: elffile.endianness()
+        };
+
+        Ok(dbg_reader.read_debug_info_entries())
     }
 
     pub(crate) fn iter(&self) -> iter::VariablesIterator {
@@ -164,119 +180,114 @@ fn get_endian(elffile: &object::read::File) -> RunTimeEndian {
     }
 }
 
-// read the debug information entries in the DWAF data to get all the global variables and their types
-fn read_debug_info_entries(dwarf: &gimli::Dwarf<SliceType>, verbose: bool) -> DebugData {
-    let (variables, typedefs, units) = load_variables(dwarf, verbose);
-    let types = load_types(&variables, &typedefs, &units, dwarf, verbose);
-    let varname_list: Vec<&String> = variables.keys().collect();
-    let demangled_names = demangle_cpp_varnames(&varname_list);
+impl<'elffile> DebugDataReader<'elffile> {
+    // read the debug information entries in the DWAF data to get all the global variables and their types
+    fn read_debug_info_entries(&mut self) -> DebugData {
+        let variables = self.load_variables();
+        let types = self.load_types(&variables);
+        let varname_list: Vec<&String> = variables.keys().collect();
+        let demangled_names = demangle_cpp_varnames(&varname_list);
 
-    DebugData {
-        variables,
-        types,
-        demangled_names,
+        DebugData {
+            variables,
+            types,
+            demangled_names,
+        }
     }
-}
 
-// load all global variables from the dwarf data
-fn load_variables<'a>(
-    dwarf: &gimli::Dwarf<EndianSlice<'a, RunTimeEndian>>,
-    verbose: bool,
-) -> (
-    HashMap<String, VarInfo>,
-    HashMap<usize, String>,
-    UnitList<'a>,
-) {
-    let mut variables = HashMap::<String, VarInfo>::new();
-    let mut typedefs = HashMap::<usize, String>::new();
-    let mut unit_list = UnitList::new();
+    // load all global variables from the dwarf data
+    fn load_variables(&mut self) -> IndexMap<String, VarInfo> {
+        let mut variables = IndexMap::<String, VarInfo>::new();
 
-    let mut iter = dwarf.debug_info.units();
-    while let Ok(Some(unit)) = iter.next() {
-        let abbreviations = unit.abbreviations(&dwarf.debug_abbrev).unwrap();
+        let mut iter = self.dwarf.debug_info.units();
+        while let Ok(Some(unit)) = iter.next() {
+            let abbreviations = unit.abbreviations(&self.dwarf.debug_abbrev).unwrap();
+            self.units.add(unit, abbreviations);
+            let (unit, abbreviations) = &self.units[self.units.list.len() - 1];
 
-        // the root of the tree inside of a unit is always a DW_TAG_compile_unit
-        // the global variables are among the immediate children of the DW_TAG_compile_unit
-        // static variable in functions are hidden further down inside of DW_TAG_subprogram[/DW_TAG_lexical_block]*
-        // we can easily find all of them by using depth-first traversal of the tree
-        let mut entries_cursor = unit.entries(&abbreviations);
-        while let Ok(Some((_depth_delta, entry))) = entries_cursor.next_dfs() {
-            if entry.tag() == gimli::constants::DW_TAG_variable {
-                match get_global_variable(entry, &unit, &abbreviations, dwarf) {
-                    Ok(Some((name, typeref, address))) => {
-                        variables.insert(name, VarInfo { address, typeref });
+            // the root of the tree inside of a unit is always a DW_TAG_compile_unit
+            // the global variables are among the immediate children of the DW_TAG_compile_unit
+            // static variable in functions are hidden further down inside of DW_TAG_subprogram[/DW_TAG_lexical_block]*
+            // we can easily find all of them by using depth-first traversal of the tree
+            let mut entries_cursor = unit.entries(abbreviations);
+            while let Ok(Some((_depth_delta, entry))) = entries_cursor.next_dfs() {
+                if entry.tag() == gimli::constants::DW_TAG_variable {
+                    match self.get_global_variable(entry, unit, abbreviations) {
+                        Ok(Some((name, typeref, address))) => {
+                            variables.insert(name, VarInfo { address, typeref });
+                        }
+                        Ok(None) => {
+                            // unremarkable, the variable is not a global variable
+                        }
+                        Err(errmsg) => {
+                            if self.verbose {
+                                let offset = entry
+                                    .offset()
+                                    .to_debug_info_offset(unit)
+                                    .unwrap_or(gimli::DebugInfoOffset(0))
+                                    .0;
+                                println!("Error loading variable @{offset:x}: {errmsg}");
+                            }
+                        }
                     }
-                    Ok(None) => {
-                        // unremarkable, the variable is not a global variable
-                    }
-                    Err(errmsg) => {
-                        if verbose {
-                            let offset = entry
-                                .offset()
-                                .to_debug_info_offset(&unit)
-                                .unwrap_or(gimli::DebugInfoOffset(0))
-                                .0;
-                            println!("Error loading variable @{offset:x}: {errmsg}");
+                } else if entry.tag() == gimli::constants::DW_TAG_typedef {
+                    // collect information about all typedefs
+                    if let Ok(name) = get_name_attribute(entry, &self.dwarf, unit) {
+                        if let Ok(typeref) = get_typeref_attribute(entry, unit) {
+                            // build a reverse map from the referenced type to the typedef name
+                            // it's possible that a type has multiple typedefs, in which case we only keep the last one
+                            self.typedefs.insert(typeref, name);
                         }
                     }
                 }
-            } else if entry.tag() == gimli::constants::DW_TAG_typedef {
-                // collect information about all typedefs
-                if let Ok(name) = get_name_attribute(entry, dwarf) {
-                    if let Ok(typeref) = get_typeref_attribute(entry, &unit) {
-                        // build a reverse map from the referenced type to the typedef name
-                        // it's possible that a type has multiple typedefs, in which case we only keep the last one
-                        typedefs.insert(typeref, name);
-                    }
-                }
             }
         }
 
-        unit_list.add(unit, abbreviations);
+        variables
     }
 
-    (variables, typedefs, unit_list)
-}
+    // an entry of the type DW_TAG_variable only describes a global variable if there is a name, a type and an address
+    // this function tries to get all three and returns them
+    fn get_global_variable(
+        &self,
+        entry: &DebuggingInformationEntry<SliceType, usize>,
+        unit: &UnitHeader<SliceType>,
+        abbrev: &gimli::Abbreviations,
+    ) -> Result<Option<(String, usize, u64)>, String> {
+        match get_location_attribute(self, entry, unit.encoding(), &self.units.list.len() - 1) {
+            Some(address) => {
+                // if debugging information entry A has a DW_AT_specification or DW_AT_abstract_origin attribute
+                // pointing to another debugging information entry B, any attributes of B are considered to be part of A.
+                if let Some(specification_entry) = get_specification_attribute(entry, unit, abbrev)
+                {
+                    // the entry refers to a specification, which contains the name and type reference
+                    let name = get_name_attribute(&specification_entry, &self.dwarf, unit)?;
+                    let typeref = get_typeref_attribute(&specification_entry, unit)?;
 
-// an entry of the type DW_TAG_variable only describes a global variable if there is a name, a type and an address
-// this function tries to get all three and returns them
-fn get_global_variable(
-    entry: &DebuggingInformationEntry<SliceType, usize>,
-    unit: &UnitHeader<SliceType>,
-    abbrev: &gimli::Abbreviations,
-    dwarf: &gimli::Dwarf<EndianSlice<RunTimeEndian>>,
-) -> Result<Option<(String, usize, u64)>, String> {
-    match get_location_attribute(entry, unit.encoding()) {
-        Some(address) => {
-            // if debugging information entry A has a DW_AT_specification or DW_AT_abstract_origin attribute
-            // pointing to another debugging information entry B, any attributes of B are considered to be part of A.
-            if let Some(specification_entry) = get_specification_attribute(entry, unit, abbrev) {
-                // the entry refers to a specification, which contains the name and type reference
-                let name = get_name_attribute(&specification_entry, dwarf)?;
-                let typeref = get_typeref_attribute(&specification_entry, unit)?;
+                    Ok(Some((name, typeref, address)))
+                } else if let Some(abstract_origin_entry) =
+                    get_abstract_origin_attribute(entry, unit, abbrev)
+                {
+                    // the entry refers to an abstract origin, which should also be considered when getting the name and type ref
+                    let name = get_name_attribute(entry, &self.dwarf, unit).or_else(|_| {
+                        get_name_attribute(&abstract_origin_entry, &self.dwarf, unit)
+                    })?;
+                    let typeref = get_typeref_attribute(entry, unit)
+                        .or_else(|_| get_typeref_attribute(&abstract_origin_entry, unit))?;
 
-                Ok(Some((name, typeref, address)))
-            } else if let Some(abstract_origin_entry) =
-                get_abstract_origin_attribute(entry, unit, abbrev)
-            {
-                // the entry refers to an abstract origin, which should also be considered when getting the name and type ref
-                let name = get_name_attribute(entry, dwarf)
-                    .or_else(|_| get_name_attribute(&abstract_origin_entry, dwarf))?;
-                let typeref = get_typeref_attribute(entry, unit)
-                    .or_else(|_| get_typeref_attribute(&abstract_origin_entry, unit))?;
+                    Ok(Some((name, typeref, address)))
+                } else {
+                    // usual case: there is no specification or abstract origin and all info is part of this entry
+                    let name = get_name_attribute(entry, &self.dwarf, unit)?;
+                    let typeref = get_typeref_attribute(entry, unit)?;
 
-                Ok(Some((name, typeref, address)))
-            } else {
-                // usual case: there is no specification or abstract origin and all info is part of this entry
-                let name = get_name_attribute(entry, dwarf)?;
-                let typeref = get_typeref_attribute(entry, unit)?;
-
-                Ok(Some((name, typeref, address)))
+                    Ok(Some((name, typeref, address)))
+                }
             }
-        }
-        None => {
-            // it's a local variable, no error
-            Ok(None)
+            None => {
+                // it's a local variable, no error
+                Ok(None)
+            }
         }
     }
 }
