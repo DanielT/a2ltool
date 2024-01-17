@@ -12,6 +12,7 @@ pub(crate) enum TypeInfoIter<'a> {
         struct_iter: indexmap::map::Iter<'a, String, (TypeInfo, u64)>,
         current_member: Option<(&'a String, &'a (TypeInfo, u64))>,
         member_iter: Option<Box<TypeInfoIter<'a>>>,
+        use_new_arrays: bool,
     },
     Array {
         size: u64,
@@ -20,6 +21,7 @@ pub(crate) enum TypeInfoIter<'a> {
         position: u64,
         arraytype: &'a TypeInfo,
         item_iter: Option<Box<TypeInfoIter<'a>>>,
+        use_new_arrays: bool,
     },
 }
 
@@ -28,10 +30,11 @@ pub(crate) struct VariablesIterator<'a> {
     var_iter: indexmap::map::Iter<'a, String, VarInfo>,
     current_var: Option<(&'a String, &'a VarInfo)>,
     type_iter: Option<TypeInfoIter<'a>>,
+    use_new_arrays: bool,
 }
 
 impl<'a> TypeInfoIter<'a> {
-    pub(crate) fn new(typeinfo: &'a TypeInfo) -> Self {
+    pub(crate) fn new(typeinfo: &'a TypeInfo, use_new_arrays: bool) -> Self {
         use TypeInfo::{Array, Class, Struct, Union};
         match typeinfo {
             Class { members, .. } | Union { members, .. } | Struct { members, .. } => {
@@ -42,6 +45,7 @@ impl<'a> TypeInfoIter<'a> {
                         struct_iter,
                         current_member: currentmember,
                         member_iter: None,
+                        use_new_arrays,
                     }
                 } else {
                     TypeInfoIter::NotIterable
@@ -59,6 +63,7 @@ impl<'a> TypeInfoIter<'a> {
                 arraytype,
                 position: 0,
                 item_iter: None,
+                use_new_arrays,
             },
             _ => TypeInfoIter::NotIterable,
         }
@@ -76,11 +81,12 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                 struct_iter,
                 current_member,
                 member_iter,
+                use_new_arrays,
             } => {
                 // current_member will be Some(...) while the iteration is still in progress
                 if let Some((name, (typeinfo, offset))) = current_member {
                     if member_iter.is_none() {
-                        *member_iter = Some(Box::new(TypeInfoIter::new(typeinfo)));
+                        *member_iter = Some(Box::new(TypeInfoIter::new(typeinfo, *use_new_arrays)));
                         Some((format!(".{name}"), typeinfo, *offset))
                     } else {
                         let member = member_iter.as_deref_mut().unwrap().next();
@@ -109,6 +115,7 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                 position,
                 arraytype,
                 item_iter,
+                use_new_arrays
             } => {
                 let total_elemcount = *size / *stride;
                 // are there more elements to iterate over
@@ -126,7 +133,11 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                     let idxstr = current_indices
                         .iter()
                         .fold(String::new(), |mut output, val| {
-                            let _ = write!(output, "._{val}_");
+                            if *use_new_arrays {
+                                let _ = write!(output, "[{val}]");
+                            } else {
+                                let _ = write!(output, "._{val}_");
+                            }
                             output
                         });
 
@@ -137,7 +148,7 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                     // individual elements of that before advancing to the next array element
                     if item_iter.is_none() {
                         // first, return the array element directly
-                        *item_iter = Some(Box::new(TypeInfoIter::new(arraytype)));
+                        *item_iter = Some(Box::new(TypeInfoIter::new(arraytype, *use_new_arrays)));
                         Some((idxstr, arraytype, offset))
                     } else {
                         // then try to return struct elements
@@ -165,7 +176,7 @@ impl<'a> Iterator for TypeInfoIter<'a> {
 }
 
 impl<'a> VariablesIterator<'a> {
-    pub(crate) fn new(debugdata: &'a DebugData) -> Self {
+    pub(crate) fn new(debugdata: &'a DebugData, use_new_arrays: bool) -> Self {
         let mut var_iter = debugdata.variables.iter();
         // current_var == None signals the end of iteration, so it needs to be set to the first value here
         let current_var = var_iter.next();
@@ -174,6 +185,7 @@ impl<'a> VariablesIterator<'a> {
             var_iter,
             current_var,
             type_iter: None,
+            use_new_arrays
         }
     }
 }
@@ -193,7 +205,7 @@ impl<'a> Iterator for VariablesIterator<'a> {
                 // newly set current_var, should be returned before using type_iter to return its sub-elements
                 let typeinfo = self.debugdata.types.get(typeref);
                 if let Some(ti) = typeinfo {
-                    self.type_iter = Some(TypeInfoIter::new(ti));
+                    self.type_iter = Some(TypeInfoIter::new(ti, self.use_new_arrays));
                 } else {
                     self.type_iter = None;
                     self.current_var = self.var_iter.next();
@@ -233,7 +245,7 @@ mod test {
         // basic types, e.g. Sint<x> and Uint<x> cannot be iterated over
         // a TypeInfoIter for these immediately returns None
         let typeinfo = TypeInfo::Sint16;
-        let mut iter = TypeInfoIter::new(&typeinfo);
+        let mut iter = TypeInfoIter::new(&typeinfo, false);
         let result = iter.next();
         assert!(result.is_none());
 
@@ -266,7 +278,7 @@ mod test {
         // for (displaystring, element_type, offset) in TypeInfoIter::new(&typeinfo) {
         //     println!("name: {}, \toffset: {}", displaystring, offset);
         // }
-        let iter = TypeInfoIter::new(&typeinfo);
+        let iter = TypeInfoIter::new(&typeinfo, false);
         assert_eq!(iter.count(), 10);
     }
 
@@ -319,10 +331,10 @@ mod test {
             demangled_names,
         };
 
-        let iter = VariablesIterator::new(&debugdata);
+        let iter = VariablesIterator::new(&debugdata, false);
         for item in iter {
             println!("{}", item.0);
         }
-        assert_eq!(VariablesIterator::new(&debugdata).count(), 6);
+        assert_eq!(VariablesIterator::new(&debugdata, false).count(), 6);
     }
 }

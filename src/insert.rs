@@ -438,6 +438,8 @@ pub(crate) fn insert_many(
             Err(error) => println!("Invalid regex \"{expr}\": {error}"),
         }
     }
+    let minor_ver = a2l_file.asap2_version.as_ref().map(|v| v.upgrade_no).unwrap_or(50);
+    let use_new_arrays = minor_ver >= 70;
     let module = &mut a2l_file.project.module[0];
     let (name_map, sym_map) = build_maps(&module);
     let mut insert_meas_count = 0u32;
@@ -445,7 +447,7 @@ pub(crate) fn insert_many(
     let mut characteristic_list = vec![];
     let mut measurement_list = vec![];
 
-    for (symbol_name, symbol_type, address) in debugdata.iter() {
+    for (symbol_name, symbol_type, address) in debugdata.iter(use_new_arrays) {
         match symbol_type {
             Some(
                 TypeInfo::Array { .. }

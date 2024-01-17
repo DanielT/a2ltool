@@ -107,8 +107,8 @@ impl DebugData {
         Ok(dbg_reader.read_debug_info_entries())
     }
 
-    pub(crate) fn iter(&self) -> iter::VariablesIterator {
-        iter::VariablesIterator::new(self)
+    pub(crate) fn iter(&self, use_new_arrays: bool) -> iter::VariablesIterator {
+        iter::VariablesIterator::new(self, use_new_arrays)
     }
 }
 
