@@ -2,7 +2,7 @@ use gimli::{Abbreviations, DebuggingInformationEntry, Dwarf, UnitHeader};
 use gimli::{EndianSlice, RunTimeEndian};
 use indexmap::IndexMap;
 use object::read::ObjectSection;
-use object::{Object, Endianness};
+use object::{Endianness, Object};
 use std::ffi::OsStr;
 use std::ops::Index;
 use std::{collections::HashMap, fs::File};
@@ -101,7 +101,7 @@ impl DebugData {
             verbose,
             typedefs: HashMap::new(),
             units: UnitList::new(),
-            endian: elffile.endianness()
+            endian: elffile.endianness(),
         };
 
         Ok(dbg_reader.read_debug_info_entries())
@@ -366,6 +366,132 @@ impl TypeInfo {
             | TypeInfo::Union { size, .. }
             | TypeInfo::Enum { size, .. }
             | TypeInfo::Array { size, .. } => *size,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    static ELF_FILE_NAMES: [&'static str; 7] = [
+        "tests/elffiles/debugdata_clang.elf",
+        "tests/elffiles/debugdata_clang_dw4.elf",
+        "tests/elffiles/debugdata_clang_dw4_dwz.elf",
+        "tests/elffiles/debugdata_gcc.elf",
+        "tests/elffiles/debugdata_gcc_dw3.elf",
+        "tests/elffiles/debugdata_gcc_dw3_dwz.elf",
+        "tests/elffiles/debugdata_gcc_dwz.elf",
+    ];
+
+    #[test]
+    fn test_load_data() {
+        for filename in ELF_FILE_NAMES {
+            let debugdata = DebugData::load(OsStr::new(filename), true).unwrap();
+            assert_eq!(debugdata.variables.len(), 7);
+            assert!(debugdata.variables.get("class1").is_some());
+            assert!(debugdata.variables.get("class2").is_some());
+            assert!(debugdata.variables.get("class3").is_some());
+            assert!(debugdata.variables.get("class4").is_some());
+            assert!(debugdata.variables.get("staticvar").is_some());
+            assert!(debugdata.variables.get("structvar").is_some());
+            assert!(debugdata.variables.get("bitfield").is_some());
+
+            for (_, varinfo) in &debugdata.variables {
+                assert!(debugdata.types.contains_key(&varinfo.typeref));
+            }
+
+            let varinfo = debugdata.variables.get("class1").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Class { .. }));
+            if let TypeInfo::Class {
+                inheritance,
+                members,
+                ..
+            } = typeinfo
+            {
+                assert!(inheritance.contains_key("base1"));
+                assert!(inheritance.contains_key("base2"));
+                assert!(matches!(members.get("ss"), Some((TypeInfo::Sint16, _))));
+                assert!(matches!(
+                    members.get("base1_var"),
+                    Some((TypeInfo::Sint32, _))
+                ));
+                assert!(matches!(
+                    members.get("base2var"),
+                    Some((TypeInfo::Sint32, _))
+                ));
+            }
+
+            let varinfo = debugdata.variables.get("class2").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Class { .. }));
+
+            let varinfo = debugdata.variables.get("class3").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Class { .. }));
+
+            let varinfo = debugdata.variables.get("class4").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Class { .. }));
+
+            let varinfo = debugdata.variables.get("staticvar").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Sint32));
+
+            let varinfo = debugdata.variables.get("structvar").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Struct { .. }));
+
+            let varinfo = debugdata.variables.get("bitfield").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Struct { .. }));
+            if let TypeInfo::Struct { members, .. } = typeinfo {
+                assert!(matches!(
+                    members.get("var"),
+                    Some((
+                        TypeInfo::Bitfield {
+                            bit_offset: 0,
+                            bit_size: 5,
+                            ..
+                        },
+                        0
+                    ))
+                ));
+                assert!(matches!(
+                    members.get("var2"),
+                    Some((
+                        TypeInfo::Bitfield {
+                            bit_offset: 5,
+                            bit_size: 5,
+                            ..
+                        },
+                        0
+                    ))
+                ));
+                assert!(matches!(
+                    members.get("var3"),
+                    Some((
+                        TypeInfo::Bitfield {
+                            bit_offset: 0,
+                            bit_size: 23,
+                            ..
+                        },
+                        4
+                    ))
+                ));
+                assert!(matches!(
+                    members.get("var4"),
+                    Some((
+                        TypeInfo::Bitfield {
+                            bit_offset: 23,
+                            bit_size: 1,
+                            ..
+                        },
+                        4
+                    ))
+                ));
+            }
         }
     }
 }
