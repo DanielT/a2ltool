@@ -206,7 +206,7 @@ impl<'elffile> DebugDataReader<'elffile> {
         let entries_tree_node2 = entries_tree2.root().unwrap();
         let inheritance = self
             .get_class_inheritance(entries_tree_node2, current_unit)
-            .unwrap_or(IndexMap::<String, (TypeInfo, u64)>::new());
+            .unwrap_or_default();
         let mut members = self.get_struct_or_union_members(entries_tree_node, current_unit)?;
         for (baseclass_type, baseclass_offset) in inheritance.values() {
             if let TypeInfo::Class {
@@ -287,7 +287,7 @@ impl<'elffile> DebugDataReader<'elffile> {
                             if data_bit_offset >= type_size_bits {
                                 // Dwarf 4 / 5: re-calculate offset
                                 offset += (data_bit_offset / type_size_bits) * type_size;
-                                data_bit_offset = data_bit_offset % type_size_bits;
+                                data_bit_offset %= type_size_bits;
                             }
                             // these values should be independent of Endianness
                             membertype = TypeInfo::Bitfield {

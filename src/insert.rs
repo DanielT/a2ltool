@@ -13,9 +13,9 @@ use regex::Regex;
 enum ItemType {
     Measurement(usize),
     Characteristic(usize),
-    Instance(usize),
-    Blob(usize),
-    AxisPts(usize),
+    Instance,
+    Blob,
+    AxisPts,
 }
 
 pub(crate) fn insert_items(
@@ -325,9 +325,9 @@ fn make_unique_measurement_name(
         }
         Some(
             ItemType::Characteristic(_)
-            | ItemType::Instance(_)
-            | ItemType::Blob(_)
-            | ItemType::AxisPts(_),
+            | ItemType::Instance
+            | ItemType::Blob
+            | ItemType::AxisPts,
         ) => {
             format!("MEASUREMENT.{cleaned_sym}")
         }
@@ -360,9 +360,9 @@ fn make_unique_characteristic_name(
         }
         Some(
             ItemType::Measurement(_)
-            | ItemType::Instance(_)
-            | ItemType::Blob(_)
-            | ItemType::AxisPts(_),
+            | ItemType::Instance
+            | ItemType::Blob
+            | ItemType::AxisPts,
         ) => {
             format!("CHARACTERISTIC.{cleaned_sym}")
         }
@@ -390,22 +390,22 @@ fn build_maps(module: &&mut Module) -> (HashMap<String, ItemType>, HashMap<Strin
             sym_map.insert(sym_link.symbol_name.clone(), ItemType::Measurement(idx));
         }
     }
-    for (idx, inst) in module.instance.iter().enumerate() {
-        name_map.insert(inst.name.clone(), ItemType::Instance(idx));
+    for inst in &module.instance {
+        name_map.insert(inst.name.clone(), ItemType::Instance);
         if let Some(sym_link) = &inst.symbol_link {
-            sym_map.insert(sym_link.symbol_name.clone(), ItemType::Instance(idx));
+            sym_map.insert(sym_link.symbol_name.clone(), ItemType::Instance);
         }
     }
-    for (idx, blob) in module.blob.iter().enumerate() {
-        name_map.insert(blob.name.clone(), ItemType::Blob(idx));
+    for blob in &module.blob {
+        name_map.insert(blob.name.clone(), ItemType::Blob);
         if let Some(sym_link) = &blob.symbol_link {
-            sym_map.insert(sym_link.symbol_name.clone(), ItemType::Blob(idx));
+            sym_map.insert(sym_link.symbol_name.clone(), ItemType::Blob);
         }
     }
-    for (idx, axis_pts) in module.axis_pts.iter().enumerate() {
-        name_map.insert(axis_pts.name.clone(), ItemType::AxisPts(idx));
+    for axis_pts in &module.axis_pts {
+        name_map.insert(axis_pts.name.clone(), ItemType::AxisPts);
         if let Some(sym_link) = &axis_pts.symbol_link {
-            sym_map.insert(sym_link.symbol_name.clone(), ItemType::AxisPts(idx));
+            sym_map.insert(sym_link.symbol_name.clone(), ItemType::AxisPts);
         }
     }
 
@@ -438,7 +438,7 @@ pub(crate) fn insert_many(
             Err(error) => println!("Invalid regex \"{expr}\": {error}"),
         }
     }
-    let minor_ver = a2l_file.asap2_version.as_ref().map(|v| v.upgrade_no).unwrap_or(50);
+    let minor_ver = a2l_file.asap2_version.as_ref().map_or(50, |v| v.upgrade_no);
     let use_new_arrays = minor_ver >= 70;
     let module = &mut a2l_file.project.module[0];
     let (name_map, sym_map) = build_maps(&module);

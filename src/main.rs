@@ -145,7 +145,7 @@ fn core() -> Result<(), String> {
             ext_println!(
                 verbose,
                 now,
-                "Consistency check complete. No problems found.".to_string()
+                "Consistency check complete. No problems found."
             );
         } else {
             for msg in &log_msgs {
@@ -245,11 +245,7 @@ fn core() -> Result<(), String> {
     // merge includes
     if merge_includes {
         a2l_file.merge_includes();
-        cond_print!(
-            verbose,
-            now,
-            "Include directives have been merged\n".to_string()
-        );
+        cond_print!(verbose, now, "Include directives have been merged\n");
     }
 
     if let Some(debugdata) = &elf_info {
@@ -263,7 +259,7 @@ fn core() -> Result<(), String> {
                 cond_print!(verbose, now, msg);
             }
 
-            cond_print!(verbose, now, "Address update done\nSummary:".to_string());
+            cond_print!(verbose, now, "Address update done\nSummary:");
             cond_print!(
                 verbose,
                 now,
@@ -346,11 +342,7 @@ fn core() -> Result<(), String> {
             || arg_matches.contains_id("INSERT_CHARACTERISTIC_REGEX")
             || arg_matches.contains_id("INSERT_MEASUREMENT_REGEX")
         {
-            cond_print!(
-                verbose,
-                now,
-                "Inserting new items from range/regex".to_string()
-            );
+            cond_print!(verbose, now, "Inserting new items from range/regex");
             let target_group = arg_matches
                 .get_one::<String>("TARGET_GROUP")
                 .map(|group| &**group);
@@ -393,20 +385,20 @@ fn core() -> Result<(), String> {
         cond_print!(
             verbose,
             now,
-            "Cleanup of unused items and empty groups is complete".to_string()
+            "Cleanup of unused items and empty groups is complete"
         );
     }
 
     // remove unknown IF_DATA
     if ifdata_cleanup {
         a2l_file.ifdata_cleanup();
-        cond_print!(verbose, now, "Unknown ifdata removal is done".to_string());
+        cond_print!(verbose, now, "Unknown ifdata removal is done");
     }
 
     // sort all elements in the file
     if sort {
         a2l_file.sort();
-        cond_print!(verbose, now, "All objects have been sorted".to_string());
+        cond_print!(verbose, now, "All objects have been sorted");
     }
 
     // output
@@ -425,11 +417,7 @@ fn core() -> Result<(), String> {
         }
     }
 
-    cond_print!(
-        verbose,
-        now,
-        "\nRun complete. Have a nice day!\n\n".to_string()
-    );
+    cond_print!(verbose, now, "\nRun complete. Have a nice day!\n\n");
 
     Ok(())
 }
