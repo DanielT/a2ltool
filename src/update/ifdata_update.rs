@@ -108,6 +108,9 @@ fn update_ifdata_canape_ext(
                 link_map.bit_offset = *bit_offset;
                 link_map.datatype_valid = 1;
             }
+            TypeInfo::Array { arraytype, .. } => {
+                update_ifdata_canape_ext(canape_ext, address, symbol_name, &arraytype);
+            }
             _ => {
                 link_map.datatype = 0;
                 link_map.bit_offset = 0;
