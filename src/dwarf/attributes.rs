@@ -176,10 +176,14 @@ pub(crate) fn get_const_value_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
 ) -> Option<i64> {
     let constval_attr = get_attr_value(entry, gimli::constants::DW_AT_const_value)?;
-    if let gimli::AttributeValue::Sdata(value) = constval_attr {
-        Some(value)
-    } else {
-        None
+    match constval_attr {
+        gimli::AttributeValue::Sdata(value) => Some(value),
+        gimli::AttributeValue::Udata(value) => Some(value as i64),
+        gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as i64),
+        gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as i64),
+        gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as i64),
+        gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset as i64),
+    _ => None
     }
 }
 
