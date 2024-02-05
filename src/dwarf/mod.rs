@@ -388,7 +388,7 @@ mod test {
     fn test_load_data() {
         for filename in ELF_FILE_NAMES {
             let debugdata = DebugData::load(OsStr::new(filename), true).unwrap();
-            assert_eq!(debugdata.variables.len(), 7);
+            assert_eq!(debugdata.variables.len(), 21);
             assert!(debugdata.variables.get("class1").is_some());
             assert!(debugdata.variables.get("class2").is_some());
             assert!(debugdata.variables.get("class3").is_some());
@@ -492,6 +492,15 @@ mod test {
                     ))
                 ));
             }
+            let varinfo = debugdata.variables.get("enum_var1").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Enum { .. }));
+            let varinfo = debugdata.variables.get("enum_var2").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Enum { .. }));
+            let varinfo = debugdata.variables.get("enum_var3").unwrap();
+            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            assert!(matches!(typeinfo, TypeInfo::Enum { .. }));
         }
     }
 }
