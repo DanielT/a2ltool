@@ -1,6 +1,6 @@
 use super::dwarf::{DebugData, TypeInfo};
 use super::ifdata;
-use a2lfile::{A2lFile, BitMask, EcuAddress, IfData, SymbolLink};
+use a2lfile::{A2lFile, BitMask, EcuAddress, IfData, MatrixDim, SymbolLink};
 use std::collections::HashSet;
 
 mod axis_pts;
@@ -77,6 +77,7 @@ pub(crate) fn update_addresses(
             debug_data,
             log_msgs,
             preserve_unknown,
+            use_new_matrix_dim,
             &mut reclayout_info,
         );
         summary.characteristic_updated += updated;
@@ -178,6 +179,40 @@ fn set_symbol_link(opt_symbol_link: &mut Option<SymbolLink>, symbol_name: String
         symbol_link.symbol_name = symbol_name;
     } else {
         *opt_symbol_link = Some(SymbolLink::new(symbol_name, 0));
+    }
+}
+
+// update the MATRIX_DIM of a MEASUREMENT or CHARACTERISTIC
+fn update_matrix_dim(
+    opt_matrix_dim: &mut Option<MatrixDim>,
+    typeinfo: &TypeInfo,
+    new_format: bool,
+) {
+    let mut matrix_dim_values = Vec::new();
+    let mut cur_typeinfo = typeinfo;
+    // compilers can represent multi-dimensional arrays in two different ways:
+    // either as nested arrays, each with one dimension, or as one array with multiple dimensions
+    while let TypeInfo::Array { dim, arraytype, .. } = &cur_typeinfo {
+        for val in dim {
+            matrix_dim_values.push(*val as u16);
+        }
+        cur_typeinfo = &**arraytype;
+    }
+
+    if matrix_dim_values.is_empty() {
+        // current type is not an array, so delete the MATRIX_DIM
+        *opt_matrix_dim = None;
+    } else {
+        if !new_format {
+            // in the file versions before 1.70, MATRIX_DIM must have exactly 3 values
+            // starting with 1.70 any nonzero number of values is permitted
+            while matrix_dim_values.len() < 3 {
+                matrix_dim_values.push(1);
+            }
+            matrix_dim_values.truncate(3);
+        }
+        let matrix_dim = opt_matrix_dim.get_or_insert(MatrixDim::new());
+        matrix_dim.dim_list = matrix_dim_values;
     }
 }
 

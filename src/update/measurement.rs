@@ -1,5 +1,5 @@
 use crate::dwarf::{DebugData, TypeInfo};
-use a2lfile::{A2lObject, MatrixDim, Measurement, Module};
+use a2lfile::{A2lObject, Measurement, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -122,40 +122,6 @@ fn update_measurement_address<'a>(
             Ok(symbol_datatype)
         }
         Err(errmsgs) => Err(errmsgs),
-    }
-}
-
-// update the MATRIX_DIM of a MEASUREMENT
-fn update_matrix_dim(
-    opt_matrix_dim: &mut Option<MatrixDim>,
-    typeinfo: &TypeInfo,
-    new_format: bool,
-) {
-    let mut matrix_dim_values = Vec::new();
-    let mut cur_typeinfo = typeinfo;
-    // compilers can represent multi-dimensional arrays in two different ways:
-    // either as nested arrays, each with one dimension, or as one array with multiple dimensions
-    while let TypeInfo::Array { dim, arraytype, .. } = cur_typeinfo {
-        for val in dim {
-            matrix_dim_values.push(*val as u16);
-        }
-        cur_typeinfo = &**arraytype;
-    }
-
-    if matrix_dim_values.is_empty() {
-        // current type is not an array, so delete the MATRIX_DIM
-        *opt_matrix_dim = None;
-    } else {
-        if !new_format {
-            // in the file versions before 1.70, MATRIX_DIM must have exactly 3 values
-            // starting with 1.70 any nonzero number of values is permitted
-            while matrix_dim_values.len() < 3 {
-                matrix_dim_values.push(1);
-            }
-            matrix_dim_values.truncate(3);
-        }
-        let matrix_dim = opt_matrix_dim.get_or_insert(MatrixDim::new());
-        matrix_dim.dim_list = matrix_dim_values;
     }
 }
 

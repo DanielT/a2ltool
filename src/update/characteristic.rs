@@ -1,5 +1,5 @@
 use crate::dwarf::{DebugData, TypeInfo};
-use a2lfile::{A2lObject, AxisDescr, Characteristic, Module, RecordLayout};
+use a2lfile::{A2lObject, AxisDescr, Characteristic, CharacteristicType, Module, RecordLayout};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -12,6 +12,7 @@ pub(crate) fn update_module_characteristics(
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
+    use_new_matrix_dim: bool,
     recordlayout_info: &mut RecordLayoutInfo,
 ) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
@@ -41,6 +42,7 @@ pub(crate) fn update_module_characteristics(
                         typeinfo,
                         &mut enum_convlist,
                         &axis_pts_dim,
+                        use_new_matrix_dim,
                     );
 
                     module.characteristic.push(characteristic);
@@ -86,6 +88,7 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
     typeinfo: &'typeinfo TypeInfo,
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
     axis_pts_dim: &HashMap<String, u16>,
+    use_new_matrix_dim: bool,
 ) {
     let member_id = get_fnc_values_memberid(module, recordlayout_info, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
@@ -99,7 +102,7 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
                 characteristic.conversion = typename.to_owned();
             }
             cond_create_enum_conversion(module, &characteristic.conversion, enumerators);
-            enum_convlist.insert(characteristic.conversion.clone(), typeinfo);
+            enum_convlist.insert(characteristic.conversion.clone(), inner_typeinfo);
         }
 
         let (ll, ul) = adjust_limits(
@@ -110,6 +113,42 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
         characteristic.lower_limit = ll;
         characteristic.upper_limit = ul;
     }
+
+    // Patch up incomplete characteristics: Curve, Map, Cuboid, Cube4 and Cube5 all require AXIS_DESCR to function correctly
+    // More extensive validation is possible, but unlikely to be needed. Even this case only occurs in manually edited files
+    if characteristic.axis_descr.is_empty()
+        && (characteristic.characteristic_type == CharacteristicType::Curve
+            || characteristic.characteristic_type == CharacteristicType::Map
+            || characteristic.characteristic_type == CharacteristicType::Cuboid
+            || characteristic.characteristic_type == CharacteristicType::Cube4
+            || characteristic.characteristic_type == CharacteristicType::Cube5)
+    {
+        // AXIS_DESCR is missing, so try to use the characteristic as a VALUE (or VAL_BLK) instead
+        characteristic.characteristic_type = CharacteristicType::Value;
+    }
+
+    // if the characteristic does not have any axes, update MATRIX_DIM and switch between types VALUE and VAL_BLK as needed
+    if characteristic.characteristic_type == CharacteristicType::Value
+        || characteristic.characteristic_type == CharacteristicType::ValBlk
+    {
+        update_matrix_dim(&mut characteristic.matrix_dim, typeinfo, use_new_matrix_dim);
+        // arrays of values should have the type ValBlk, while single values should NOT have the type ValBlk
+        if characteristic.characteristic_type == CharacteristicType::Value
+            && characteristic.matrix_dim.is_some()
+        {
+            // change Value -> ValBlk
+            characteristic.characteristic_type = CharacteristicType::ValBlk;
+        } else if characteristic.characteristic_type == CharacteristicType::ValBlk
+            && characteristic.matrix_dim.is_none()
+        {
+            // change ValBlk -> Value
+            characteristic.characteristic_type = CharacteristicType::Value;
+        }
+	characteristic.number = None;
+    } else {
+        characteristic.matrix_dim = None;
+    }
+
     let record_layout = if let Some(idx) = recordlayout_info.idxmap.get(&characteristic.deposit) {
         Some(&module.record_layout[*idx])
     } else {
