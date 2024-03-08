@@ -144,7 +144,7 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
             // change ValBlk -> Value
             characteristic.characteristic_type = CharacteristicType::Value;
         }
-	characteristic.number = None;
+        characteristic.number = None;
     } else {
         characteristic.matrix_dim = None;
     }

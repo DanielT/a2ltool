@@ -358,6 +358,16 @@ impl RecordLayoutInfo {
                 refcount[*idx] += 1;
             }
         }
+        for td_axis in &module.typedef_axis {
+            if let Some(idx) = idxmap.get(&td_axis.record_layout) {
+                refcount[*idx] += 1;
+            }
+        }
+        for td_chr in &module.typedef_characteristic {
+            if let Some(idx) = idxmap.get(&td_chr.record_layout) {
+                refcount[*idx] += 1;
+            }
+        }
 
         Self { idxmap, refcount }
     }
