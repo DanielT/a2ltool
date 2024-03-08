@@ -110,22 +110,47 @@ impl<'elffile> DebugDataReader<'elffile> {
         let maybe_size = get_byte_size_attribute(entry);
         let (new_cur_unit, new_unit_offset) = get_type_attribute(entry, &self.units, current_unit)?;
         let arraytype = self.get_type(new_cur_unit, new_unit_offset, None)?;
-        let mut dim = Vec::<u64>::new();
         let stride = if let Some(stride) = get_byte_stride_attribute(entry) {
             stride
         } else {
             // this is the usual case
             arraytype.get_size()
         };
-        let default_ubound = maybe_size.map(|s: u64| s / stride - 1);
+
+        // get the array dimensions
+        let mut dim = Vec::<u64>::new();
         let mut iter = entries_tree_node.children();
         while let Ok(Some(child_node)) = iter.next() {
             let child_entry = child_node.entry();
             if child_entry.tag() == gimli::constants::DW_TAG_subrange_type {
-                let ubound = get_upper_bound_attribute(child_entry)
-                    .or(default_ubound)
-                    .unwrap_or(0);
-                dim.push(ubound + 1);
+                let count = if let Some(ubound) = get_upper_bound_attribute(child_entry) {
+                    let lbound = get_lower_bound_attribute(child_entry).unwrap_or(0);
+                    ubound - lbound + 1
+                } else if let Some(count) = get_count_attribute(child_entry) {
+                    // clang generates DW_AT_count instead of DW_AT_ubound
+                    count
+                } else {
+                    // unknown size of this array dimension, use 1 as a default (0 causes problems)
+                    1
+                };
+                dim.push(count);
+            } else if child_entry.tag() == gimli::constants::DW_TAG_enumeration_type {
+                // the DWARF spec allows an array dimension to be given using an enumeration type
+                // presumably this could be created by languages other than C / C++
+                let mut enum_count = 0;
+                let mut enum_iter = child_node.children();
+                while let Ok(Some(enum_node)) = enum_iter.next() {
+                    if enum_node.entry().tag() == gimli::constants::DW_TAG_enumerator {
+                        enum_count += 1;
+                    }
+                }
+                dim.push(enum_count);
+            }
+        }
+        // try to fix the dimension of the array, if the DW_TAG_subrange_type didn't contain enough info
+        if dim.len() == 1 && dim[0] == 1 {
+            if let Some(count) = maybe_size.map(|s: u64| s / stride) {
+                dim[0] = count;
             }
         }
         let size = maybe_size.unwrap_or_else(|| dim.iter().fold(stride, |acc, num| acc * num));

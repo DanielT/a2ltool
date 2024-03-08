@@ -155,14 +155,50 @@ pub(crate) fn get_encoding_attribute(
 }
 
 // get the upper bound of an array from the DW_AT_upper_bound attribute
+pub(crate) fn get_lower_bound_attribute(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+) -> Option<u64> {
+    let lbound_attr = get_attr_value(entry, gimli::constants::DW_AT_lower_bound)?;
+    match lbound_attr {
+        gimli::AttributeValue::Sdata(lbound) => Some(lbound as u64),
+        gimli::AttributeValue::Udata(lbound) => Some(lbound),
+        gimli::AttributeValue::Data1(lbound) => Some(lbound as u64),
+        gimli::AttributeValue::Data2(lbound) => Some(lbound as u64),
+        gimli::AttributeValue::Data4(lbound) => Some(lbound as u64),
+        gimli::AttributeValue::Data8(lbound) => Some(lbound),
+        _ => None,
+    }
+}
+
+// get the upper bound of an array from the DW_AT_upper_bound attribute
 pub(crate) fn get_upper_bound_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
 ) -> Option<u64> {
     let ubound_attr = get_attr_value(entry, gimli::constants::DW_AT_upper_bound)?;
-    if let gimli::AttributeValue::Udata(ubound) = ubound_attr {
-        Some(ubound)
-    } else {
-        None
+    match ubound_attr {
+        gimli::AttributeValue::Sdata(ubound) => Some(ubound as u64),
+        gimli::AttributeValue::Udata(ubound) => Some(ubound),
+        gimli::AttributeValue::Data1(ubound) => Some(ubound as u64),
+        gimli::AttributeValue::Data2(ubound) => Some(ubound as u64),
+        gimli::AttributeValue::Data4(ubound) => Some(ubound as u64),
+        gimli::AttributeValue::Data8(ubound) => Some(ubound),
+        _ => None,
+    }
+}
+
+// get the upper bound of an array from the DW_AT_upper_bound attribute
+pub(crate) fn get_count_attribute(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+) -> Option<u64> {
+    let count_attr = get_attr_value(entry, gimli::constants::DW_AT_count)?;
+    match count_attr {
+        gimli::AttributeValue::Sdata(count) => Some(count as u64),
+        gimli::AttributeValue::Udata(count) => Some(count),
+        gimli::AttributeValue::Data1(count) => Some(count as u64),
+        gimli::AttributeValue::Data2(count) => Some(count as u64),
+        gimli::AttributeValue::Data4(count) => Some(count as u64),
+        gimli::AttributeValue::Data8(count) => Some(count),
+        _ => None,
     }
 }
 
@@ -218,16 +254,16 @@ pub(crate) fn get_bit_offset_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
 ) -> Option<u64> {
     let data_bit_offset_attr = get_attr_value(entry, gimli::constants::DW_AT_bit_offset)?;
-        // DW_AT_bit_offset: up to Dwarf 3
-        // DW_AT_data_bit_offset: Dwarf 4 and following
-        match data_bit_offset_attr {
+    // DW_AT_bit_offset: up to Dwarf 3
+    // DW_AT_data_bit_offset: Dwarf 4 and following
+    match data_bit_offset_attr {
         gimli::AttributeValue::Sdata(bit_offset) => Some(bit_offset as u64),
-            gimli::AttributeValue::Udata(bit_offset) => Some(bit_offset),
-            gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as u64),
-            gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as u64),
-            gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as u64),
-            gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset),
-            _ => None,
+        gimli::AttributeValue::Udata(bit_offset) => Some(bit_offset),
+        gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as u64),
+        gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as u64),
+        gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as u64),
+        gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset),
+        _ => None,
     }
 }
 
@@ -237,16 +273,16 @@ pub(crate) fn get_data_bit_offset_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
 ) -> Option<u64> {
     let data_bit_offset_attr = get_attr_value(entry, gimli::constants::DW_AT_data_bit_offset)?;
-        // DW_AT_bit_offset: up to Dwarf 3
-        // DW_AT_data_bit_offset: Dwarf 4 and following
-        match data_bit_offset_attr {
+    // DW_AT_bit_offset: up to Dwarf 3
+    // DW_AT_data_bit_offset: Dwarf 4 and following
+    match data_bit_offset_attr {
         gimli::AttributeValue::Sdata(bit_offset) => Some(bit_offset as u64),
-            gimli::AttributeValue::Udata(bit_offset) => Some(bit_offset),
-            gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as u64),
-            gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as u64),
-            gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as u64),
-            gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset),
-            _ => None,
+        gimli::AttributeValue::Udata(bit_offset) => Some(bit_offset),
+        gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as u64),
+        gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as u64),
+        gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as u64),
+        gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset),
+        _ => None,
     }
 }
 
