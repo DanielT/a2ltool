@@ -6,7 +6,7 @@ a2ml_specification! {
     <A2mlVector>
 
     struct Protocol_Layer {
-        uint protocol_version;  /// XCP protocol layer version, current 0x100
+        uint protocol_version;  /// XCP protocol layer version
         uint t1;  /// T1 [ms]
         uint t2;  /// T2 [ms]
         uint t3;  /// T3 [ms]
@@ -79,7 +79,16 @@ a2ml_specification! {
                 "PROGRAM_NEXT" = 202,
                 "PROGRAM_MAX" = 201,
                 "PROGRAM_VERIFY" = 200,
-                "WRITE_DAQ_MULTIPLE" = 199
+                "WRITE_DAQ_MULTIPLE" = 199,
+                "TIME_CORRELATION_PROPERTIES" = 198,
+                "DTO_CTR_PROPERTIES" = 197
+            })*;
+            ("OPTIONAL_LEVEL1_CMD" enum {                         /* XCP-Code of optional level 1 commands, starting with level 0 0xC0 as first byte */
+                "GET_VERSION" = 0x00,
+                "SET_DAQ_PACKED_MODE" = 0x01,
+                "GET_DAQ_PACKED_MODE" = 0x02,
+                "SW_DBG_COMMAND_SPACE" = 0xFC,
+                "POD_COMMAND_SPACE" = 0xFD
             })*;
             "COMMUNICATION_MODE_SUPPORTED" taggedunion {
                 "BLOCK" taggedstruct {
@@ -93,6 +102,49 @@ a2ml_specification! {
             };
             "SEED_AND_KEY_EXTERNAL_FUNCTION" char funcname[256];  /// Name of the Seed&Key function
             "MAX_DTO_STIM" uint max_dto_stim;  /// overrules MAX_DTO see above for STIM use case
+
+            block "ECU_STATES" taggedstruct{
+                (block "STATE" struct{
+                    uchar state_number;   /// STATE_NUMBER
+                    char state_name[100]; /// STATE_NAME
+                    taggedstruct {
+                        "ECU_SWITCHED_TO_DEFAULT_PAGE";
+                    };
+                    enum CalPagResource {
+                        "NOT_ACTIVE" = 0,
+                        "ACTIVE" = 1,
+                        "GETTER_ONLY" = 2
+                    };
+                    enum DaqResource {
+                        "NOT_ACTIVE" = 0,
+                        "ACTIVE" = 1
+                    };
+                    enum StimResource {
+                        "NOT_ACTIVE" = 0,
+                        "ACTIVE" = 1
+                    };
+                    enum PgmResource {
+                        "NOT_ACTIVE" = 0,
+                        "ACTIVE" = 1
+                    };
+            
+                    taggedstruct {
+                        (block "MEMORY_ACCESS" struct{    /* CAL/PAG AVAILABLE */
+                            uchar segment_number;         /* SEGMENT_NUMBER */
+                            uchar page_number;            /* PAGE_NUMBER */
+                            enum ReadAccess {
+                                "READ_ACCESS_NOT_ALLOWED" = 0,
+                                "READ_ACCESS_ALLOWED" = 1
+                            };
+                            enum WriteAccess {
+                                "WRITE_ACCESS_NOT_ALLOWED" = 0,
+                                "WRITE_ACCESS_ALLOWED" = 1
+                            };
+                        })*;
+                    };
+                })*;
+          
+              };
         };
     };
 
@@ -140,6 +192,8 @@ a2ml_specification! {
             "PRESCALER_SUPPORTED" ;
             "RESUME_SUPPORTED" ;
             "STORE_DAQ_SUPPORTED" ;  ///This flag indicates that the slave can store DAQ configurations.
+            "DTO_CTR_FIELD_SUPPORTED" ;
+            "OPTIMISATION_TYPE_ODT_STRICT" ;
             block "STIM" struct {
                 enum GranularityOdtEntrySizeStim {
                     "GRANULARITY_ODT_ENTRY_SIZE_STIM_BYTE" = 1,
@@ -189,6 +243,11 @@ a2ml_specification! {
             "MAX_ODT_ENTRIES_DAQ_TOTAL" uint;
             "MAX_ODT_ENTRIES_STIM_TOTAL" uint;
             "CPU_LOAD_MAX_TOTAL" float;
+            "CORE_LOAD_MAX_TOTAL" float;   /// max load of all cores
+            (block "CORE_LOAD_MAX" struct {
+                uint core_nr;          /// CORE_NR: core reference number
+                float core_load_max;   /// CORE_LOAD_MAX: max load of core(CORE_NR)
+            })*;
             block "DAQ_MEMORY_CONSUMPTION" struct {
                 ulong daq_memory_limit;  /// "DAQ_MEMORY_LIMIT"
                 uint daq_size;  /// "DAQ_SIZE" : Bytes pro DAQ-Liste
@@ -196,6 +255,12 @@ a2ml_specification! {
                 uint odt_entry_size;  /// "ODT_ENTRY_SIZE" : Bytes pro ODT_Entry
                 uint odt_daq_buffer_factor;  /// "ODT_DAQ_BUFFER_FACTOR"  : Nutzbytes * Faktor = Bytes für Sendepuffer
                 uint odt_stim_buffer_factor;  /// "ODT_STIM_BUFFER_FACTOR" : Nutzbytes * Faktor = Bytes für Empfangspuffer
+                taggedstruct {
+                    block "BUFFER_RESERVE" struct {     // default for all EVENTs
+                        uchar odt_daq_buffer_reserve;   /// ODT_DAQ_BUFFER_ELEMENT_RESERVE in % of ODT_DAQ_BUFFER_ELEMENT_SIZE
+                        uchar odt_stim_buffer_reserve;  /// ODT_STIM_BUFFER_ELEMENT_RESERVE in % of ODT_STIM_BUFFER_ELEMENT_SIZE
+                    };
+                };
             };
             (block "DAQ_LIST" struct {
                 uint daq_list_number;  /// DAQ_LIST_NUMBER
@@ -209,6 +274,7 @@ a2ml_specification! {
                     "MAX_ODT_ENTRIES" uchar;
                     "FIRST_PID" uchar;
                     "EVENT_FIXED" uint;
+                    "DAQ_PACKED_MODE_SUPPORTED";     /// supports DAQ packed mode
                     block "PREDEFINED" taggedstruct {
                         (block "ODT" struct {
                             uchar odt_number;  /// ODT number
@@ -242,8 +308,42 @@ a2ml_specification! {
                     "COMPLEMENTARY_BYPASS_EVENT_CHANNEL_NUMBER" uint;  ///This keyword is used to make a combination of two event channels building a bypassing raster.
                     "CONSISTENCY" enum {
                         "DAQ" = 0,
-                        "EVENT" = 1
+                        "EVENT" = 1,
+                        "ODT"   = 2,
+                        "NONE"  = 3
                     };  ///With this keyword, the slave can indicate what kind of data consistency exists when data are processed within this Event.
+                    "EVENT_COUNTER_PRESENT";
+                    "RELATED_EVENT_CHANNEL_NUMBER" uint;
+                    "RELATED_EVENT_CHANNEL_NUMBER_FIXED";        /* RELATED_EVENT_CHANNEL_NUMBER can not be modified. */
+                    "DTO_CTR_DAQ_MODE" enum {                    /* When inserting the DTO CTR field: */
+                        "INSERT_COUNTER" = 0,                    /* - use CTR of the related event channel */
+                        "INSERT_STIM_COUNTER_COPY" = 1           /* - use STIM CTR CPY of the related event channel */
+                    };
+                    "DTO_CTR_DAQ_MODE_FIXED";                    /* DTO_CTR_DAQ_MODE properties can not be modified. */
+                    "DTO_CTR_STIM_MODE" enum {                   /* When receiving DTOs with CTR field: */
+                        "DO_NOT_CHECK_COUNTER" = 0,              /* - do not check CTR */
+                        "CHECK_COUNTER" = 1                      /* - check CTR */
+                    };
+                    "DTO_CTR_STIM_MODE_FIXED";                   /* DTO_CTR_STIM_MODE properties can not be modified */
+                    "STIM_DTO_CTR_COPY_PRESENT";                 /* DTO CTR can be saved for later reference */
+                    block "DAQ_PACKED_MODE" struct {             /* DAQ packed mode, applies for all associated DAQ lists */
+                        enum Grouping {                          /* El. A,B,C,D, 3 samples */
+                            "ELEMENT_GROUPED" = 1,               /* A0A1A2B0B1B2C0C1C2D0D1D2 */
+                            "EVENT_GROUPED"   = 2                /* A0B0C0D0A1B1C1D1A2B2C2D2 */
+                        };
+                        enum TimestampMode {
+                            "STS_LAST"      = 0,                 /* single timestamp of last sample */
+                            "STS_FIRST"     = 1                  /* single timestamp of first sample */
+                        };
+                        enum PackedModeUsage {                   /* usage */
+                            "OPTIONAL"      = 0,                 /* optional, EVENT allows also non-packed mode */
+                            "MANDATORY"     = 1                  /* mandatory, only packed mode allowed */
+                        };
+                        uint sample_count;                       /* DAQ packed mode sample count */
+                        taggedstruct {
+                            ("ALT_SAMPLE_COUNT" uint)*;          /* other valid sample count values (optional) */
+                        };
+                    };
                     block "MIN_CYCLE_TIME" struct {
                         uchar event_channel_time_cycle;  /// EVENT_CHANNEL_TIME_CYCLE
                         uchar event_channel_time_unit;  /// EVENT_CHANNEL_TIME_UNIT
@@ -289,6 +389,9 @@ a2ml_specification! {
                 ("EVENT" uint)*;
             };
             block "DEFAULT_EVENT_LIST" taggedstruct {
+                ("EVENT" uint)*;
+            };
+            block "CONSISTENCY_EVENT_LIST" taggedstruct {
                 ("EVENT" uint)*;
             };
         };
@@ -355,8 +458,10 @@ a2ml_specification! {
                 taggedstruct {
                     "MAX_BLOCK_SIZE" ulong max_block_size;
                     "EXTERNAL_FUNCTION" char dllname[256];  /// Name of the Checksum.DLL
+                    "MTA_BLOCK_SIZE_ALIGN" uint align;
                 };
             };
+            "DEFAULT_PAGE_NUMBER" uchar def_page;  /// Number of the default page
             (block "PAGE" struct {
                 uchar page_number;  /// PAGE_NUMBER
                 enum EcuAccessPermission {
@@ -390,8 +495,83 @@ a2ml_specification! {
         };
     };
 
+    taggedstruct Time_Correlation {
+        /***********************************************************/
+        /*    XCP_SLAVE_CLOCK and ECU_CLOCK need not               */
+        /*    necessarily be the same clock, i.e. in case of       */
+        /*    an external XCP Slave, these clocks might differ     */
+        /***********************************************************/
+        "DAQ_TIMESTAMPS_RELATE_TO" enum {
+          "XCP_SLAVE_CLOCK"           = 0,
+          "ECU_CLOCK"                 = 1
+        };
+        (block "CLOCK" struct {
+            char uuid_octet_1;  /// globally unique clock identifier (UUID/EUI), 1st octet (most significant byte)
+            char uuid_octet_2;  /// globally unique clock identifier (UUID/EUI), 2nd octet
+            char uuid_octet_3;  /// globally unique clock identifier (UUID/EUI), 3rd octet
+            char uuid_octet_4;  /// globally unique clock identifier (UUID/EUI), 4th octet
+            char uuid_octet_5;  /// globally unique clock identifier (UUID/EUI), 5th octet
+            char uuid_octet_6;  /// globally unique clock identifier (UUID/EUI), 6th octet
+            char uuid_octet_7;  /// globally unique clock identifier (UUID/EUI), 7th octet
+            char uuid_octet_8;  /// globally unique clock identifier (UUID/EUI), 8th octet (least significant byte)
+            enum ClockType {                       /* clock enumerator */
+              "XCP_SLAVE_CLOCK"             = 0,
+              "ECU_CLOCK"                   = 1,
+              "XCP_SLAVE_GRANDMASTER_CLOCK" = 2,   /* related to XCP_SLAVE_CLOCK */
+              "ECU_GRANDMASTER_CLOCK"       = 3    /* related to ECU_CLOCK in case of an external slave */
+            };
+            enum Readability {                     /* readability */
+              "RANDOMLY_READABLE" = 0,
+              "LIMITED_READABLE"  = 1,
+              "NOT_READABLE"      = 2
+            };
+            enum SynSupport {                                     /* synchronization features */
+              "SYN_UNSUPPORTED"      = 0,                         /* clock neither supports synchronization */
+                                                                  /* nor syntonization */
+              "SYNCHRONIZATION_ONLY" = 1,                         /* clock only supports synchronization to */
+                                                                  /* external grandmaster clock */
+              "SYNTONIZATION_ONLY"   = 2,                         /* clock only supports syntonization to */
+                                                                  /* external grandmaster clock */
+              "SYN_ALL"              = 3                          /* clock supports synchronization as well */
+                                                                  /* as syntonization to external grandmaster clock */
+            };
+            uchar clock_quality;                                  /* clock quality, stratum level */
+            taggedstruct {
+                block "TIMESTAMP_CHARACTERIZATION" struct {
+                    uint timestamp_ticks;                             /* TIMESTAMP_TICKS */
+                    enum TimestampUnit {                              /* RESOLUTION OF TIMESTAMP */
+                        "UNIT_1NS"   = 0,
+                        "UNIT_10NS"  = 1,
+                        "UNIT_100NS" = 2,
+                        "UNIT_1US"   = 3,
+                        "UNIT_10US"  = 4,
+                        "UNIT_100US" = 5,
+                        "UNIT_1MS"   = 6,
+                        "UNIT_10MS"  = 7,
+                        "UNIT_100MS" = 8,
+                        "UNIT_1S"    = 9,
+                        "UNIT_1PS"   = 10,
+                        "UNIT_10PS"  = 11,
+                        "UNIT_100PS" = 12
+                    };
+                    enum NativeTimestampSize {                        /* NATIVE TIMESTAMP SIZE */
+                        "SIZE_FOUR_BYTE"  = 4,
+                        "SIZE_EIGHT_BYTE" = 8
+                    };
+                };
+            };
+            uint64 max_clock_value;                               /* MAX_TIMESTAMP_VALUE_BEFORE_WRAP_AROUND */
+            enum ClockEpoch {                                     /* epoch */
+              "ATOMIC_TIME"                = 0,                   /* TAI */
+              "UNIVERSAL_COORDINATED_TIME" = 1,                   /* UTC */
+              "ARBITRARY"                  = 2                    /* unknown */
+            };
+        })*;
+    };
+
     taggedstruct Common_Parameters {
         block "PROTOCOL_LAYER" struct Protocol_Layer;
+        block "TIME_CORRELATION" taggedstruct Time_Correlation;
         block "SEGMENT" struct Segment;
         block "DAQ" struct Daq;
         block "PAG" struct Pag;
@@ -826,6 +1006,55 @@ a2ml_specification! {
                     taggedstruct Common_Parameters;  /// overruling of default
                 };
             };
+        };
+
+        "XCPplus" struct {
+            uint xcpplus_version;
+            taggedstruct Common_Parameters; /* default parameters */
+            taggedstruct {
+                (block "XCP_ON_CAN" struct {
+                    struct CAN_Parameters;  /// specific for CAN
+                    taggedstruct Common_Parameters;  /// overruling of default
+                    taggedstruct {
+                        "TRANSPORT_LAYER_INSTANCE" char name[101];  /// name of the transport layer instance
+                    };
+                })*;
+                (block "XCP_ON_SxI" struct {
+                    struct SxI_Parameters;  /// specific for SxI
+                    taggedstruct Common_Parameters;  /// overruling of default
+                    taggedstruct {
+                        "TRANSPORT_LAYER_INSTANCE" char name[101];  /// name of the transport layer instance
+                    };
+                })*;
+                (block "XCP_ON_TCP_IP" struct {
+                    struct TCP_IP_Parameters;  /// specific for TCP_IP
+                    taggedstruct Common_Parameters;  /// overruling of default
+                    taggedstruct {
+                        "TRANSPORT_LAYER_INSTANCE" char name[101];  /// name of the transport layer instance
+                    };
+                })*;
+                (block "XCP_ON_UDP_IP" struct {
+                    struct UDP_IP_Parameters;  /// specific for UDP
+                    taggedstruct Common_Parameters;  /// overruling of default
+                    taggedstruct {
+                        "TRANSPORT_LAYER_INSTANCE" char name[101];  /// name of the transport layer instance
+                    };
+                })*;
+                (block "XCP_ON_USB" struct {
+                    struct USB_Parameters;  /// specific for USB
+                    taggedstruct Common_Parameters;  /// overruling of default
+                    taggedstruct {
+                        "TRANSPORT_LAYER_INSTANCE" char name[101];  /// name of the transport layer instance
+                    };
+                })*;
+                (block "XCP_ON_FLX" struct {
+                    struct FLX_Parameters;  /// specific for FlexRay
+                    taggedstruct Common_Parameters;  /// overruling of default
+                    taggedstruct {
+                        "TRANSPORT_LAYER_INSTANCE" char name[101];  /// name of the transport layer instance
+                    };
+                })*;
+            }; /* transport layer specific parameters */
         };
 
         "ASAP1B_CCP" taggedstruct {
