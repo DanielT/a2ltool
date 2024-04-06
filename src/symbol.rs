@@ -1,4 +1,5 @@
-use super::dwarf::{DebugData, TypeInfo};
+use crate::dwarf::DwarfDataType;
+use crate::dwarf::{DebugData, TypeInfo};
 
 #[cfg(test)]
 use std::collections::HashMap;
@@ -47,7 +48,15 @@ fn find_symbol_from_components<'a>(
             // this exists for completeness, but shouldn't happen with a correctly generated elffile
             // if the variable is present in the elffile, then the type should also be present
             if components.len() == 1 {
-                Ok((varinfo.address, &TypeInfo::Uint8))
+                Ok((
+                    varinfo.address,
+                    &TypeInfo {
+                        datatype: DwarfDataType::Uint8,
+                        name: None,
+                        unit_idx: usize::MAX,
+                        dbginfo_offset: 0,
+                    },
+                ))
             } else {
                 Err(format!(
                     "Remaining portion \"{}\" of \"{}\" could not be matched",
@@ -90,8 +99,8 @@ fn find_membertype<'a>(
     if component_index >= components.len() {
         Ok((address, typeinfo))
     } else {
-        match typeinfo {
-            TypeInfo::Class {
+        match &typeinfo.datatype {
+            DwarfDataType::Class {
                 members,
                 inheritance,
                 ..
@@ -126,7 +135,7 @@ fn find_membertype<'a>(
                     ))
                 }
             }
-            TypeInfo::Struct { members, .. } | TypeInfo::Union { members, .. } => {
+            DwarfDataType::Struct { members, .. } | DwarfDataType::Union { members, .. } => {
                 if let Some((membertype, offset)) = members.get(components[component_index]) {
                     find_membertype(
                         membertype,
@@ -142,7 +151,7 @@ fn find_membertype<'a>(
                     ))
                 }
             }
-            TypeInfo::Array {
+            DwarfDataType::Array {
                 dim,
                 stride,
                 arraytype,
@@ -228,8 +237,10 @@ mod test {
     fn test_find_symbol_of_array() {
         let mut dbgdata = DebugData {
             types: HashMap::new(),
+            typenames: HashMap::new(),
             variables: IndexMap::new(),
             demangled_names: HashMap::new(),
+            unit_names: Vec::new(),
         };
         // global variable: uint32_t my_array[2]
         dbgdata.variables.insert(
@@ -241,11 +252,21 @@ mod test {
         );
         dbgdata.types.insert(
             1,
-            TypeInfo::Array {
-                arraytype: Box::new(TypeInfo::Uint32),
-                dim: vec![2],
-                size: 8, // total size of the array
-                stride: 4,
+            TypeInfo {
+                datatype: DwarfDataType::Array {
+                    arraytype: Box::new(TypeInfo {
+                        datatype: DwarfDataType::Uint32,
+                        name: None,
+                        unit_idx: usize::MAX,
+                        dbginfo_offset: 0,
+                    }),
+                    dim: vec![2],
+                    size: 8, // total size of the array
+                    stride: 4,
+                },
+                name: None,
+                unit_idx: usize::MAX,
+                dbginfo_offset: 0,
             },
         );
 
@@ -272,8 +293,10 @@ mod test {
     fn test_find_symbol_of_array_in_struct() {
         let mut dbgdata = DebugData {
             types: HashMap::new(),
+            typenames: HashMap::new(),
             variables: IndexMap::new(),
             demangled_names: HashMap::new(),
+            unit_names: Vec::new(),
         };
         // global variable defined in C like this:
         // struct {
@@ -283,11 +306,21 @@ mod test {
         structmembers.insert(
             "array_item".to_string(),
             (
-                TypeInfo::Array {
-                    arraytype: Box::new(TypeInfo::Uint32),
-                    dim: vec![2],
-                    size: 8,
-                    stride: 4,
+                TypeInfo {
+                    datatype: DwarfDataType::Array {
+                        arraytype: Box::new(TypeInfo {
+                            datatype: DwarfDataType::Uint32,
+                            name: None,
+                            unit_idx: usize::MAX,
+                            dbginfo_offset: 0,
+                        }),
+                        dim: vec![2],
+                        size: 8,
+                        stride: 4,
+                    },
+                    name: None,
+                    unit_idx: usize::MAX,
+                    dbginfo_offset: 0,
                 },
                 0,
             ),
@@ -295,15 +328,20 @@ mod test {
         dbgdata.variables.insert(
             "my_struct".to_string(),
             crate::dwarf::VarInfo {
-                address: 0xcafe00,
+                address: 0x00ca_fe00,
                 typeref: 2,
             },
         );
         dbgdata.types.insert(
             2,
-            TypeInfo::Struct {
-                members: structmembers,
-                size: 4,
+            TypeInfo {
+                datatype: DwarfDataType::Struct {
+                    members: structmembers,
+                    size: 4,
+                },
+                unit_idx: 0,
+                name: None,
+                dbginfo_offset: 0,
             },
         );
 

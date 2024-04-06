@@ -1,9 +1,10 @@
-use gimli::{Abbreviations, DebuggingInformationEntry, Dwarf, UnitHeader};
+use gimli::{Abbreviations, DebugInfoOffset, DebuggingInformationEntry, Dwarf, UnitHeader};
 use gimli::{EndianSlice, RunTimeEndian};
 use indexmap::IndexMap;
 use object::read::ObjectSection;
 use object::{Endianness, Object};
 use std::ffi::OsStr;
+use std::fmt::Display;
 use std::ops::Index;
 use std::{collections::HashMap, fs::File};
 
@@ -24,7 +25,15 @@ pub(crate) struct VarInfo {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum TypeInfo {
+pub(crate) struct TypeInfo {
+    pub(crate) name: Option<String>, // not all types have a name
+    pub(crate) unit_idx: usize,
+    pub(crate) datatype: DwarfDataType,
+    pub(crate) dbginfo_offset: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum DwarfDataType {
     Uint8,
     Uint16,
     Uint32,
@@ -40,15 +49,12 @@ pub(crate) enum TypeInfo {
         bit_offset: u16,
         bit_size: u16,
     },
-    Pointer(u64),
-    Other(u64),
+    Pointer(u64, DebugInfoOffset),
     Struct {
-        // typename: String,
         size: u64,
         members: IndexMap<String, (TypeInfo, u64)>,
     },
     Class {
-        // typename: String,
         size: u64,
         inheritance: IndexMap<String, (TypeInfo, u64)>,
         members: IndexMap<String, (TypeInfo, u64)>,
@@ -58,7 +64,6 @@ pub(crate) enum TypeInfo {
         members: IndexMap<String, (TypeInfo, u64)>,
     },
     Enum {
-        typename: String,
         size: u64,
         enumerators: Vec<(String, i64)>,
     },
@@ -68,6 +73,9 @@ pub(crate) enum TypeInfo {
         stride: u64,
         arraytype: Box<TypeInfo>,
     },
+    TypeRef(usize, u64),
+    FuncPtr(u64),
+    Other(u64),
 }
 
 pub(crate) struct UnitList<'a> {
@@ -78,14 +86,16 @@ pub(crate) struct UnitList<'a> {
 pub(crate) struct DebugData {
     pub(crate) variables: IndexMap<String, VarInfo>,
     pub(crate) types: HashMap<usize, TypeInfo>,
+    pub(crate) typenames: HashMap<String, Vec<usize>>,
     pub(crate) demangled_names: HashMap<String, String>,
+    pub(crate) unit_names: Vec<Option<String>>,
 }
 
 struct DebugDataReader<'elffile> {
     dwarf: Dwarf<EndianSlice<'elffile, RunTimeEndian>>,
     verbose: bool,
-    typedefs: HashMap<usize, String>,
     units: UnitList<'elffile>,
+    unit_names: Vec<Option<String>>,
     endian: Endianness,
 }
 
@@ -99,8 +109,8 @@ impl DebugData {
         let mut dbg_reader = DebugDataReader {
             dwarf,
             verbose,
-            typedefs: HashMap::new(),
             units: UnitList::new(),
+            unit_names: Vec::new(),
             endian: elffile.endianness(),
         };
 
@@ -184,14 +194,19 @@ impl<'elffile> DebugDataReader<'elffile> {
     // read the debug information entries in the DWAF data to get all the global variables and their types
     fn read_debug_info_entries(&mut self) -> DebugData {
         let variables = self.load_variables();
-        let types = self.load_types(&variables);
+        let (types, typenames) = self.load_types(&variables);
         let varname_list: Vec<&String> = variables.keys().collect();
         let demangled_names = demangle_cpp_varnames(&varname_list);
+
+        let mut unit_names = Vec::new();
+        std::mem::swap(&mut unit_names, &mut self.unit_names);
 
         DebugData {
             variables,
             types,
+            typenames,
             demangled_names,
+            unit_names,
         }
     }
 
@@ -210,6 +225,13 @@ impl<'elffile> DebugDataReader<'elffile> {
             // static variable in functions are hidden further down inside of DW_TAG_subprogram[/DW_TAG_lexical_block]*
             // we can easily find all of them by using depth-first traversal of the tree
             let mut entries_cursor = unit.entries(abbreviations);
+            if let Ok(Some((_, entry))) = entries_cursor.next_dfs() {
+                if entry.tag() == gimli::constants::DW_TAG_compile_unit {
+                    self.unit_names
+                        .push(get_name_attribute(entry, &self.dwarf, unit).ok());
+                }
+            }
+
             while let Ok(Some((_depth_delta, entry))) = entries_cursor.next_dfs() {
                 if entry.tag() == gimli::constants::DW_TAG_variable {
                     match self.get_global_variable(entry, unit, abbreviations) {
@@ -228,15 +250,6 @@ impl<'elffile> DebugDataReader<'elffile> {
                                     .0;
                                 println!("Error loading variable @{offset:x}: {errmsg}");
                             }
-                        }
-                    }
-                } else if entry.tag() == gimli::constants::DW_TAG_typedef {
-                    // collect information about all typedefs
-                    if let Ok(name) = get_name_attribute(entry, &self.dwarf, unit) {
-                        if let Ok(typeref) = get_typeref_attribute(entry, unit) {
-                            // build a reverse map from the referenced type to the typedef name
-                            // it's possible that a type has multiple typedefs, in which case we only keep the last one
-                            self.typedefs.insert(typeref, name);
                         }
                     }
                 }
@@ -346,26 +359,288 @@ impl<'a> Index<usize> for UnitList<'a> {
 }
 
 impl TypeInfo {
+    const MAX_RECURSION_DEPTH: usize = 5;
+
     pub(crate) fn get_size(&self) -> u64 {
-        match self {
-            TypeInfo::Uint8 => 1,
-            TypeInfo::Uint16 => 2,
-            TypeInfo::Uint32 => 4,
-            TypeInfo::Uint64 => 8,
-            TypeInfo::Sint8 => 1,
-            TypeInfo::Sint16 => 2,
-            TypeInfo::Sint32 => 4,
-            TypeInfo::Sint64 => 8,
-            TypeInfo::Float => 4,
-            TypeInfo::Double => 8,
-            TypeInfo::Bitfield { basetype, .. } => basetype.get_size(),
-            TypeInfo::Pointer(size)
-            | TypeInfo::Other(size)
-            | TypeInfo::Struct { size, .. }
-            | TypeInfo::Class { size, .. }
-            | TypeInfo::Union { size, .. }
-            | TypeInfo::Enum { size, .. }
-            | TypeInfo::Array { size, .. } => *size,
+        match &self.datatype {
+            DwarfDataType::Uint8 => 1,
+            DwarfDataType::Uint16 => 2,
+            DwarfDataType::Uint32 => 4,
+            DwarfDataType::Uint64 => 8,
+            DwarfDataType::Sint8 => 1,
+            DwarfDataType::Sint16 => 2,
+            DwarfDataType::Sint32 => 4,
+            DwarfDataType::Sint64 => 8,
+            DwarfDataType::Float => 4,
+            DwarfDataType::Double => 8,
+            DwarfDataType::Bitfield { basetype, .. } => basetype.get_size(),
+            DwarfDataType::Pointer(size, _)
+            | DwarfDataType::Other(size)
+            | DwarfDataType::Struct { size, .. }
+            | DwarfDataType::Class { size, .. }
+            | DwarfDataType::Union { size, .. }
+            | DwarfDataType::Enum { size, .. }
+            | DwarfDataType::Array { size, .. }
+            | DwarfDataType::FuncPtr(size)
+            | DwarfDataType::TypeRef(_, size) => *size,
+        }
+    }
+
+    pub(crate) fn get_members(&self) -> Option<&IndexMap<String, (TypeInfo, u64)>> {
+        match &self.datatype {
+            DwarfDataType::Struct { members, .. }
+            | DwarfDataType::Class { members, .. }
+            | DwarfDataType::Union { members, .. } => Some(members),
+
+            _ => None,
+        }
+    }
+
+    pub(crate) fn get_pointer<'a>(
+        &self,
+        types: &'a HashMap<usize, TypeInfo>,
+    ) -> Option<(u64, &'a TypeInfo)> {
+        if let DwarfDataType::Pointer(pt_size, pt_ref) = &self.datatype {
+            let typeinfo = types.get(&pt_ref.0)?;
+            Some((*pt_size, typeinfo))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn get_arraytype(&self) -> Option<&TypeInfo> {
+        if let DwarfDataType::Array { arraytype, .. } = &self.datatype {
+            Some(arraytype)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn get_reference<'a>(&'a self, types: &'a HashMap<usize, TypeInfo>) -> &'a Self {
+        if let DwarfDataType::TypeRef(dbginfo_offset, _) = &self.datatype {
+            types.get(dbginfo_offset).unwrap_or(self)
+        } else {
+            self
+        }
+    }
+
+    // not using PartialEq, because not all fields are considered for this comparison
+    pub(crate) fn compare(&self, other: &TypeInfo, types: &HashMap<usize, TypeInfo>) -> bool {
+        self.compare_internal(other, types, 0)
+    }
+
+    fn compare_internal(
+        &self,
+        other: &TypeInfo,
+        types: &HashMap<usize, TypeInfo>,
+        depth: usize,
+    ) -> bool {
+        let type_1 = self.get_reference(types);
+        let type_2 = other.get_reference(types);
+
+        type_1.dbginfo_offset == type_2.dbginfo_offset
+            || (type_1.name == type_2.name
+                && match (&type_1.datatype, &type_2.datatype) {
+                    (DwarfDataType::Uint8, DwarfDataType::Uint8)
+                    | (DwarfDataType::Uint16, DwarfDataType::Uint16)
+                    | (DwarfDataType::Uint32, DwarfDataType::Uint32)
+                    | (DwarfDataType::Uint64, DwarfDataType::Uint64)
+                    | (DwarfDataType::Sint8, DwarfDataType::Sint8)
+                    | (DwarfDataType::Sint16, DwarfDataType::Sint16)
+                    | (DwarfDataType::Sint32, DwarfDataType::Sint32)
+                    | (DwarfDataType::Sint64, DwarfDataType::Sint64)
+                    | (DwarfDataType::Float, DwarfDataType::Float)
+                    | (DwarfDataType::Double, DwarfDataType::Double) => true,
+                    (
+                        DwarfDataType::Enum { size, enumerators },
+                        DwarfDataType::Enum {
+                            size: size2,
+                            enumerators: enumerators2,
+                        },
+                    ) => size == size2 && enumerators == enumerators2,
+                    (
+                        DwarfDataType::Array {
+                            size,
+                            dim,
+                            stride,
+                            arraytype,
+                        },
+                        DwarfDataType::Array {
+                            size: size2,
+                            dim: dim2,
+                            stride: stride2,
+                            arraytype: arraytype2,
+                        },
+                    ) => {
+                        size == size2
+                            && dim == dim2
+                            && stride == stride2
+                            && arraytype.compare_internal(arraytype2, types, depth + 1)
+                    }
+                    (
+                        DwarfDataType::Pointer(size1, dest_offset1),
+                        DwarfDataType::Pointer(size2, dest_offset2),
+                    ) => {
+                        size1 == size2
+                            && if dest_offset1.0 == dest_offset2.0 {
+                                true
+                            } else if let (Some(dest_type1), Some(dest_type2)) =
+                                (types.get(&dest_offset1.0), types.get(&dest_offset2.0))
+                            {
+                                // can't always call ref1.compare(&ref2) here, because this could result in infinite recursion
+                                if depth < Self::MAX_RECURSION_DEPTH {
+                                    dest_type1.compare_internal(dest_type2, types, depth + 1)
+                                } else {
+                                    // when we're not using compare(), we need to follow TypeRef (if any) to the referenced type
+                                    let dest1_deref = dest_type1.get_reference(types);
+                                    let dest2_deref = dest_type2.get_reference(types);
+                                    dest1_deref.name == dest2_deref.name
+                                        && std::mem::discriminant(&dest1_deref.datatype)
+                                            == std::mem::discriminant(&dest2_deref.datatype)
+                                        && dest1_deref.get_size() == dest2_deref.get_size()
+                                }
+                            } else {
+                                false
+                            }
+                    }
+                    (DwarfDataType::Other(size1), DwarfDataType::Other(size2)) => size1 == size2,
+                    (
+                        DwarfDataType::Bitfield {
+                            basetype,
+                            bit_offset,
+                            bit_size,
+                        },
+                        DwarfDataType::Bitfield {
+                            basetype: basetype2,
+                            bit_offset: bit_offset2,
+                            bit_size: bit_size2,
+                        },
+                    ) => {
+                        bit_offset == bit_offset2
+                            && bit_size == bit_size2
+                            && basetype.compare_internal(basetype2, types, depth + 1)
+                    }
+                    (
+                        DwarfDataType::Struct { size, members },
+                        DwarfDataType::Struct {
+                            size: size2,
+                            members: members2,
+                        },
+                    ) => size == size2 && Self::compare_members(members, members2, types, depth),
+                    (
+                        DwarfDataType::Union { size, members },
+                        DwarfDataType::Union {
+                            size: size2,
+                            members: members2,
+                        },
+                    ) => size == size2 && Self::compare_members(members, members2, types, depth),
+                    (
+                        DwarfDataType::Class {
+                            size,
+                            members,
+                            inheritance,
+                        },
+                        DwarfDataType::Class {
+                            size: size2,
+                            members: members2,
+                            inheritance: inheritance2,
+                        },
+                    ) => {
+                        size == size2
+                            && Self::compare_members(members, members2, types, depth)
+                            && Self::compare_members(inheritance, inheritance2, types, depth)
+                    }
+                    (DwarfDataType::FuncPtr(size1), DwarfDataType::FuncPtr(size2)) => {
+                        size1 == size2
+                    }
+                    _ => false,
+                })
+    }
+
+    fn compare_members(
+        members1: &IndexMap<String, (TypeInfo, u64)>,
+        members2: &IndexMap<String, (TypeInfo, u64)>,
+        types: &HashMap<usize, TypeInfo>,
+        depth: usize,
+    ) -> bool {
+        if members1.len() != members2.len() {
+            return false;
+        }
+        for (member1_name, (member1_type, member1_offset)) in members1 {
+            let Some((member2_type, member2_offset)) = members2.get(member1_name) else {
+                return false;
+            };
+            if member1_offset != member2_offset {
+                return false;
+            }
+            if depth < Self::MAX_RECURSION_DEPTH {
+                if !member1_type.compare_internal(member2_type, types, depth + 1) {
+                    return false;
+                }
+            } else {
+                let member1_deref = member1_type.get_reference(types);
+                let member2_deref = member2_type.get_reference(types);
+                if std::mem::discriminant(&member1_deref.datatype)
+                    != std::mem::discriminant(&member2_deref.datatype)
+                    || member1_deref.name != member2_deref.name
+                {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+
+impl Display for TypeInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.datatype {
+            DwarfDataType::Uint8 => f.write_str("Uint8"),
+            DwarfDataType::Uint16 => f.write_str("Uint16"),
+            DwarfDataType::Uint32 => f.write_str("Uint32"),
+            DwarfDataType::Uint64 => f.write_str("Uint64"),
+            DwarfDataType::Sint8 => f.write_str("Sint8"),
+            DwarfDataType::Sint16 => f.write_str("Sint16"),
+            DwarfDataType::Sint32 => f.write_str("Sint32"),
+            DwarfDataType::Sint64 => f.write_str("Sint64"),
+            DwarfDataType::Float => f.write_str("Float"),
+            DwarfDataType::Double => f.write_str("Double"),
+            DwarfDataType::Bitfield { .. } => f.write_str("Bitfield"),
+            DwarfDataType::Pointer(_, _) => write!(f, "Pointer(...)"),
+            DwarfDataType::Other(osize) => write!(f, "Other({osize})"),
+            DwarfDataType::FuncPtr(osize) => write!(f, "function pointer({osize})"),
+            DwarfDataType::Struct { members, .. } => {
+                if let Some(name) = &self.name {
+                    write!(f, "Struct {name}({} members)", members.len())
+                } else {
+                    write!(f, "Struct <anonymous>({} members)", members.len())
+                }
+            }
+            DwarfDataType::Class { members, .. } => {
+                if let Some(name) = &self.name {
+                    write!(f, "Class {name}({} members)", members.len())
+                } else {
+                    write!(f, "Class <anonymous>({} members)", members.len())
+                }
+            }
+            DwarfDataType::Union { members, .. } => {
+                if let Some(name) = &self.name {
+                    write!(f, "Union {name}({} members)", members.len())
+                } else {
+                    write!(f, "Union <anonymous>({} members)", members.len())
+                }
+            }
+            DwarfDataType::Enum { enumerators, .. } => {
+                if let Some(name) = &self.name {
+                    write!(f, "Enum {name}({} enumerators)", enumerators.len())
+                } else {
+                    write!(f, "Enum <anonymous>({} enumerators)", enumerators.len())
+                }
+            }
+            DwarfDataType::Array { dim, arraytype, .. } => {
+                write!(f, "Array({dim:?} x {arraytype})")
+            }
+            DwarfDataType::TypeRef(t_ref, _) => write!(f, "TypeRef({t_ref})"),
         }
     }
 }
@@ -374,7 +649,7 @@ impl TypeInfo {
 mod test {
     use super::*;
 
-    static ELF_FILE_NAMES: [&'static str; 7] = [
+    static ELF_FILE_NAMES: [&str; 7] = [
         "tests/elffiles/debugdata_clang.elf",
         "tests/elffiles/debugdata_clang_dw4.elf",
         "tests/elffiles/debugdata_clang_dw4_dwz.elf",
@@ -403,56 +678,130 @@ mod test {
 
             let varinfo = debugdata.variables.get("class1").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Class { .. }));
-            if let TypeInfo::Class {
-                inheritance,
-                members,
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Class { .. },
+                    ..
+                }
+            ));
+            if let TypeInfo {
+                datatype:
+                    DwarfDataType::Class {
+                        inheritance,
+                        members,
+                        ..
+                    },
                 ..
             } = typeinfo
             {
                 assert!(inheritance.contains_key("base1"));
                 assert!(inheritance.contains_key("base2"));
-                assert!(matches!(members.get("ss"), Some((TypeInfo::Sint16, _))));
+                assert!(matches!(
+                    members.get("ss"),
+                    Some((
+                        TypeInfo {
+                            datatype: DwarfDataType::Sint16,
+                            ..
+                        },
+                        _
+                    ))
+                ));
                 assert!(matches!(
                     members.get("base1_var"),
-                    Some((TypeInfo::Sint32, _))
+                    Some((
+                        TypeInfo {
+                            datatype: DwarfDataType::Sint32,
+                            ..
+                        },
+                        _
+                    ))
                 ));
                 assert!(matches!(
                     members.get("base2var"),
-                    Some((TypeInfo::Sint32, _))
+                    Some((
+                        TypeInfo {
+                            datatype: DwarfDataType::Sint32,
+                            ..
+                        },
+                        _
+                    ))
                 ));
             }
 
             let varinfo = debugdata.variables.get("class2").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Class { .. }));
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Class { .. },
+                    ..
+                }
+            ));
 
             let varinfo = debugdata.variables.get("class3").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Class { .. }));
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Class { .. },
+                    ..
+                }
+            ));
 
             let varinfo = debugdata.variables.get("class4").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Class { .. }));
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Class { .. },
+                    ..
+                }
+            ));
 
             let varinfo = debugdata.variables.get("staticvar").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Sint32));
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Sint32,
+                    ..
+                }
+            ));
 
             let varinfo = debugdata.variables.get("structvar").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Struct { .. }));
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Struct { .. },
+                    ..
+                }
+            ));
 
             let varinfo = debugdata.variables.get("bitfield").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Struct { .. }));
-            if let TypeInfo::Struct { members, .. } = typeinfo {
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Struct { .. },
+                    ..
+                }
+            ));
+            if let TypeInfo {
+                datatype: DwarfDataType::Struct { members, .. },
+                ..
+            } = typeinfo
+            {
                 assert!(matches!(
                     members.get("var"),
                     Some((
-                        TypeInfo::Bitfield {
-                            bit_offset: 0,
-                            bit_size: 5,
+                        TypeInfo {
+                            datatype: DwarfDataType::Bitfield {
+                                bit_offset: 0,
+                                bit_size: 5,
+                                ..
+                            },
                             ..
                         },
                         0
@@ -461,9 +810,12 @@ mod test {
                 assert!(matches!(
                     members.get("var2"),
                     Some((
-                        TypeInfo::Bitfield {
-                            bit_offset: 5,
-                            bit_size: 5,
+                        TypeInfo {
+                            datatype: DwarfDataType::Bitfield {
+                                bit_offset: 5,
+                                bit_size: 5,
+                                ..
+                            },
                             ..
                         },
                         0
@@ -472,9 +824,12 @@ mod test {
                 assert!(matches!(
                     members.get("var3"),
                     Some((
-                        TypeInfo::Bitfield {
-                            bit_offset: 0,
-                            bit_size: 23,
+                        TypeInfo {
+                            datatype: DwarfDataType::Bitfield {
+                                bit_offset: 0,
+                                bit_size: 23,
+                                ..
+                            },
                             ..
                         },
                         4
@@ -483,9 +838,12 @@ mod test {
                 assert!(matches!(
                     members.get("var4"),
                     Some((
-                        TypeInfo::Bitfield {
-                            bit_offset: 23,
-                            bit_size: 1,
+                        TypeInfo {
+                            datatype: DwarfDataType::Bitfield {
+                                bit_offset: 23,
+                                bit_size: 1,
+                                ..
+                            },
                             ..
                         },
                         4
@@ -494,13 +852,31 @@ mod test {
             }
             let varinfo = debugdata.variables.get("enum_var1").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Enum { .. }));
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Enum { .. },
+                    ..
+                }
+            ));
             let varinfo = debugdata.variables.get("enum_var2").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Enum { .. }));
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Enum { .. },
+                    ..
+                }
+            ));
             let varinfo = debugdata.variables.get("enum_var3").unwrap();
             let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
-            assert!(matches!(typeinfo, TypeInfo::Enum { .. }));
+            assert!(matches!(
+                typeinfo,
+                TypeInfo {
+                    datatype: DwarfDataType::Enum { .. },
+                    ..
+                }
+            ));
         }
     }
 }

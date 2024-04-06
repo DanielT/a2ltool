@@ -1,0 +1,243 @@
+/* a2ltool 1.6.0 */
+ASAP2_VERSION 1 71
+/begin PROJECT test_project ""
+  /begin MODULE test_module ""
+
+    /begin INSTANCE reg ""
+      RegDef 0x9038
+      SYMBOL_LINK "reg" 0
+    /end INSTANCE
+
+    /begin INSTANCE struct_b ""
+      StructB 0x9040
+      SYMBOL_LINK "struct_b" 0
+    /end INSTANCE
+
+    /begin INSTANCE TEST_struct ""
+      TestStruct 0x9078
+      SYMBOL_LINK "TEST_struct" 0
+    /end INSTANCE
+
+    /begin INSTANCE TEST_structarr ""
+      TestStruct 0x907C
+      MATRIX_DIM 10
+      SYMBOL_LINK "TEST_structarr" 0
+    /end INSTANCE
+
+    /begin INSTANCE TEST_structarr_arr ""
+      TestStruct 0x90A4
+      MATRIX_DIM 2 10
+      SYMBOL_LINK "TEST_structarr_arr" 0
+    /end INSTANCE
+
+    /begin INSTANCE TEST_structarr_ptr ""
+      TestStruct 0x9018
+      ADDRESS_TYPE PLONG
+      MATRIX_DIM 10
+      SYMBOL_LINK "TEST_structarr_ptr" 0
+    /end INSTANCE
+
+    /begin INSTANCE TEST_structarr_ptr_arr ""
+      LongPointer_Array_10_TestStruct 0x901C
+      MATRIX_DIM 2
+      SYMBOL_LINK "TEST_structarr_ptr_arr" 0
+    /end INSTANCE
+
+    /begin INSTANCE TEST_structptr ""
+      TestStruct 0x9010
+      ADDRESS_TYPE PLONG
+      SYMBOL_LINK "TEST_structptr" 0
+    /end INSTANCE
+
+    /begin INSTANCE TEST_structptr_arr ""
+      LongPointer_TestStruct 0x9024
+      MATRIX_DIM 4
+      SYMBOL_LINK "TEST_structptr_arr" 0
+    /end INSTANCE
+
+    /begin INSTANCE TEST_structptr_arr_ptr ""
+      LongPointer_TestStruct 0x9034
+      ADDRESS_TYPE PLONG
+      MATRIX_DIM 4
+      SYMBOL_LINK "TEST_structptr_arr_ptr" 0
+    /end INSTANCE
+
+    /begin INSTANCE TEST_structptr_ptr ""
+      LongPointer_TestStruct 0x9014
+      ADDRESS_TYPE PLONG
+      SYMBOL_LINK "TEST_structptr_ptr" 0
+    /end INSTANCE
+
+    /begin TYPEDEF_MEASUREMENT Measurement_ULong ""
+      ULONG NO_COMPU_METHOD 0 0 0 4294967295
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_MEASUREMENT Measurement_Float32 ""
+      FLOAT32_IEEE NO_COMPU_METHOD 0 0 -3.4028234663852886e38 3.4028234663852886e38
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_MEASUREMENT Measurement_UInt64 ""
+      A_UINT64 NO_COMPU_METHOD 0 0 0 1.8446744073709552e19
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_MEASUREMENT Measurement_ULong_0x1F ""
+      ULONG NO_COMPU_METHOD 0 0 0 32
+      BIT_MASK 0x1F
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_MEASUREMENT Measurement_ULong_0x3E0 ""
+      ULONG NO_COMPU_METHOD 0 0 0 32
+      BIT_MASK 0x3E0
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_MEASUREMENT Measurement_ULong_0x7C00 ""
+      ULONG NO_COMPU_METHOD 0 0 0 32
+      BIT_MASK 0x7C00
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_MEASUREMENT Measurement_ULong_0xF8000 ""
+      ULONG NO_COMPU_METHOD 0 0 0 32
+      BIT_MASK 0xF8000
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_MEASUREMENT MyEnum ""
+      UWORD MyEnum 0 0 20 11111
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_STRUCTURE LongPointer_Array_10_TestStruct ""
+      0x28
+      ADDRESS_TYPE PLONG
+      /begin STRUCTURE_COMPONENT
+        array_element TestStruct
+        0
+        MATRIX_DIM 10
+      /end STRUCTURE_COMPONENT
+      SYMBOL_TYPE_LINK "TestStruct"
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_STRUCTURE LongPointer_TestStruct ""
+      0x4
+      ADDRESS_TYPE PLONG
+      /begin STRUCTURE_COMPONENT
+        value Measurement_ULong
+        0
+        SYMBOL_TYPE_LINK "value"
+      /end STRUCTURE_COMPONENT
+      SYMBOL_TYPE_LINK "TestStruct"
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_STRUCTURE TestStruct ""
+      0x4
+      /begin STRUCTURE_COMPONENT
+        value Measurement_ULong
+        0
+        SYMBOL_TYPE_LINK "value"
+      /end STRUCTURE_COMPONENT
+      SYMBOL_TYPE_LINK "TestStruct"
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_STRUCTURE RegDef ""
+      0x4
+      /begin STRUCTURE_COMPONENT
+        Value Measurement_ULong
+        0
+        SYMBOL_TYPE_LINK "Value"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        Bits_ABC Measurement_ULong_0x1F
+        0
+        SYMBOL_TYPE_LINK "Bits_ABC"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        Bits_DEF Measurement_ULong_0x3E0
+        0
+        SYMBOL_TYPE_LINK "Bits_DEF"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        Bits_GHI Measurement_ULong_0x7C00
+        0
+        SYMBOL_TYPE_LINK "Bits_GHI"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        Bits_JKL Measurement_ULong_0xF8000
+        0
+        SYMBOL_TYPE_LINK "Bits_JKL"
+      /end STRUCTURE_COMPONENT
+      SYMBOL_TYPE_LINK "RegDef"
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_STRUCTURE StructA ""
+      0x18
+      /begin STRUCTURE_COMPONENT
+        enumval MyEnum
+        0
+        SYMBOL_TYPE_LINK "enumval"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        val_i32 Measurement_ULong
+        4
+        SYMBOL_TYPE_LINK "val_i32"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        val_i64 Measurement_UInt64
+        8
+        SYMBOL_TYPE_LINK "val_i64"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        val_f32 Measurement_Float32
+        16
+        SYMBOL_TYPE_LINK "val_f32"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        nonexistent_nothing Measurement_Float32
+        20
+        SYMBOL_TYPE_LINK "nonexistent_nothing"
+      /end STRUCTURE_COMPONENT
+      SYMBOL_TYPE_LINK "baaaaaaaaaaaaaaaad"
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_STRUCTURE StructB ""
+      0x38
+      /begin STRUCTURE_COMPONENT
+        pPrev StructB
+        0
+        ADDRESS_TYPE PLONG
+        SYMBOL_TYPE_LINK "pPrev"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        pNext StructB
+        4
+        ADDRESS_TYPE PLONG
+        SYMBOL_TYPE_LINK "pNext"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        s1 StructA
+        8
+        SYMBOL_TYPE_LINK "s1"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        s2 StructA
+        32
+        SYMBOL_TYPE_LINK "s2"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        nonexistent_nothing Measurement_Float32
+        56
+        SYMBOL_TYPE_LINK "nonexistent_nothing"
+      /end STRUCTURE_COMPONENT
+      SYMBOL_TYPE_LINK "StructB"
+    /end TYPEDEF_STRUCTURE
+
+    /begin COMPU_METHOD MyEnum "Conversion table for enum MyEnum"
+      TAB_VERB "%.4" ""
+      COMPU_TAB_REF MyEnum
+    /end COMPU_METHOD
+
+    /begin COMPU_VTAB MyEnum "Conversion table for enum MyEnum"
+      TAB_VERB 3
+      20 "VALUE_2"
+      100 "VALUE_1"
+      11111 "VALUE_3"
+    /end COMPU_VTAB
+  /end MODULE
+/end PROJECT

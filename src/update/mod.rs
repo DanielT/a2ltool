@@ -1,7 +1,7 @@
-use super::dwarf::{DebugData, TypeInfo};
-use super::ifdata;
-use a2lfile::{A2lFile, BitMask, EcuAddress, IfData, MatrixDim, SymbolLink};
-use std::collections::HashSet;
+use crate::dwarf::{DebugData, TypeInfo};
+use crate::ifdata;
+use a2lfile::{A2lFile, A2lObject, BitMask, EcuAddress, IfData, MatrixDim, Module, SymbolLink};
+use std::collections::{HashMap, HashSet};
 
 mod axis_pts;
 mod blob;
@@ -11,15 +11,18 @@ mod ifdata_update;
 mod instance;
 mod measurement;
 mod record_layout;
+mod typedef;
 
-use crate::datatype::*;
-use crate::symbol::*;
+use crate::datatype::{get_a2l_datatype, get_type_limits};
+use crate::dwarf::DwarfDataType;
+use crate::symbol::find_symbol;
 use axis_pts::*;
-use blob::*;
+use blob::{cleanup_removed_blobs, update_module_blobs};
 use characteristic::*;
-use instance::*;
+use instance::update_module_instances;
 use measurement::*;
 use record_layout::*;
+use typedef::update_module_typedefs;
 
 pub(crate) struct UpdateSumary {
     pub(crate) measurement_updated: u32,
@@ -34,6 +37,22 @@ pub(crate) struct UpdateSumary {
     pub(crate) instance_not_updated: u32,
 }
 
+#[derive(Debug, Clone)]
+enum TypedefReferrer {
+    Instance(usize),
+    StructureComponent(String, String),
+}
+
+struct TypedefNames {
+    axis: HashSet<String>,
+    blob: HashSet<String>,
+    characteristic: HashSet<String>,
+    measurement: HashSet<String>,
+    structure: HashSet<String>,
+}
+
+type TypedefsRefInfo<'a> = HashMap<String, Vec<(Option<&'a TypeInfo>, TypedefReferrer)>>;
+
 // perform an address update.
 // This update can be destructive (any object that cannot be updated will be discarded)
 // or non-destructive (addresses of invalid objects will be set to zero).
@@ -42,6 +61,7 @@ pub(crate) fn update_addresses(
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
+    enable_structures: bool,
 ) -> UpdateSumary {
     let use_new_matrix_dim = check_version_1_70(a2l_file);
 
@@ -89,11 +109,30 @@ pub(crate) fn update_addresses(
         summary.blob_updated += updated;
         summary.blob_not_updated += not_updated;
 
+        let typedef_names = TypedefNames::new(module);
+
         // update all INSTANCEs
-        let (updated, not_updated) =
-            update_module_instances(module, debug_data, log_msgs, preserve_unknown);
-        summary.blob_updated += updated;
-        summary.blob_not_updated += not_updated;
+        let (updated, not_updated, typedef_ref_info) = update_module_instances(
+            module,
+            debug_data,
+            log_msgs,
+            preserve_unknown,
+            &typedef_names,
+        );
+        summary.instance_updated += updated;
+        summary.instance_not_updated += not_updated;
+
+        if enable_structures {
+            update_module_typedefs(
+                module,
+                debug_data,
+                log_msgs,
+                preserve_unknown,
+                typedef_ref_info,
+                typedef_names,
+                &mut reclayout_info,
+            );
+        }
     }
 
     summary
@@ -192,7 +231,7 @@ fn update_matrix_dim(
     let mut cur_typeinfo = typeinfo;
     // compilers can represent multi-dimensional arrays in two different ways:
     // either as nested arrays, each with one dimension, or as one array with multiple dimensions
-    while let TypeInfo::Array { dim, arraytype, .. } = &cur_typeinfo {
+    while let DwarfDataType::Array { dim, arraytype, .. } = &cur_typeinfo.datatype {
         for val in dim {
             matrix_dim_values.push(*val as u16);
         }
@@ -228,18 +267,22 @@ fn set_measurement_ecu_address(opt_ecu_address: &mut Option<EcuAddress>, address
 
 // CHARACTERISTIC and MEASUREMENT objects contain a BIT_MASK for bitfield elements
 // it will be created/updated/deleted here, depending on the new data type of the variable
-fn set_bitmask(opt_bitmask: &mut Option<BitMask>, datatype: &TypeInfo) {
-    if let TypeInfo::Bitfield {
+fn set_bitmask(opt_bitmask: &mut Option<BitMask>, typeinfo: &TypeInfo) {
+    if let DwarfDataType::Bitfield {
         bit_offset,
         bit_size,
         ..
-    } = datatype
+    } = &typeinfo.datatype
     {
-        let mask = ((1 << bit_size) - 1) << bit_offset;
+        // make sure we don't panic for bit_size = 32
+        let wide_mask: u64 = ((1 << bit_size) - 1) << bit_offset;
+        let mask: u32 = wide_mask.try_into().unwrap_or(0xffff_ffff);
         if let Some(bit_mask) = opt_bitmask {
             bit_mask.mask = mask;
         } else {
-            *opt_bitmask = Some(BitMask::new(mask));
+            let mut bm = BitMask::new(mask);
+            bm.get_layout_mut().item_location.0 = (0, true); // write bitmask as hex by default
+            *opt_bitmask = Some(bm);
         }
     } else {
         *opt_bitmask = None;
@@ -308,5 +351,45 @@ impl UpdateSumary {
             instance_not_updated: 0,
             instance_updated: 0,
         }
+    }
+}
+
+impl TypedefNames {
+    pub(crate) fn new(module: &Module) -> Self {
+        Self {
+            axis: module
+                .typedef_axis
+                .iter()
+                .map(|item| item.name.clone())
+                .collect(),
+            blob: module
+                .typedef_blob
+                .iter()
+                .map(|item| item.name.clone())
+                .collect(),
+            characteristic: module
+                .typedef_characteristic
+                .iter()
+                .map(|item| item.name.clone())
+                .collect(),
+            measurement: module
+                .typedef_measurement
+                .iter()
+                .map(|item| item.name.clone())
+                .collect(),
+            structure: module
+                .typedef_structure
+                .iter()
+                .map(|item| item.name.clone())
+                .collect(),
+        }
+    }
+
+    pub(crate) fn contains(&self, name: &str) -> bool {
+        self.structure.contains(name)
+            || self.measurement.contains(name)
+            || self.characteristic.contains(name)
+            || self.blob.contains(name)
+            || self.axis.contains(name)
     }
 }

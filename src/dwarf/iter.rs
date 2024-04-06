@@ -1,20 +1,18 @@
-use super::DebugData;
-use super::TypeInfo;
-use super::VarInfo;
-use std::fmt::Write;
-
-#[cfg(test)]
+use crate::dwarf::{DebugData, DwarfDataType, TypeInfo, VarInfo};
 use std::collections::HashMap;
+use std::fmt::Write;
 
 pub(crate) enum TypeInfoIter<'a> {
     NotIterable,
     StructLike {
+        types: &'a HashMap<usize, TypeInfo>,
         struct_iter: indexmap::map::Iter<'a, String, (TypeInfo, u64)>,
         current_member: Option<(&'a String, &'a (TypeInfo, u64))>,
         member_iter: Option<Box<TypeInfoIter<'a>>>,
         use_new_arrays: bool,
     },
     Array {
+        types: &'a HashMap<usize, TypeInfo>,
         size: u64,
         dim: &'a Vec<u64>,
         stride: u64,
@@ -34,14 +32,19 @@ pub(crate) struct VariablesIterator<'a> {
 }
 
 impl<'a> TypeInfoIter<'a> {
-    pub(crate) fn new(typeinfo: &'a TypeInfo, use_new_arrays: bool) -> Self {
-        use TypeInfo::{Array, Class, Struct, Union};
-        match typeinfo {
+    pub(crate) fn new(
+        types: &'a HashMap<usize, TypeInfo>,
+        typeinfo: &'a TypeInfo,
+        use_new_arrays: bool,
+    ) -> Self {
+        use DwarfDataType::{Array, Class, Struct, Union};
+        match &typeinfo.datatype {
             Class { members, .. } | Union { members, .. } | Struct { members, .. } => {
                 let mut struct_iter = members.iter();
                 let currentmember = struct_iter.next();
                 if currentmember.is_some() {
                     TypeInfoIter::StructLike {
+                        types,
                         struct_iter,
                         current_member: currentmember,
                         member_iter: None,
@@ -57,6 +60,7 @@ impl<'a> TypeInfoIter<'a> {
                 ref stride,
                 arraytype,
             } => TypeInfoIter::Array {
+                types,
                 size: *size,
                 dim,
                 stride: *stride,
@@ -78,15 +82,32 @@ impl<'a> Iterator for TypeInfoIter<'a> {
             TypeInfoIter::NotIterable => None,
 
             TypeInfoIter::StructLike {
+                types,
                 struct_iter,
                 current_member,
                 member_iter,
                 use_new_arrays,
             } => {
                 // current_member will be Some(...) while the iteration is still in progress
-                if let Some((name, (typeinfo, offset))) = current_member {
+                if let Some((name, (member_typeinfo, offset))) = current_member {
                     if member_iter.is_none() {
-                        *member_iter = Some(Box::new(TypeInfoIter::new(typeinfo, *use_new_arrays)));
+                        let typeinfo = if let DwarfDataType::TypeRef(typeinfo_offset, _) =
+                            &member_typeinfo.datatype
+                        {
+                            types.get(typeinfo_offset).unwrap_or(&TypeInfo {
+                                name: None,
+                                unit_idx: usize::MAX,
+                                datatype: DwarfDataType::Uint8,
+                                dbginfo_offset: 0,
+                            })
+                        } else {
+                            member_typeinfo
+                        };
+                        *member_iter = Some(Box::new(TypeInfoIter::new(
+                            types,
+                            typeinfo,
+                            *use_new_arrays,
+                        )));
                         Some((format!(".{name}"), typeinfo, *offset))
                     } else {
                         let member = member_iter.as_deref_mut().unwrap().next();
@@ -109,13 +130,14 @@ impl<'a> Iterator for TypeInfoIter<'a> {
             }
 
             TypeInfoIter::Array {
+                types,
                 size,
                 dim,
                 stride,
                 position,
                 arraytype,
                 item_iter,
-                use_new_arrays
+                use_new_arrays,
             } => {
                 let total_elemcount = *size / *stride;
                 // are there more elements to iterate over
@@ -148,7 +170,11 @@ impl<'a> Iterator for TypeInfoIter<'a> {
                     // individual elements of that before advancing to the next array element
                     if item_iter.is_none() {
                         // first, return the array element directly
-                        *item_iter = Some(Box::new(TypeInfoIter::new(arraytype, *use_new_arrays)));
+                        *item_iter = Some(Box::new(TypeInfoIter::new(
+                            types,
+                            arraytype,
+                            *use_new_arrays,
+                        )));
                         Some((idxstr, arraytype, offset))
                     } else {
                         // then try to return struct elements
@@ -185,7 +211,7 @@ impl<'a> VariablesIterator<'a> {
             var_iter,
             current_var,
             type_iter: None,
-            use_new_arrays
+            use_new_arrays,
         }
     }
 }
@@ -205,7 +231,11 @@ impl<'a> Iterator for VariablesIterator<'a> {
                 // newly set current_var, should be returned before using type_iter to return its sub-elements
                 let typeinfo = self.debugdata.types.get(typeref);
                 if let Some(ti) = typeinfo {
-                    self.type_iter = Some(TypeInfoIter::new(ti, self.use_new_arrays));
+                    self.type_iter = Some(TypeInfoIter::new(
+                        &self.debugdata.types,
+                        ti,
+                        self.use_new_arrays,
+                    ));
                 } else {
                     self.type_iter = None;
                     self.current_var = self.var_iter.next();
@@ -240,45 +270,81 @@ mod test {
     use super::*;
     use indexmap::IndexMap;
 
+    const DEFAULT_TYPEINFO: TypeInfo = TypeInfo {
+        name: None,
+        unit_idx: usize::MAX,
+        datatype: DwarfDataType::Sint16,
+        dbginfo_offset: 0,
+    };
+
     #[test]
     fn test_typeinfo_iter() {
         // basic types, e.g. Sint<x> and Uint<x> cannot be iterated over
         // a TypeInfoIter for these immediately returns None
-        let typeinfo = TypeInfo::Sint16;
-        let mut iter = TypeInfoIter::new(&typeinfo, false);
+        let typeinfo = TypeInfo {
+            datatype: DwarfDataType::Sint16,
+            ..DEFAULT_TYPEINFO.clone()
+        };
+        let types = HashMap::new();
+        let mut iter = TypeInfoIter::new(&types, &typeinfo, false);
         let result = iter.next();
         assert!(result.is_none());
 
         // a struct iterates over all of its members
+        let mut types = HashMap::new();
+        let t_uint64 = TypeInfo {
+            datatype: DwarfDataType::Uint64,
+            ..DEFAULT_TYPEINFO.clone()
+        };
+        let t_sint8 = TypeInfo {
+            datatype: DwarfDataType::Uint64,
+            ..DEFAULT_TYPEINFO.clone()
+        };
         let mut structmembers_a: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
-        structmembers_a.insert("structmember_1".to_string(), (TypeInfo::Uint64, 0));
-        structmembers_a.insert("structmember_2".to_string(), (TypeInfo::Uint64, 0));
-        structmembers_a.insert("structmember_3".to_string(), (TypeInfo::Uint64, 0));
-        structmembers_a.insert("structmember_4".to_string(), (TypeInfo::Uint64, 0));
-        structmembers_a.insert("structmember_5".to_string(), (TypeInfo::Uint64, 0));
-        let typeinfo_inner_1 = TypeInfo::Struct {
-            size: 64,
-            members: structmembers_a,
+        structmembers_a.insert("structmember_1".to_string(), (t_uint64.clone(), 0));
+        structmembers_a.insert("structmember_2".to_string(), (t_uint64.clone(), 0));
+        structmembers_a.insert("structmember_3".to_string(), (t_uint64.clone(), 0));
+        structmembers_a.insert("structmember_4".to_string(), (t_uint64.clone(), 0));
+        structmembers_a.insert("structmember_5".to_string(), (t_uint64.clone(), 0));
+        let typeinfo_inner_1 = TypeInfo {
+            datatype: DwarfDataType::Struct {
+                size: 64,
+                members: structmembers_a,
+            },
+            ..DEFAULT_TYPEINFO.clone()
         };
         let mut structmembers_b: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
-        structmembers_b.insert("foobar_1".to_string(), (TypeInfo::Sint8, 0));
-        structmembers_b.insert("foobar_2".to_string(), (TypeInfo::Sint8, 0));
-        structmembers_b.insert("foobar_3".to_string(), (TypeInfo::Sint8, 0));
-        let typeinfo_inner_2 = TypeInfo::Struct {
-            size: 64,
-            members: structmembers_b,
+        structmembers_b.insert("foobar_1".to_string(), (t_sint8.clone(), 0));
+        structmembers_b.insert("foobar_2".to_string(), (t_sint8.clone(), 0));
+        structmembers_b.insert("foobar_3".to_string(), (t_sint8.clone(), 0));
+        let typeinfo_inner_2 = TypeInfo {
+            datatype: DwarfDataType::Struct {
+                size: 64,
+                members: structmembers_b,
+            },
+            ..DEFAULT_TYPEINFO.clone()
+        };
+        types.insert(100, typeinfo_inner_1);
+        types.insert(101, typeinfo_inner_2);
+        let typeref_inner_1 = TypeInfo {
+            datatype: DwarfDataType::TypeRef(100, 0),
+            ..DEFAULT_TYPEINFO.clone()
+        };
+        let typeref_inner_2 = TypeInfo {
+            datatype: DwarfDataType::TypeRef(101, 0),
+            ..DEFAULT_TYPEINFO.clone()
         };
         let mut structmembers: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
-        structmembers.insert("inner_a".to_string(), (typeinfo_inner_1, 0));
-        structmembers.insert("inner_b".to_string(), (typeinfo_inner_2, 0));
-        let typeinfo = TypeInfo::Struct {
-            size: 64,
-            members: structmembers,
+        structmembers.insert("inner_a".to_string(), (typeref_inner_1, 0));
+        structmembers.insert("inner_b".to_string(), (typeref_inner_2, 0));
+        let typeinfo = TypeInfo {
+            datatype: DwarfDataType::Struct {
+                size: 64,
+                members: structmembers,
+            },
+            ..DEFAULT_TYPEINFO.clone()
         };
-        // for (displaystring, element_type, offset) in TypeInfoIter::new(&typeinfo) {
-        //     println!("name: {}, \toffset: {}", displaystring, offset);
-        // }
-        let iter = TypeInfoIter::new(&typeinfo, false);
+        let iter = TypeInfoIter::new(&types, &typeinfo, false);
         assert_eq!(iter.count(), 10);
     }
 
@@ -315,20 +381,28 @@ mod test {
         );
 
         let mut types = HashMap::<usize, TypeInfo>::new();
-        let mut structmembers: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
-        structmembers.insert("member_1".to_string(), (TypeInfo::Uint8, 0));
-        structmembers.insert("member_2".to_string(), (TypeInfo::Uint8, 1));
-        let structtype = TypeInfo::Struct {
-            size: 64,
-            members: structmembers,
+        let t_uint8 = TypeInfo {
+            datatype: DwarfDataType::Uint8,
+            ..DEFAULT_TYPEINFO.clone()
         };
-        types.insert(0, TypeInfo::Uint8);
+        let mut structmembers: IndexMap<String, (TypeInfo, u64)> = IndexMap::new();
+        structmembers.insert("member_1".to_string(), (t_uint8.clone(), 0));
+        structmembers.insert("member_2".to_string(), (t_uint8.clone(), 1));
+        let structtype = TypeInfo {
+            datatype: DwarfDataType::Struct {
+                size: 64,
+                members: structmembers,
+            },
+            ..DEFAULT_TYPEINFO.clone()
+        };
         types.insert(1, structtype);
         let demangled_names = HashMap::new();
         let debugdata = DebugData {
             variables,
             types,
+            typenames: HashMap::new(),
             demangled_names,
+            unit_names: Vec::new(),
         };
 
         let iter = VariablesIterator::new(&debugdata, false);

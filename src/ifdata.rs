@@ -127,7 +127,7 @@ a2ml_specification! {
                         "NOT_ACTIVE" = 0,
                         "ACTIVE" = 1
                     };
-            
+
                     taggedstruct {
                         (block "MEMORY_ACCESS" struct{    /* CAL/PAG AVAILABLE */
                             uchar segment_number;         /* SEGMENT_NUMBER */
@@ -143,7 +143,7 @@ a2ml_specification! {
                         })*;
                     };
                 })*;
-          
+
               };
         };
     };

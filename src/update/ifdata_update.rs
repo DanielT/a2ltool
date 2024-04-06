@@ -1,4 +1,4 @@
-use crate::dwarf::TypeInfo;
+use crate::dwarf::{DwarfDataType, TypeInfo};
 use crate::ifdata;
 use a2lfile::IfData;
 
@@ -26,63 +26,63 @@ fn update_ifdata_canape_ext(
     canape_ext: &mut ifdata::CanapeExt,
     address: u64,
     symbol_name: &str,
-    datatype: &TypeInfo,
+    typeinfo: &TypeInfo,
 ) {
     if let Some(link_map) = &mut canape_ext.link_map {
         link_map.address = address as i32;
         link_map.symbol_name = symbol_name.to_string();
-        match datatype {
-            TypeInfo::Uint8 => {
+        match &typeinfo.datatype {
+            DwarfDataType::Uint8 => {
                 link_map.datatype = 0x87;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Uint16 => {
+            DwarfDataType::Uint16 => {
                 link_map.datatype = 0x8f;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Uint32 => {
+            DwarfDataType::Uint32 => {
                 link_map.datatype = 0x9f;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Uint64 => {
+            DwarfDataType::Uint64 => {
                 link_map.datatype = 0xbf;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Sint8 => {
+            DwarfDataType::Sint8 => {
                 link_map.datatype = 0xc7;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Sint16 => {
+            DwarfDataType::Sint16 => {
                 link_map.datatype = 0xcf;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Sint32 => {
+            DwarfDataType::Sint32 => {
                 link_map.datatype = 0xdf;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Sint64 => {
+            DwarfDataType::Sint64 => {
                 link_map.datatype = 0xff;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Float => {
+            DwarfDataType::Float => {
                 link_map.datatype = 0x01;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Double => {
+            DwarfDataType::Double => {
                 link_map.datatype = 0x02;
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Enum { size, .. } => {
+            DwarfDataType::Enum { size, .. } => {
                 match *size {
                     1 => link_map.datatype = 0x87,
                     2 => link_map.datatype = 0x8f,
@@ -93,22 +93,23 @@ fn update_ifdata_canape_ext(
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Bitfield {
+            DwarfDataType::Bitfield {
                 basetype,
                 bit_offset,
                 bit_size,
             } => {
-                let signed: u16 = match **basetype {
-                    TypeInfo::Sint8 | TypeInfo::Sint16 | TypeInfo::Sint32 | TypeInfo::Sint64 => {
-                        0x40
-                    }
+                let signed: u16 = match &basetype.datatype {
+                    DwarfDataType::Sint8
+                    | DwarfDataType::Sint16
+                    | DwarfDataType::Sint32
+                    | DwarfDataType::Sint64 => 0x40,
                     _ => 0x0,
                 };
                 link_map.datatype = 0x80 | signed | (bit_size - 1);
                 link_map.bit_offset = *bit_offset;
                 link_map.datatype_valid = 1;
             }
-            TypeInfo::Array { arraytype, .. } => {
+            DwarfDataType::Array { arraytype, .. } => {
                 update_ifdata_canape_ext(canape_ext, address, symbol_name, arraytype);
             }
             _ => {
@@ -120,17 +121,21 @@ fn update_ifdata_canape_ext(
     }
 }
 
-fn update_ifdata_asap1b_ccp(asap1b_ccp: &mut ifdata::Asap1bCcp, address: u64, datatype: &TypeInfo) {
+fn update_ifdata_asap1b_ccp(asap1b_ccp: &mut ifdata::Asap1bCcp, address: u64, typeinfo: &TypeInfo) {
     if let Some(dp_blob) = &mut asap1b_ccp.dp_blob {
         dp_blob.address_extension = 0;
         dp_blob.base_address = address as u32;
 
-        match datatype {
-            TypeInfo::Uint8 | TypeInfo::Sint8 => dp_blob.size = 1,
-            TypeInfo::Uint16 | TypeInfo::Sint16 => dp_blob.size = 2,
-            TypeInfo::Float | TypeInfo::Uint32 | TypeInfo::Sint32 => dp_blob.size = 4,
-            TypeInfo::Double | TypeInfo::Uint64 | TypeInfo::Sint64 => dp_blob.size = 8,
-            TypeInfo::Enum { size, .. } => dp_blob.size = *size as u32,
+        match &typeinfo.datatype {
+            DwarfDataType::Uint8 | DwarfDataType::Sint8 => dp_blob.size = 1,
+            DwarfDataType::Uint16 | DwarfDataType::Sint16 => dp_blob.size = 2,
+            DwarfDataType::Float | DwarfDataType::Uint32 | DwarfDataType::Sint32 => {
+                dp_blob.size = 4;
+            }
+            DwarfDataType::Double | DwarfDataType::Uint64 | DwarfDataType::Sint64 => {
+                dp_blob.size = 8;
+            }
+            DwarfDataType::Enum { size, .. } => dp_blob.size = *size as u32,
             _ => {
                 // size is not set because we don't know
                 // for example if the datatype is Struct, then the record_layout must be taken into the calculation

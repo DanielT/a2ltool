@@ -1,8 +1,12 @@
 use clap::{builder::ValueParser, parser::ValuesRef, Arg, ArgGroup, ArgMatches, Command};
 
-use a2lfile::{A2lError, A2lObject};
+use a2lfile::{A2lError, A2lFile, A2lObject};
 use dwarf::DebugData;
-use std::{ffi::OsStr, ffi::OsString, time::Instant};
+use std::{
+    ffi::{OsStr, OsString},
+    fmt::Display,
+    time::Instant,
+};
 
 mod datatype;
 mod dwarf;
@@ -95,6 +99,9 @@ fn core() -> Result<(), String> {
     let update_preserve = *arg_matches
         .get_one::<bool>("SAFE_UPDATE")
         .expect("option update-preserve must always exist");
+    let enable_structures = *arg_matches
+        .get_one::<bool>("ENABLE_STRUCTURES")
+        .expect("option enable-structures must always exist");
     let cleanup = *arg_matches
         .get_one::<bool>("CLEANUP")
         .expect("option cleanup must always exist");
@@ -165,6 +172,11 @@ fn core() -> Result<(), String> {
     // convert/downgrade the file to some version
     if let Some(new_a2l_version) = arg_matches.get_one::<A2lVersion>("A2LVERSION") {
         version::convert(&mut a2l_file, *new_a2l_version);
+    }
+
+    let current_version = A2lVersion::from(&a2l_file);
+    if enable_structures && current_version < A2lVersion::V1_7_1 {
+        return Err(format!("Error: The option --enable-structures requires input file version 1.7.1, but the current version is {current_version}"));
     }
 
     // load elf
@@ -252,8 +264,13 @@ fn core() -> Result<(), String> {
         // update addresses
         if update || update_preserve {
             let mut log_msgs = Vec::<String>::new();
-            let summary =
-                update::update_addresses(&mut a2l_file, debugdata, &mut log_msgs, update_preserve);
+            let summary = update::update_addresses(
+                &mut a2l_file,
+                debugdata,
+                &mut log_msgs,
+                update_preserve,
+                enable_structures,
+            );
 
             for msg in log_msgs {
                 cond_print!(verbose, now, msg);
@@ -579,6 +596,14 @@ fn get_args() -> ArgMatches {
         .action(clap::ArgAction::SetTrue)
         .requires("ELFFILE")
     )
+    .arg(Arg::new("ENABLE_STRUCTURES")
+        .help("Enable the update of INSTANCE, TYPEDEF_STRUCTURE & co. Requires a2l version 1.7.1")
+        .short('t')
+        .long("enable-structures")
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
+        .requires("ELFFILE")
+    )
     .arg(Arg::new("A2LVERSION")
         .help("Convert the input file to the given version (e.g. \"1.5.1\", \"1.6.0\", etc.). This is a lossy operation, which deletes incompatible information.")
         .short('a')
@@ -803,6 +828,36 @@ impl clap::builder::TypedValueParser for A2lVersionParser {
                 );
                 Err(err)
             }
+        }
+    }
+}
+
+impl From<&A2lFile> for A2lVersion {
+    fn from(a2l_file: &A2lFile) -> Self {
+        if let Some(asap2_version) = &a2l_file.asap2_version {
+            match (asap2_version.version_no, asap2_version.upgrade_no) {
+                (1, 51) => A2lVersion::V1_5_1,
+                (1, 60) => A2lVersion::V1_6_0,
+                (1, 61) => A2lVersion::V1_6_1,
+                (1, 70) => A2lVersion::V1_7_0,
+                (1, 71) => A2lVersion::V1_7_1,
+                _ => A2lVersion::V1_5_0,
+            }
+        } else {
+            A2lVersion::V1_5_0
+        }
+    }
+}
+
+impl Display for A2lVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            A2lVersion::V1_5_0 => f.write_str("1.5.0"),
+            A2lVersion::V1_5_1 => f.write_str("1.5.1"),
+            A2lVersion::V1_6_0 => f.write_str("1.6.0"),
+            A2lVersion::V1_6_1 => f.write_str("1.6.1"),
+            A2lVersion::V1_7_0 => f.write_str("1.7.0"),
+            A2lVersion::V1_7_1 => f.write_str("1.7.1"),
         }
     }
 }

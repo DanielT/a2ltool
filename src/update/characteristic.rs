@@ -1,11 +1,17 @@
+use crate::dwarf::DwarfDataType;
 use crate::dwarf::{DebugData, TypeInfo};
 use a2lfile::{A2lObject, AxisDescr, Characteristic, CharacteristicType, Module, RecordLayout};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use super::enums::{cond_create_enum_conversion, update_enum_compu_methods};
-use super::ifdata_update::{update_ifdata, zero_if_data};
-use super::*;
+use crate::update::{
+    adjust_limits, cleanup_item_list,
+    enums::{cond_create_enum_conversion, update_enum_compu_methods},
+    get_fnc_values_memberid, get_inner_type, get_symbol_info,
+    ifdata_update::{update_ifdata, zero_if_data},
+    log_update_errors, set_bitmask, set_symbol_link, update_matrix_dim, update_record_layout,
+    RecordLayoutInfo,
+};
 
 pub(crate) fn update_module_characteristics(
     module: &mut Module,
@@ -92,14 +98,13 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
 ) {
     let member_id = get_fnc_values_memberid(module, recordlayout_info, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
-        if let TypeInfo::Enum {
-            typename,
-            enumerators,
-            ..
-        } = inner_typeinfo
-        {
+        if let DwarfDataType::Enum { enumerators, .. } = &inner_typeinfo.datatype {
+            let enum_name = inner_typeinfo
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("{}_compu_method", characteristic.name));
             if characteristic.conversion == "NO_COMPU_METHOD" {
-                characteristic.conversion = typename.to_owned();
+                characteristic.conversion = enum_name;
             }
             cond_create_enum_conversion(module, &characteristic.conversion, enumerators);
             enum_convlist.insert(characteristic.conversion.clone(), inner_typeinfo);
@@ -164,9 +169,9 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
         update_record_layout(module, recordlayout_info, &characteristic.deposit, typeinfo);
 }
 
-// update all the AXIS_DESCRs inside a CHARACTERISTIC
+// update all the AXIS_DESCRs inside a CHARACTERISTIC (or TYPEDEF_CHARACTERISTIC)
 // for the list of AXIS_DESCR the ordering matters: the first AXIS_DESCR describes the x axis, the second describes the y axis, etc.
-fn update_characteristic_axis(
+pub(crate) fn update_characteristic_axis(
     axis_descr: &mut [AxisDescr],
     record_layout: Option<&RecordLayout>,
     axis_pts_dim: &HashMap<String, u16>,
@@ -203,7 +208,11 @@ fn update_characteristic_axis(
         } else if idx <= 5 {
             // an internal axis, using info from the typeinfo and the record layout
             if let Some(position) = axis_positions[idx] {
-                if let Some(TypeInfo::Array { dim, .. }) = get_inner_type(typeinfo, position) {
+                if let Some(TypeInfo {
+                    datatype: DwarfDataType::Array { dim, .. },
+                    ..
+                }) = get_inner_type(typeinfo, position)
+                {
                     axis_descr.max_axis_points = dim[0] as u16;
                 }
             }

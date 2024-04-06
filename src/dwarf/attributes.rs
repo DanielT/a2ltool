@@ -115,9 +115,9 @@ pub(crate) fn get_data_member_location_attribute(
             evaluate_exprloc(debug_data_reader, expression, encoding, current_unit)
         }
         gimli::AttributeValue::Udata(val) => Some(val),
-        gimli::AttributeValue::Data1(val) => Some(val as u64),
-        gimli::AttributeValue::Data2(val) => Some(val as u64),
-        gimli::AttributeValue::Data4(val) => Some(val as u64),
+        gimli::AttributeValue::Data1(val) => Some(u64::from(val)),
+        gimli::AttributeValue::Data2(val) => Some(u64::from(val)),
+        gimli::AttributeValue::Data4(val) => Some(u64::from(val)),
         gimli::AttributeValue::Data8(val) => Some(val),
         other => {
             println!("unexpected data_member_location attribute: {other:?}");
@@ -134,9 +134,9 @@ pub(crate) fn get_byte_size_attribute(
     match byte_size_attr {
         gimli::AttributeValue::Sdata(byte_size) => Some(byte_size as u64),
         gimli::AttributeValue::Udata(byte_size) => Some(byte_size),
-        gimli::AttributeValue::Data1(byte_size) => Some(byte_size as u64),
-        gimli::AttributeValue::Data2(byte_size) => Some(byte_size as u64),
-        gimli::AttributeValue::Data4(byte_size) => Some(byte_size as u64),
+        gimli::AttributeValue::Data1(byte_size) => Some(u64::from(byte_size)),
+        gimli::AttributeValue::Data2(byte_size) => Some(u64::from(byte_size)),
+        gimli::AttributeValue::Data4(byte_size) => Some(u64::from(byte_size)),
         gimli::AttributeValue::Data8(byte_size) => Some(byte_size),
         _ => None,
     }
@@ -162,9 +162,9 @@ pub(crate) fn get_lower_bound_attribute(
     match lbound_attr {
         gimli::AttributeValue::Sdata(lbound) => Some(lbound as u64),
         gimli::AttributeValue::Udata(lbound) => Some(lbound),
-        gimli::AttributeValue::Data1(lbound) => Some(lbound as u64),
-        gimli::AttributeValue::Data2(lbound) => Some(lbound as u64),
-        gimli::AttributeValue::Data4(lbound) => Some(lbound as u64),
+        gimli::AttributeValue::Data1(lbound) => Some(u64::from(lbound)),
+        gimli::AttributeValue::Data2(lbound) => Some(u64::from(lbound)),
+        gimli::AttributeValue::Data4(lbound) => Some(u64::from(lbound)),
         gimli::AttributeValue::Data8(lbound) => Some(lbound),
         _ => None,
     }
@@ -178,9 +178,9 @@ pub(crate) fn get_upper_bound_attribute(
     match ubound_attr {
         gimli::AttributeValue::Sdata(ubound) => Some(ubound as u64),
         gimli::AttributeValue::Udata(ubound) => Some(ubound),
-        gimli::AttributeValue::Data1(ubound) => Some(ubound as u64),
-        gimli::AttributeValue::Data2(ubound) => Some(ubound as u64),
-        gimli::AttributeValue::Data4(ubound) => Some(ubound as u64),
+        gimli::AttributeValue::Data1(ubound) => Some(u64::from(ubound)),
+        gimli::AttributeValue::Data2(ubound) => Some(u64::from(ubound)),
+        gimli::AttributeValue::Data4(ubound) => Some(u64::from(ubound)),
         gimli::AttributeValue::Data8(ubound) => Some(ubound),
         _ => None,
     }
@@ -194,9 +194,9 @@ pub(crate) fn get_count_attribute(
     match count_attr {
         gimli::AttributeValue::Sdata(count) => Some(count as u64),
         gimli::AttributeValue::Udata(count) => Some(count),
-        gimli::AttributeValue::Data1(count) => Some(count as u64),
-        gimli::AttributeValue::Data2(count) => Some(count as u64),
-        gimli::AttributeValue::Data4(count) => Some(count as u64),
+        gimli::AttributeValue::Data1(count) => Some(u64::from(count)),
+        gimli::AttributeValue::Data2(count) => Some(u64::from(count)),
+        gimli::AttributeValue::Data4(count) => Some(u64::from(count)),
         gimli::AttributeValue::Data8(count) => Some(count),
         _ => None,
     }
@@ -211,9 +211,9 @@ pub(crate) fn get_byte_stride_attribute(
     match stride_attr {
         gimli::AttributeValue::Sdata(stride) => Some(stride as u64),
         gimli::AttributeValue::Udata(stride) => Some(stride),
-        gimli::AttributeValue::Data1(stride) => Some(stride as u64),
-        gimli::AttributeValue::Data2(stride) => Some(stride as u64),
-        gimli::AttributeValue::Data4(stride) => Some(stride as u64),
+        gimli::AttributeValue::Data1(stride) => Some(u64::from(stride)),
+        gimli::AttributeValue::Data2(stride) => Some(u64::from(stride)),
+        gimli::AttributeValue::Data4(stride) => Some(u64::from(stride)),
         gimli::AttributeValue::Data8(stride) => Some(stride),
         _ => None,
     }
@@ -227,9 +227,9 @@ pub(crate) fn get_const_value_attribute(
     match constval_attr {
         gimli::AttributeValue::Sdata(value) => Some(value),
         gimli::AttributeValue::Udata(value) => Some(value as i64),
-        gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as i64),
-        gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as i64),
-        gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as i64),
+        gimli::AttributeValue::Data1(bit_offset) => Some(i64::from(bit_offset)),
+        gimli::AttributeValue::Data2(bit_offset) => Some(i64::from(bit_offset)),
+        gimli::AttributeValue::Data4(bit_offset) => Some(i64::from(bit_offset)),
         gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset as i64),
         _ => None,
     }
@@ -259,9 +259,9 @@ pub(crate) fn get_bit_offset_attribute(
     match data_bit_offset_attr {
         gimli::AttributeValue::Sdata(bit_offset) => Some(bit_offset as u64),
         gimli::AttributeValue::Udata(bit_offset) => Some(bit_offset),
-        gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as u64),
-        gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as u64),
-        gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as u64),
+        gimli::AttributeValue::Data1(bit_offset) => Some(u64::from(bit_offset)),
+        gimli::AttributeValue::Data2(bit_offset) => Some(u64::from(bit_offset)),
+        gimli::AttributeValue::Data4(bit_offset) => Some(u64::from(bit_offset)),
         gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset),
         _ => None,
     }
@@ -278,9 +278,9 @@ pub(crate) fn get_data_bit_offset_attribute(
     match data_bit_offset_attr {
         gimli::AttributeValue::Sdata(bit_offset) => Some(bit_offset as u64),
         gimli::AttributeValue::Udata(bit_offset) => Some(bit_offset),
-        gimli::AttributeValue::Data1(bit_offset) => Some(bit_offset as u64),
-        gimli::AttributeValue::Data2(bit_offset) => Some(bit_offset as u64),
-        gimli::AttributeValue::Data4(bit_offset) => Some(bit_offset as u64),
+        gimli::AttributeValue::Data1(bit_offset) => Some(u64::from(bit_offset)),
+        gimli::AttributeValue::Data2(bit_offset) => Some(u64::from(bit_offset)),
+        gimli::AttributeValue::Data4(bit_offset) => Some(u64::from(bit_offset)),
         gimli::AttributeValue::Data8(bit_offset) => Some(bit_offset),
         _ => None,
     }
@@ -404,18 +404,20 @@ pub(crate) fn get_type_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
     unit_list: &UnitList<'_>,
     current_unit: usize,
-) -> Result<(usize, gimli::UnitOffset), String> {
+) -> Result<(usize, gimli::DebugInfoOffset), String> {
     match get_attr_value(entry, gimli::constants::DW_AT_type) {
         Some(gimli::AttributeValue::DebugInfoRef(dbginfo_offset)) => {
             if let Some(unit_idx) = unit_list.get_unit(dbginfo_offset.0) {
-                let (unit, _) = &unit_list[unit_idx];
-                let unit_offset = dbginfo_offset.to_unit_offset(unit).unwrap();
-                Ok((unit_idx, unit_offset))
+                Ok((unit_idx, dbginfo_offset))
             } else {
                 Err("invalid debug info ref".to_string())
             }
         }
-        Some(gimli::AttributeValue::UnitRef(unit_offset)) => Ok((current_unit, unit_offset)),
+        Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
+            let (unit, _) = &unit_list[current_unit];
+            let dbginfo_offset = unit_offset.to_debug_info_offset(unit).unwrap();
+            Ok((current_unit, dbginfo_offset))
+        }
         _ => Err("failed to get DIE tree".to_string()),
     }
 }

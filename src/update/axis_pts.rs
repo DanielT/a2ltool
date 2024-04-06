@@ -1,11 +1,16 @@
+use crate::dwarf::DwarfDataType;
 use crate::dwarf::{DebugData, TypeInfo};
 use a2lfile::{A2lObject, AxisPts, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use super::enums::{cond_create_enum_conversion, update_enum_compu_methods};
-use super::ifdata_update::{update_ifdata, zero_if_data};
-use super::*;
+use crate::update::{
+    adjust_limits,
+    enums::{cond_create_enum_conversion, update_enum_compu_methods},
+    get_axis_pts_x_memberid, get_inner_type, get_symbol_info,
+    ifdata_update::{update_ifdata, zero_if_data},
+    log_update_errors, set_symbol_link, update_record_layout, RecordLayoutInfo,
+};
 
 pub(crate) fn update_module_axis_pts(
     module: &mut Module,
@@ -29,21 +34,22 @@ pub(crate) fn update_module_axis_pts(
                 let member_id =
                     get_axis_pts_x_memberid(module, recordlayout_info, &axis_pts.deposit_record);
                 if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
-                    match inner_typeinfo {
-                        TypeInfo::Array { dim, arraytype, .. } => {
+                    match &inner_typeinfo.datatype {
+                        DwarfDataType::Array { dim, arraytype, .. } => {
                             // update max_axis_points to match the size of the array
                             if !dim.is_empty() {
                                 axis_pts.max_axis_points = dim[0] as u16;
                             }
-                            if let TypeInfo::Enum {
-                                typename,
-                                enumerators,
-                                ..
-                            } = &**arraytype
-                            {
+                            if let DwarfDataType::Enum { enumerators, .. } = &arraytype.datatype {
                                 // an array of enums? it could be done...
                                 if axis_pts.conversion == "NO_COMPU_METHOD" {
-                                    axis_pts.conversion = typename.to_owned();
+                                    axis_pts.conversion = arraytype
+                                        .name
+                                        .clone()
+                                        .unwrap_or_else(|| {
+                                            format!("{}_compu_method", axis_pts.name)
+                                        })
+                                        .clone();
                                 }
                                 cond_create_enum_conversion(
                                     module,
@@ -53,7 +59,7 @@ pub(crate) fn update_module_axis_pts(
                                 enum_convlist.insert(axis_pts.conversion.clone(), arraytype);
                             }
                         }
-                        TypeInfo::Enum { .. } => {
+                        DwarfDataType::Enum { .. } => {
                             // likely not useful, because what purpose would an axis consisting of a single enum value serve?
                             enum_convlist.insert(axis_pts.conversion.clone(), typeinfo);
                         }

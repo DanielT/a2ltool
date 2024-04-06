@@ -1,4 +1,4 @@
-use crate::dwarf::TypeInfo;
+use crate::dwarf::{DwarfDataType, TypeInfo};
 use a2lfile::{
     CompuMethod, CompuTabRef, CompuVtab, ConversionType, Module, ValuePairsStruct,
     ValueTriplesStruct,
@@ -76,7 +76,15 @@ pub(crate) fn update_enum_compu_methods(
 
     // check all COMPU_VTABs in the module to see if we know of an associated enum type
     for compu_vtab in &mut module.compu_vtab {
-        if let Some(TypeInfo::Enum { enumerators, .. }) = enum_compu_tab.get(&compu_vtab.name) {
+        if let Some(TypeInfo {
+            datatype: DwarfDataType::Enum { enumerators, .. },
+            ..
+        }) = enum_compu_tab.get(&compu_vtab.name)
+        {
+            // some enums are not sorted by ID in the source, but we want to output sorted COMPU_VTABs
+            let mut enumerators = enumerators.clone();
+            enumerators.sort_by(|e1, e2| e1.1.cmp(&e2.1));
+
             // TabVerb is the only permitted conversion type for a compu_vtab
             compu_vtab.conversion_type = ConversionType::TabVerb;
 
@@ -102,8 +110,15 @@ pub(crate) fn update_enum_compu_methods(
 
     // do the same for COMPU_VTAB_RANGE, because the enum could also be stored as a COMPU_VTAB_RANGE where min = max for all entries
     for compu_vtab_range in &mut module.compu_vtab_range {
-        if let Some(TypeInfo::Enum { enumerators, .. }) = enum_compu_tab.get(&compu_vtab_range.name)
+        if let Some(TypeInfo {
+            datatype: DwarfDataType::Enum { enumerators, .. },
+            ..
+        }) = enum_compu_tab.get(&compu_vtab_range.name)
         {
+            // some enums are not sorted by ID in the source, but we want to output sorted COMPU_VTAB_RANGEs
+            let mut enumerators = enumerators.clone();
+            enumerators.sort_by(|e1, e2| e1.1.cmp(&e2.1));
+
             // if compu_vtab_range has more entries than the enum, delete the extras
             while compu_vtab_range.value_triples.len() > enumerators.len() {
                 compu_vtab_range.value_triples.pop();

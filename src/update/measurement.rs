@@ -1,11 +1,17 @@
+use crate::dwarf::DwarfDataType;
 use crate::dwarf::{DebugData, TypeInfo};
 use a2lfile::{A2lObject, Measurement, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use super::enums::{cond_create_enum_conversion, update_enum_compu_methods};
-use super::ifdata_update::{update_ifdata, zero_if_data};
-use super::*;
+use crate::update::{
+    adjust_limits, cleanup_item_list,
+    enums::{cond_create_enum_conversion, update_enum_compu_methods},
+    get_a2l_datatype, get_symbol_info,
+    ifdata_update::{update_ifdata, zero_if_data},
+    log_update_errors, set_bitmask, set_measurement_ecu_address, set_symbol_link,
+    update_matrix_dim,
+};
 
 pub(crate) fn update_module_measurements(
     module: &mut Module,
@@ -74,14 +80,12 @@ fn update_measurement_information<'enumlist, 'typeinfo: 'enumlist>(
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
     use_new_matrix_dim: bool,
 ) {
-    if let TypeInfo::Enum {
-        typename,
-        enumerators,
-        ..
-    } = typeinfo
-    {
+    if let DwarfDataType::Enum { enumerators, .. } = &typeinfo.datatype {
         if measurement.conversion == "NO_COMPU_METHOD" {
-            measurement.conversion = typename.to_owned();
+            measurement.conversion = typeinfo
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("{}_compu_method", measurement.name));
         }
         cond_create_enum_conversion(module, &measurement.conversion, enumerators);
         enum_convlist.insert(measurement.conversion.clone(), typeinfo);

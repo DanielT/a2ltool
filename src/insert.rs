@@ -1,12 +1,12 @@
 use a2lfile::{
-    A2lFile, A2lObject, AddrType, BitMask, Characteristic, CharacteristicType, EcuAddress, FncValues, Group,
-    IndexMode, MatrixDim, Measurement, Module, RecordLayout, RefCharacteristic, RefMeasurement,
-    Root, SymbolLink,
+    A2lFile, A2lObject, AddrType, BitMask, Characteristic, CharacteristicType, EcuAddress,
+    FncValues, Group, IndexMode, MatrixDim, Measurement, Module, RecordLayout, RefCharacteristic,
+    RefMeasurement, Root, SymbolLink,
 };
 use std::collections::HashMap;
 
 use crate::datatype::{get_a2l_datatype, get_type_limits};
-use crate::dwarf::{DebugData, TypeInfo};
+use crate::dwarf::{DebugData, DwarfDataType, TypeInfo};
 use crate::update::enums;
 use regex::Regex;
 
@@ -121,17 +121,17 @@ fn insert_measurement_sym(
     new_measurement.ecu_address = Some(ecu_address);
     // create a SYMBOL_LINK attribute
     new_measurement.symbol_link = Some(SymbolLink::new(true_name, 0));
-    match typeinfo {
-        TypeInfo::Enum {
-            typename,
-            enumerators,
-            ..
-        } => {
+    match &typeinfo.datatype {
+        DwarfDataType::Enum { enumerators, .. } => {
             // create a conversion table for enums
-            new_measurement.conversion = typename.to_owned();
-            enums::cond_create_enum_conversion(module, typename, enumerators);
+            let enum_name = typeinfo
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("{}_compu_method", new_measurement.name));
+            enums::cond_create_enum_conversion(module, &enum_name, enumerators);
+            new_measurement.conversion = enum_name;
         }
-        TypeInfo::Bitfield {
+        DwarfDataType::Bitfield {
             bit_offset,
             bit_size,
             ..
@@ -139,7 +139,7 @@ fn insert_measurement_sym(
             // create a BIT_MASK for bitfields
             let bitmask = ((1 << bit_size) - 1) << bit_offset;
             let mut bm = BitMask::new(bitmask);
-            bm.get_layout_mut().item_location.0.1 = true;
+            bm.get_layout_mut().item_location.0 .1 = true;
             new_measurement.bit_mask = Some(bm);
         }
         _ => {}
@@ -187,14 +187,16 @@ fn insert_characteristic_sym(
 
     let datatype = get_a2l_datatype(typeinfo);
     let recordlayout_name = format!("__{datatype}_Z");
-    let mut new_characteristic = match typeinfo {
-        TypeInfo::Class { .. } | TypeInfo::Union { .. } | TypeInfo::Struct { .. } => {
+    let mut new_characteristic = match &typeinfo.datatype {
+        DwarfDataType::Class { .. }
+        | DwarfDataType::Union { .. }
+        | DwarfDataType::Struct { .. } => {
             // Structs cannot be handled at all in this code. In some cases structs can be used by CHARACTERISTICs,
             // but in that case the struct represents function values together with axis info.
             // Much more information regarding which struct member has which use would be required
             return Err("Don't know how to add a CHARACTERISTIC for a struct. Please add a struct member instead.".to_string());
         }
-        TypeInfo::Array { arraytype, dim, .. } => {
+        DwarfDataType::Array { arraytype, dim, .. } => {
             // an array is turned into a CHARACTERISTIC of type VAL_BLK, and needs a MATRIX_DIM sub-element
             let (lower_limit, upper_limit) = get_type_limits(arraytype, f64::MIN, f64::MAX);
             let mut newitem = Characteristic::new(
@@ -217,14 +219,14 @@ fn insert_characteristic_sym(
             newitem.matrix_dim = Some(matrix_dim);
             newitem
         }
-        TypeInfo::Enum {
-            typename,
-            enumerators,
-            ..
-        } => {
+        DwarfDataType::Enum { enumerators, .. } => {
             // CHARACTERISTICs for enums get a COMPU_METHOD and COMPU_VTAB providing translation of values to text
             let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
-            enums::cond_create_enum_conversion(module, typename, enumerators);
+            let enum_name = typeinfo
+                .name
+                .clone()
+                .unwrap_or_else(|| format!("{item_name}_compu_method"));
+            enums::cond_create_enum_conversion(module, &enum_name, enumerators);
             Characteristic::new(
                 item_name.clone(),
                 format!("characteristic for {characteristic_sym}"),
@@ -232,12 +234,16 @@ fn insert_characteristic_sym(
                 address as u32,
                 recordlayout_name.clone(),
                 0f64,
-                typename.to_string(),
+                enum_name,
                 lower_limit,
                 upper_limit,
             )
         }
-        TypeInfo::Bitfield { bit_offset, bit_size, .. } => {
+        DwarfDataType::Bitfield {
+            bit_offset,
+            bit_size,
+            ..
+        } => {
             let (lower_limit, upper_limit) = get_type_limits(typeinfo, f64::MIN, f64::MAX);
             let mut new_characteristic = Characteristic::new(
                 item_name.clone(),
@@ -253,7 +259,7 @@ fn insert_characteristic_sym(
             // create a BIT_MASK
             let bitmask = ((1 << bit_size) - 1) << bit_offset;
             let mut bm = BitMask::new(bitmask);
-            bm.get_layout_mut().item_location.0.1 = true;
+            bm.get_layout_mut().item_location.0 .1 = true;
             new_characteristic.bit_mask = Some(bm);
             new_characteristic
         }
@@ -324,10 +330,7 @@ fn make_unique_measurement_name(
             ))
         }
         Some(
-            ItemType::Characteristic(_)
-            | ItemType::Instance
-            | ItemType::Blob
-            | ItemType::AxisPts,
+            ItemType::Characteristic(_) | ItemType::Instance | ItemType::Blob | ItemType::AxisPts,
         ) => {
             format!("MEASUREMENT.{cleaned_sym}")
         }
@@ -359,10 +362,7 @@ fn make_unique_characteristic_name(
             ))
         }
         Some(
-            ItemType::Measurement(_)
-            | ItemType::Instance
-            | ItemType::Blob
-            | ItemType::AxisPts,
+            ItemType::Measurement(_) | ItemType::Instance | ItemType::Blob | ItemType::AxisPts,
         ) => {
             format!("CHARACTERISTIC.{cleaned_sym}")
         }
@@ -448,19 +448,20 @@ pub(crate) fn insert_many(
     let mut measurement_list = vec![];
 
     for (symbol_name, symbol_type, address) in debugdata.iter(use_new_arrays) {
-        match symbol_type {
-            Some(
-                TypeInfo::Array { .. }
-                | TypeInfo::Struct { .. }
-                | TypeInfo::Union { .. }
-                | TypeInfo::Class { .. },
-            ) => {
+        let typeinfo = symbol_type.unwrap_or(&TypeInfo {
+            name: None,
+            unit_idx: usize::MAX,
+            datatype: DwarfDataType::Uint8,
+            dbginfo_offset: 0,
+        });
+        match &typeinfo.datatype {
+            DwarfDataType::Struct { .. }
+            | DwarfDataType::Class { .. }
+            | DwarfDataType::Union { .. }
+            | DwarfDataType::Array { .. } => {
                 // don't insert complex types directly. Their individual members will be inserted instead
             }
             _ => {
-                // get the type of the symbol, or default to uint8 if no type could be loaded for this symbol
-                let typeinfo = symbol_type.unwrap_or(&TypeInfo::Uint8);
-
                 // insert if the address is inside a given range, or if a regex matches the symbol name
                 if is_insert_requested(address, &symbol_name, measurement_ranges, &compiled_meas_re)
                 {
