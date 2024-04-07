@@ -23,7 +23,7 @@ A tool to edit, merge and update a2l files
 
 ### Create a new a2lfile and add a characteristic from an elf file to it
 
-`a2ltool --create --ellfile input.elf --characteristic my_var --output newfile.a2l`
+`a2ltool --create --elffile input.elf --characteristic my_var --output newfile.a2l`
 
 ## About a2l Files
 

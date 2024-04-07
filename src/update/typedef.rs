@@ -1206,7 +1206,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                     layout.item_location.2 = (1, false); // offset is placed on a new line, not displayd as hex
                 }
                 let sc = &mut td_struct.structure_component[0];
-                sc.size = 0; // this field is misnamed in the spec: it is actually an offset
+                sc.address_offset = 0;
                 sc.component_name = "array_element".to_string();
                 sc.symbol_type_link = None;
                 update_matrix_dim(&mut sc.matrix_dim, typeinfo, true);
@@ -1235,7 +1235,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                     layout.item_location.2 = (1, false); // offset is placed on a new line, not displayd as hex
                 }
                 let sc = &mut td_struct.structure_component[0];
-                sc.size = 0; // this field is misnamed in the spec: it is actually an offset
+                sc.address_offset = 0;
                 sc.component_name = "ptr".to_string();
                 set_address_type(&mut sc.address_type, typeinfo);
                 if let Some((_, pt_type)) = typeinfo.get_pointer(&self.debug_data.types) {
@@ -1316,7 +1316,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                         sc.symbol_type_link = Some(SymbolTypeLink::new(cur_member_name.clone()));
                     }
 
-                    sc.size = *cur_member_offset as u32;
+                    sc.address_offset = *cur_member_offset as u32;
                     if let Some(typedef_name) =
                         self.create_typedef(cur_type_unwrapped, is_calib, enum_convlist)
                     {

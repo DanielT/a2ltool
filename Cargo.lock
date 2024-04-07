@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "a2lfile"
-version = "1.5.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22bf77e34d74b1349345336ea1d825a4f4600e1e2b4c66e0a46f28393531af2e"
+checksum = "1a66842692a090611c9c738c249e8c42f44b6b7d355d8c4ba7686cbda4baccb5"
 dependencies = [
  "a2lmacros",
  "thiserror",
@@ -14,9 +14,9 @@ dependencies = [
 
 [[package]]
 name = "a2lmacros"
-version = "1.3.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0affe6d7bc658bea7c3ad4d978ead041aaac52514342867b3631bd0095b705ba"
+checksum = "cdeded0c7b2450c3c24b9ad51fcdef7f222a6dc74067a21e2b4797639150b5db"
 dependencies = [
  "proc-macro2",
  "quote",
