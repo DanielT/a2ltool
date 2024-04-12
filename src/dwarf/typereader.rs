@@ -284,17 +284,20 @@ impl<'elffile> DebugDataReader<'elffile> {
                     if let Some(bit_size) = get_bit_size_attribute(child_entry) {
                         if let Some(bit_offset) = get_bit_offset_attribute(child_entry) {
                             // Dwarf 2 / 3
+                            // It may happen that DW_AT_byte_size and the size given by DW_AT_type disagree.
+                            // Prefer DW_AT_byte_size in those cases.
+                            let type_size = get_byte_size_attribute(child_entry).unwrap_or_else(|| membertype.get_size());
+                            let type_size_bits = type_size * 8;
+                            let bit_offset_le = type_size_bits - bit_offset - bit_size;
+                            let inverted_bitfields = true; // TODO: Turn this into a command line flag or something
                             if self.endian == Endianness::Big {
                                 membertype = TypeInfo::Bitfield {
                                     basetype: Box::new(membertype),
                                     bit_size: bit_size as u16,
-                                    bit_offset: bit_offset as u16,
+                                    bit_offset: if inverted_bitfields { bit_offset_le } else {bit_offset } as u16,
                                 };
                             } else {
                                 // Endianness::Little
-                                let type_size = membertype.get_size();
-                                let type_size_bits = type_size * 8;
-                                let bit_offset_le = type_size_bits - bit_offset - bit_size;
                                 membertype = TypeInfo::Bitfield {
                                     basetype: Box::new(membertype),
                                     bit_size: bit_size as u16,
