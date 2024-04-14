@@ -2,228 +2,149 @@ use crate::dwarf::{DebugData, DwarfDataType, TypeInfo, VarInfo};
 use std::collections::HashMap;
 use std::fmt::Write;
 
-pub(crate) enum TypeInfoIter<'a> {
-    NotIterable,
-    StructLike {
-        types: &'a HashMap<usize, TypeInfo>,
-        struct_iter: indexmap::map::Iter<'a, String, (TypeInfo, u64)>,
-        current_member: Option<(&'a String, &'a (TypeInfo, u64))>,
-        member_iter: Option<Box<TypeInfoIter<'a>>>,
-        use_new_arrays: bool,
-    },
-    Array {
-        types: &'a HashMap<usize, TypeInfo>,
-        size: u64,
-        dim: &'a Vec<u64>,
-        stride: u64,
-        position: u64,
-        arraytype: &'a TypeInfo,
-        item_iter: Option<Box<TypeInfoIter<'a>>>,
-        use_new_arrays: bool,
-    },
-}
-
-pub(crate) struct VariablesIterator<'a> {
-    debugdata: &'a DebugData,
-    var_iter: indexmap::map::Iter<'a, String, VarInfo>,
-    current_var: Option<(&'a String, &'a VarInfo)>,
-    type_iter: Option<TypeInfoIter<'a>>,
+pub(crate) struct TypeInfoIter<'dbg> {
+    types: &'dbg HashMap<usize, TypeInfo>,
+    type_stack: Vec<&'dbg TypeInfo>,
+    position_stack: Vec<usize>,
+    offset_stack: Vec<u64>,
+    name_stack: Vec<String>,
     use_new_arrays: bool,
-    enable_structures: bool,
 }
 
-impl<'a> TypeInfoIter<'a> {
-    pub(crate) fn new(
-        types: &'a HashMap<usize, TypeInfo>,
-        typeinfo: &'a TypeInfo,
-        use_new_arrays: bool,
-    ) -> Self {
-        use DwarfDataType::{Array, Class, Struct, Union};
-        match &typeinfo.datatype {
-            Class { members, .. } | Union { members, .. } | Struct { members, .. } => {
-                let mut struct_iter = members.iter();
-                let currentmember = struct_iter.next();
-                if currentmember.is_some() {
-                    TypeInfoIter::StructLike {
-                        types,
-                        struct_iter,
-                        current_member: currentmember,
-                        member_iter: None,
-                        use_new_arrays,
-                    }
-                } else {
-                    TypeInfoIter::NotIterable
-                }
-            }
-            Array {
-                ref size,
-                dim,
-                ref stride,
-                arraytype,
-            } => TypeInfoIter::Array {
-                types,
-                size: *size,
-                dim,
-                stride: *stride,
-                arraytype,
-                position: 0,
-                item_iter: None,
-                use_new_arrays,
-            },
-            _ => TypeInfoIter::NotIterable,
+pub(crate) struct VariablesIterator<'dbg> {
+    debugdata: &'dbg DebugData,
+    var_iter: indexmap::map::Iter<'dbg, String, VarInfo>,
+    current_var: Option<(&'dbg String, &'dbg VarInfo)>,
+    type_iter: Option<TypeInfoIter<'dbg>>,
+    use_new_arrays: bool,
+}
+
+impl<'dbg> Iterator for TypeInfoIter<'dbg> {
+    type Item = (String, &'dbg TypeInfo, u64);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut result = self.next_core();
+        while result.is_none() && !self.type_stack.is_empty() {
+            self.up();
+            result = self.next_core();
         }
+        result
     }
 }
 
-impl<'a> Iterator for TypeInfoIter<'a> {
-    type Item = (String, &'a TypeInfo, u64);
+impl<'dbg> TypeInfoIter<'dbg> {
+    pub(crate) fn new(
+        types: &'dbg HashMap<usize, TypeInfo>,
+        typeinfo: &'dbg TypeInfo,
+        use_new_arrays: bool,
+    ) -> Self {
+        Self {
+            types,
+            type_stack: vec![typeinfo],
+            position_stack: vec![0],
+            offset_stack: vec![0],
+            name_stack: vec!["".to_string()],
+            use_new_arrays,
+        }
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            TypeInfoIter::NotIterable => None,
+    fn next_core(&mut self) -> Option<(String, &'dbg TypeInfo, u64)> {
+        match &self.type_stack.last()?.datatype {
+            DwarfDataType::Class { members, .. }
+            | DwarfDataType::Struct { members, .. }
+            | DwarfDataType::Union { members, .. } => {
+                let depth = self.type_stack.len() - 1;
+                let position = self.position_stack[depth];
+                let base = self.offset_stack[depth];
+                let prev_name = &self.name_stack[depth];
+                let (member_name, (member_typeinfo, member_offset)) =
+                    members.get_index(position)?;
+                let member_typeinfo = member_typeinfo.get_reference(self.types);
+                let complete_offset = base + member_offset;
+                let fullname = format!("{prev_name}.{member_name}");
 
-            TypeInfoIter::StructLike {
-                types,
-                struct_iter,
-                current_member,
-                member_iter,
-                use_new_arrays,
-            } => {
-                // current_member will be Some(...) while the iteration is still in progress
-                if let Some((name, (member_typeinfo, offset))) = current_member {
-                    if member_iter.is_none() {
-                        let typeinfo = if let DwarfDataType::TypeRef(typeinfo_offset, _) =
-                            &member_typeinfo.datatype
-                        {
-                            types.get(typeinfo_offset).unwrap_or(&TypeInfo {
-                                name: None,
-                                unit_idx: usize::MAX,
-                                datatype: DwarfDataType::Uint8,
-                                dbginfo_offset: 0,
-                            })
-                        } else {
-                            member_typeinfo
-                        };
-                        *member_iter = Some(Box::new(TypeInfoIter::new(
-                            types,
-                            typeinfo,
-                            *use_new_arrays,
-                        )));
-                        Some((format!(".{name}"), typeinfo, *offset))
-                    } else {
-                        let member = member_iter.as_deref_mut().unwrap().next();
-                        if let Some((member_name, member_typeinfo, member_offset)) = member {
-                            Some((
-                                format!(".{name}{member_name}"),
-                                member_typeinfo,
-                                offset + member_offset,
-                            ))
-                        } else {
-                            // this struct member can't iterate or has finished iterating, move to the next struct member
-                            *current_member = struct_iter.next();
-                            *member_iter = None;
-                            self.next()
-                        }
-                    }
-                } else {
-                    None
-                }
+                // advance to next member
+                self.position_stack[depth] += 1;
+
+                // prepare to return the children of the current member
+                self.type_stack.push(member_typeinfo);
+                self.position_stack.push(0);
+                self.offset_stack.push(complete_offset);
+                self.name_stack.push(fullname.clone());
+
+                Some((fullname, member_typeinfo, complete_offset))
             }
-
-            TypeInfoIter::Array {
-                types,
+            DwarfDataType::Array {
                 size,
                 dim,
                 stride,
-                position,
                 arraytype,
-                item_iter,
-                use_new_arrays,
             } => {
-                let total_elemcount = *size / *stride;
-                // are there more elements to iterate over
-                if *position < total_elemcount {
+                let total_elemcount = size / stride;
+                let depth = self.type_stack.len() - 1;
+                let position = self.position_stack[depth] as u64;
+                let prev_name = &self.name_stack[depth];
+                let base = self.offset_stack[depth];
+
+                if total_elemcount > position {
                     // in a multi-dimensional array, e.g. [5][10], position goes from 0 to 50
                     // it needs to be decomposed into individual array indices
                     let mut current_indices = vec![0; dim.len()];
-                    let mut rem = *position;
+                    let mut rem = position;
 
                     // going backward over the list of array dimensions, divide and keep the remainder
                     for idx in (0..dim.len()).rev() {
                         current_indices[idx] = rem % dim[idx];
                         rem /= dim[idx];
                     }
-                    let idxstr = current_indices
-                        .iter()
-                        .fold(String::new(), |mut output, val| {
-                            if *use_new_arrays {
-                                let _ = write!(output, "[{val}]");
-                            } else {
-                                let _ = write!(output, "._{val}_");
-                            }
-                            output
-                        });
+                    let idxstr =
+                        current_indices
+                            .iter()
+                            .fold(prev_name.clone(), |mut output, val| {
+                                if self.use_new_arrays {
+                                    let _ = write!(output, "[{val}]");
+                                } else {
+                                    let _ = write!(output, "._{val}_");
+                                }
+                                output
+                            });
 
                     // calculate the storage offset of this array element. Each element is stride bytes wide.
-                    let offset = *stride * (*position);
+                    let complete_offset = base + (*stride * position);
 
-                    // each array element might be a struct, in this case iterate over the
-                    // individual elements of that before advancing to the next array element
-                    if item_iter.is_none() {
-                        // first, return the array element directly
-                        *item_iter = Some(Box::new(TypeInfoIter::new(
-                            types,
-                            arraytype,
-                            *use_new_arrays,
-                        )));
-                        Some((idxstr, arraytype, offset))
-                    } else {
-                        // then try to return struct elements
-                        let item = item_iter.as_deref_mut().unwrap().next();
-                        if let Some((item_name, item_typeinfo, item_offset)) = item {
-                            Some((
-                                format!("{idxstr}{item_name}"),
-                                item_typeinfo,
-                                offset + item_offset,
-                            ))
-                        } else {
-                            // no (more) struct elements to return, advance to the next array element
-                            *position += 1;
-                            *item_iter = None;
-                            self.next()
-                        }
-                    }
+                    // advance to next member
+                    self.position_stack[depth] += 1;
+
+                    // prepare to return the children of the current member
+                    self.type_stack.push(arraytype);
+                    self.position_stack.push(0);
+                    self.offset_stack.push(complete_offset);
+                    self.name_stack.push(idxstr.clone());
+
+                    Some((idxstr, arraytype, complete_offset))
                 } else {
-                    // reached the end of the array
                     None
                 }
             }
+            _ => None,
         }
     }
-}
 
-impl<'a> VariablesIterator<'a> {
-    pub(crate) fn new(
-        debugdata: &'a DebugData,
-        use_new_arrays: bool,
-        enable_structures: bool,
-    ) -> Self {
-        let mut var_iter = debugdata.variables.iter();
-        // current_var == None signals the end of iteration, so it needs to be set to the first value here
-        let current_var = var_iter.next();
-        VariablesIterator {
-            debugdata,
-            var_iter,
-            current_var,
-            type_iter: None,
-            use_new_arrays,
-            enable_structures,
-        }
+    fn up(&mut self) {
+        self.type_stack.pop();
+        self.position_stack.pop();
+        self.name_stack.pop();
+        self.offset_stack.pop();
     }
+
+    // pub(crate) fn next_sibling(&mut self) -> Option<(String, &'dbg TypeInfo, u64)> {
+    //     self.up();
+    //     self.next()
+    // }
 }
 
-impl<'a> Iterator for VariablesIterator<'a> {
-    type Item = (String, Option<&'a TypeInfo>, u64);
+impl<'dbg> Iterator for VariablesIterator<'dbg> {
+    type Item = (String, Option<&'dbg TypeInfo>, u64);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((
@@ -233,13 +154,7 @@ impl<'a> Iterator for VariablesIterator<'a> {
             },
         )) = self.current_var
         {
-            if self.enable_structures {
-                // don't iterate over members when enable_structures is set
-                // In this mode we only want whole data types
-                self.current_var = self.var_iter.next();
-                let typeinfo = self.debugdata.types.get(typeref);
-                Some((varname.to_string(), typeinfo, *address))
-            } else if self.type_iter.is_none() {
+            if self.type_iter.is_none() {
                 // newly set current_var, should be returned before using type_iter to return its sub-elements
                 let typeinfo = self.debugdata.types.get(typeref);
                 if let Some(ti) = typeinfo {
@@ -276,6 +191,31 @@ impl<'a> Iterator for VariablesIterator<'a> {
         }
     }
 }
+
+impl<'dbg> VariablesIterator<'dbg> {
+    pub(crate) fn new(debugdata: &'dbg DebugData, use_new_arrays: bool) -> Self {
+        let mut var_iter = debugdata.variables.iter();
+        // current_var == None signals the end of iteration, so it needs to be set to the first value here
+        let current_var = var_iter.next();
+        VariablesIterator {
+            debugdata,
+            var_iter,
+            current_var,
+            type_iter: None,
+            use_new_arrays,
+        }
+    }
+
+    pub(crate) fn next_sibling(&mut self) -> Option<(String, Option<&'dbg TypeInfo>, u64)> {
+        if let Some(type_iter) = &mut self.type_iter {
+            type_iter.up();
+        }
+
+        self.next()
+    }
+}
+
+//########################################################
 
 #[cfg(test)]
 mod test {
@@ -417,10 +357,10 @@ mod test {
             unit_names: Vec::new(),
         };
 
-        let iter = VariablesIterator::new(&debugdata, false, false);
+        let iter = VariablesIterator::new(&debugdata, false);
         for item in iter {
             println!("{}", item.0);
         }
-        assert_eq!(VariablesIterator::new(&debugdata, false, false).count(), 6);
+        assert_eq!(VariablesIterator::new(&debugdata, false).count(), 6);
     }
 }

@@ -485,7 +485,9 @@ pub(crate) fn insert_many<'param>(
         }
     }
 
-    for (symbol_name, symbol_type, address) in debugdata.iter(use_new_arrays, enable_structures) {
+    let mut debugdata_iter = debugdata.iter(use_new_arrays);
+    let mut current_item = debugdata_iter.next();
+    while let Some((symbol_name, symbol_type, address)) = current_item {
         let typeinfo = symbol_type.unwrap_or(&TypeInfo {
             name: None,
             unit_idx: usize::MAX,
@@ -504,15 +506,22 @@ pub(crate) fn insert_many<'param>(
             | DwarfDataType::Struct { .. }
             | DwarfDataType::Class { .. }
             | DwarfDataType::Union { .. } => {
-                if enable_structures {
-                    check_insert_instance(&mut isupp, &sym_info, log_msgs);
+                if enable_structures && check_insert_instance(&mut isupp, &sym_info, log_msgs) {
+                    current_item = debugdata_iter.next_sibling();
+                    continue;
                 }
             }
             DwarfDataType::Array { arraytype, .. } => {
                 if is_simple_type(arraytype) {
-                    check_insert_simple_type(&mut isupp, &sym_info, log_msgs);
-                } else if enable_structures {
-                    check_insert_instance(&mut isupp, &sym_info, log_msgs);
+                    if check_insert_simple_type(&mut isupp, &sym_info, log_msgs) {
+                        current_item = debugdata_iter.next_sibling();
+                        continue;
+                    }
+                } else if enable_structures
+                    && check_insert_instance(&mut isupp, &sym_info, log_msgs)
+                {
+                    current_item = debugdata_iter.next_sibling();
+                    continue;
                 }
             }
             DwarfDataType::Enum { .. }
@@ -530,6 +539,8 @@ pub(crate) fn insert_many<'param>(
                 check_insert_simple_type(&mut isupp, &sym_info, log_msgs);
             }
         }
+
+        current_item = debugdata_iter.next();
     }
 
     if let Some(group_name) = target_group {
@@ -579,7 +590,9 @@ fn check_insert_simple_type(
     isupp: &mut InsertSupport,
     sym_info: &SymbolInfo,
     log_msgs: &mut Vec<String>,
-) {
+) -> bool {
+    let mut any_inserted = false;
+
     // insert if the address is inside a given range, or if a regex matches the symbol name
     if is_insert_requested(
         sym_info.address,
@@ -607,6 +620,8 @@ fn check_insert_simple_type(
                 let it = ItemType::Measurement(isupp.module.measurement.len() - 1);
                 isupp.name_map.insert(measurement_name, it);
                 isupp.sym_map.insert(sym_info.name.clone(), it);
+
+                any_inserted = true;
             }
             Err(errmsg) => {
                 log_msgs.push(format!("Skipped: {errmsg}"));
@@ -641,19 +656,25 @@ fn check_insert_simple_type(
                 let it = ItemType::Characteristic(isupp.module.characteristic.len() - 1);
                 isupp.name_map.insert(characteristic_name, it);
                 isupp.sym_map.insert(sym_info.name.clone(), it);
+
+                any_inserted = true;
             }
             Err(errmsg) => {
                 log_msgs.push(format!("Skipped: {errmsg}"));
             }
         }
     }
+
+    any_inserted
 }
 
 fn check_insert_instance<'dbg>(
     isupp: &mut InsertSupport<'_, 'dbg, '_>,
     sym_info: &SymbolInfo<'dbg>,
     log_msgs: &mut Vec<String>,
-) {
+) -> bool {
+    let mut any_inserted = false;
+
     // insert if the address is inside a given range, or if a regex matches the symbol name
     if is_insert_requested(
         sym_info.address,
@@ -686,6 +707,7 @@ fn check_insert_instance<'dbg>(
                 isupp
                     .create_typedef
                     .push((typedef_typeinfo, isupp.module.instance.len() - 1));
+                any_inserted = true;
             }
             Err(errmsg) => {
                 log_msgs.push(format!("Skipped: {errmsg}"));
@@ -725,12 +747,15 @@ fn check_insert_instance<'dbg>(
                 isupp
                     .create_typedef
                     .push((typedef_typeinfo, isupp.module.instance.len() - 1));
+                any_inserted = true;
             }
             Err(errmsg) => {
                 log_msgs.push(format!("Skipped: {errmsg}"));
             }
         }
     }
+
+    any_inserted
 }
 
 fn is_insert_requested(
