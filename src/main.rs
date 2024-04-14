@@ -599,7 +599,7 @@ fn get_args() -> ArgMatches {
         .requires("ELFFILE")
     )
     .arg(Arg::new("ENABLE_STRUCTURES")
-        .help("Enable the update of INSTANCE, TYPEDEF_STRUCTURE & co. Requires a2l version 1.7.1")
+        .help("Enable the the use of INSTANCE, TYPEDEF_STRUCTURE & co. for all operations. Requires a2l version 1.7.1")
         .short('t')
         .long("enable-structures")
         .number_of_values(0)
