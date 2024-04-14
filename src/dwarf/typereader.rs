@@ -43,9 +43,8 @@ impl<'elffile> DebugDataReader<'elffile> {
                         if self.verbose {
                             println!("Error loading type info for variable {name}: {errmsg}");
                         }
-                        typereader_data.wip_items.clear();
                     }
-                    assert_eq!(typereader_data.wip_items.len(), 0);
+                    typereader_data.wip_items.clear();
                 }
             }
         }
@@ -53,8 +52,44 @@ impl<'elffile> DebugDataReader<'elffile> {
         (typereader_data.types, typereader_data.typenames)
     }
 
-    // get one type from the debug info
     fn get_type(
+        &self,
+        current_unit: usize,
+        dbginfo_offset: DebugInfoOffset,
+        typereader_data: &mut TypeReaderData,
+    ) -> Result<TypeInfo, String> {
+        let wip_items_orig_len = typereader_data.wip_items.len();
+        match self.get_type_wrapped(current_unit, dbginfo_offset, typereader_data) {
+            Ok(typeinfo) => Ok(typeinfo),
+            Err(errmsg) => {
+                // try to print a readable error message
+                println!("Failed to read type: {errmsg}");
+                for (idx, wip) in typereader_data.wip_items.iter().enumerate() {
+                    print!("  {:indent$}{}", "", wip.tag, indent = idx * 2);
+                    if let Some(name) = &wip.name {
+                        print!(" {name}");
+                    }
+                    println!(" @0x{:X}", wip.offset);
+                }
+
+                // create a dummy typeinfo using DwarfDataType::Other, rather than propagate the error
+                // this allows the caller to continue, which is more useful
+                // for example, this could result in a struct where one member is unusable, but any others could still be OK
+                typereader_data.wip_items.truncate(wip_items_orig_len);
+                let replacement_type = TypeInfo {
+                    datatype: DwarfDataType::Other(0),
+                    name: typereader_data.wip_items.last().and_then(|wip| wip.name.clone()),
+                    unit_idx: current_unit,
+                    dbginfo_offset: dbginfo_offset.0,
+                };
+                typereader_data.types.insert(dbginfo_offset.0, replacement_type.clone());
+                Ok(replacement_type)
+            }
+        }
+    }
+
+    // get one type from the debug info
+    fn get_type_wrapped(
         &self,
         current_unit: usize,
         dbginfo_offset: DebugInfoOffset,
