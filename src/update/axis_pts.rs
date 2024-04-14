@@ -118,18 +118,18 @@ fn update_axis_pts_address<'a>(
         &axis_pts.if_data,
         debug_data,
     ) {
-        Ok((address, symbol_datatype, symbol_name)) => {
+        Ok(sym_info) => {
             // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut axis_pts.symbol_link, symbol_name.clone());
-            axis_pts.address = address as u32;
+            set_symbol_link(&mut axis_pts.symbol_link, sym_info.name.clone());
+            axis_pts.address = sym_info.address as u32;
             update_ifdata(
                 &mut axis_pts.if_data,
-                &symbol_name,
-                symbol_datatype,
-                address,
+                &sym_info.name,
+                sym_info.typeinfo,
+                sym_info.address,
             );
 
-            Ok(symbol_datatype)
+            Ok(sym_info.typeinfo)
         }
         Err(errmsgs) => Err(errmsgs),
     }

@@ -1,31 +1,43 @@
 use crate::dwarf::DwarfDataType;
 use crate::dwarf::{DebugData, TypeInfo};
 
-#[cfg(test)]
-use std::collections::HashMap;
+#[derive(Clone)]
+pub(crate) struct SymbolInfo<'dbg> {
+    pub(crate) name: String,
+    pub(crate) address: u64,
+    pub(crate) typeinfo: &'dbg TypeInfo,
+}
 
 // find a symbol in the elf_info data structure that was derived from the DWARF debug info in the elf file
 pub(crate) fn find_symbol<'a>(
     varname: &str,
     debug_data: &'a DebugData,
-) -> Result<(String, u64, &'a TypeInfo), String> {
+) -> Result<SymbolInfo<'a>, String> {
     // split the a2l symbol name: e.g. "motortune.param._0_" -> ["motortune", "param", "_0_"]
     let components = split_symbol_components(varname);
 
     // find the symbol in the symbol table
     match find_symbol_from_components(&components, debug_data) {
-        Ok((addr, typeinfo)) => Ok((varname.to_owned(), addr, typeinfo)),
+        Ok((address, typeinfo)) => Ok(SymbolInfo {
+            name: varname.to_owned(),
+            address,
+            typeinfo,
+        }),
         Err(find_err) => {
             // it was not found using the given varname; if this is name has a mangled form then try that instead
             if let Some(mangled) = debug_data.demangled_names.get(components[0]) {
                 let mut components_mangled = components.clone();
                 components_mangled[0] = mangled;
-                if let Ok((addr, typeinfo)) =
+                if let Ok((address, typeinfo)) =
                     find_symbol_from_components(&components_mangled, debug_data)
                 {
                     let mangled_varname =
                         mangled.to_owned() + varname.strip_prefix(components[0]).unwrap();
-                    return Ok((mangled_varname, addr, typeinfo));
+                    return Ok(SymbolInfo {
+                        name: mangled_varname,
+                        address,
+                        typeinfo,
+                    });
                 }
             }
 
@@ -43,7 +55,7 @@ fn find_symbol_from_components<'a>(
         // we also need the type in order to resolve struct members, etc.
         if let Some(vartype) = debug_data.types.get(&varinfo.typeref) {
             // all further components of the symbol name are struct/union members or array indices
-            find_membertype(vartype, components, 1, varinfo.address)
+            find_membertype(vartype, debug_data, components, 1, varinfo.address)
         } else {
             // this exists for completeness, but shouldn't happen with a correctly generated elffile
             // if the variable is present in the elffile, then the type should also be present
@@ -92,6 +104,7 @@ fn split_symbol_components(varname: &str) -> Vec<&str> {
 // find the address and type of the current component of a symbol name
 fn find_membertype<'a>(
     typeinfo: &'a TypeInfo,
+    debug_data: &'a DebugData,
     components: &[&str],
     component_index: usize,
     address: u64,
@@ -106,8 +119,10 @@ fn find_membertype<'a>(
                 ..
             } => {
                 if let Some((membertype, offset)) = members.get(components[component_index]) {
+                    let membertype = membertype.get_reference(&debug_data.types);
                     find_membertype(
                         membertype,
+                        debug_data,
                         components,
                         component_index + 1,
                         address + offset,
@@ -121,13 +136,14 @@ fn find_membertype<'a>(
                     );
                     find_membertype(
                         baseclass_type,
+                        debug_data,
                         components,
                         component_index + 1 + skip,
                         address + offset,
                     )
                 } else {
-                    println!("components: {components:?}");
-                    println!("inheritance: {inheritance:?}");
+                    // println!("components: {components:?}");
+                    // println!("inheritance: {inheritance:?}");
                     Err(format!(
                         "There is no member \"{}\" in \"{}\"",
                         components[component_index],
@@ -137,8 +153,10 @@ fn find_membertype<'a>(
             }
             DwarfDataType::Struct { members, .. } | DwarfDataType::Union { members, .. } => {
                 if let Some((membertype, offset)) = members.get(components[component_index]) {
+                    let membertype = membertype.get_reference(&debug_data.types);
                     find_membertype(
                         membertype,
+                        debug_data,
                         components,
                         component_index + 1,
                         address + offset,
@@ -174,6 +192,7 @@ fn find_membertype<'a>(
                 let elementaddr = address + (multi_index as u64 * stride);
                 find_membertype(
                     arraytype,
+                    debug_data,
                     components,
                     component_index + dim.len(),
                     elementaddr,
@@ -215,6 +234,7 @@ fn get_index(idxstr: &str) -> Option<usize> {
 mod test {
     use super::*;
     use indexmap::IndexMap;
+    use std::collections::HashMap;
 
     #[test]
     fn test_split_symbol_components() {

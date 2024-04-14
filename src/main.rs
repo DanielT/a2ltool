@@ -18,7 +18,7 @@ mod version;
 mod xcp;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum A2lVersion {
+pub enum A2lVersion {
     V1_5_0,
     V1_5_1,
     V1_6_0,
@@ -348,6 +348,7 @@ fn core() -> Result<(), String> {
                 characteristic_symbols,
                 target_group,
                 &mut log_msgs,
+                enable_structures,
             );
             for msg in log_msgs {
                 cond_print!(verbose, now, msg);
@@ -389,6 +390,7 @@ fn core() -> Result<(), String> {
                 char_regexes,
                 target_group,
                 &mut log_msgs,
+                enable_structures,
             );
             for msg in log_msgs {
                 cond_print!(verbose, now, msg);

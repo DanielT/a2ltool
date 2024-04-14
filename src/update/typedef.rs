@@ -1,13 +1,13 @@
 use crate::dwarf::{DebugData, DwarfDataType, TypeInfo};
 use crate::update::{
-    adjust_limits, get_a2l_datatype, get_fnc_values_memberid, get_inner_type, set_bitmask,
-    update_characteristic_axis, update_matrix_dim, update_record_layout, RecordLayoutInfo,
-    TypedefNames, TypedefReferrer, TypedefsRefInfo,
+    adjust_limits, get_a2l_datatype, get_fnc_values_memberid, get_inner_type, set_address_type,
+    set_bitmask, set_matrix_dim, update_characteristic_axis, update_record_layout,
+    RecordLayoutInfo, TypedefNames, TypedefReferrer, TypedefsRefInfo,
 };
 use a2lfile::{
-    A2lObject, AddrType, AddressType, CharacteristicType, FncValues, IndexMode, Module, Number,
-    RecordLayout, StructureComponent, SymbolTypeLink, TypedefBlob, TypedefCharacteristic,
-    TypedefMeasurement, TypedefStructure,
+    A2lObject, AddrType, CharacteristicType, FncValues, IndexMode, Module, Number, RecordLayout,
+    StructureComponent, SymbolTypeLink, TypedefBlob, TypedefCharacteristic, TypedefMeasurement,
+    TypedefStructure,
 };
 use fxhash::FxBuildHasher;
 use indexmap::{IndexMap, IndexSet};
@@ -65,6 +65,9 @@ struct TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
     axis_pts_dim: HashMap<String, u16>,
 }
 
+pub(crate) const FLAG_CREATE_CALIB: &str = "||calib||";
+pub(crate) const FLAG_CREATE_MEAS: &str = "||meas||";
+
 pub(crate) fn update_module_typedefs<'a>(
     module: &mut Module,
     debug_data: &'a DebugData,
@@ -86,8 +89,38 @@ pub(crate) fn update_module_typedefs<'a>(
     updater.process_typedefs(preserve_unknown, false);
 }
 
+pub(crate) fn create_new_typedefs<'a>(
+    module: &mut Module,
+    debug_data: &'a DebugData,
+    log_msgs: &mut Vec<String>,
+    create_list: &[(&'a TypeInfo, usize)],
+) {
+    let typedef_names = TypedefNames::new(module);
+    let mut recordlayout_info = RecordLayoutInfo::build(module);
+    let mut typedef_ref_info: TypedefsRefInfo = HashMap::new();
+
+    for (typeinfo, instance_idx) in create_list {
+        let name = module.instance[*instance_idx].name.clone();
+        typedef_ref_info
+            .entry(name)
+            .or_default()
+            .push((Some(typeinfo), TypedefReferrer::Instance(*instance_idx)));
+    }
+
+    let updater = TypedefUpdater::new(
+        module,
+        debug_data,
+        log_msgs,
+        typedef_names,
+        &mut recordlayout_info,
+        typedef_ref_info,
+    );
+
+    updater.process_typedefs(true, true);
+}
+
 impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
-    /// create a new `TypedefUpater`
+    /// create a new `TypedefUpdater`
     pub(crate) fn new(
         module: &'a2l mut Module,
         debug_data: &'dbg DebugData,
@@ -579,8 +612,9 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 // TYPEDEF_AXIS / TYPEDEF_BLOB / TYPEDEF_CHARACTERISTIC
                 true
             } else {
-                // nonexistent TYPEDEF
-                false
+                // nonexistent TYPEDEF, use the "magic" refname to determine if a TYPEDEF_CHARWYCTERISTIC should be created
+                // '|' is not allowed in names, so this name should only occur when it is used as a flag in the insert code.
+                refname == FLAG_CREATE_CALIB
             };
 
             for typeinfo in dtypes {
@@ -1042,7 +1076,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             || td_char.characteristic_type == CharacteristicType::ValBlk
         {
             td_char.number = None;
-            update_matrix_dim(&mut td_char.matrix_dim, char_type, true);
+            set_matrix_dim(&mut td_char.matrix_dim, char_type, true);
             // arrays of values should have the type ValBlk, while single values should NOT have the type ValBlk
             if td_char.characteristic_type == CharacteristicType::Value
                 && td_char.matrix_dim.is_some()
@@ -1130,7 +1164,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
         td_meas.lower_limit = ll;
         td_meas.upper_limit = ul;
 
-        update_matrix_dim(&mut td_meas.matrix_dim, meas_type, true);
+        set_matrix_dim(&mut td_meas.matrix_dim, meas_type, true);
     }
 
     /// update all `TYPEDEF_STRUCTUREs`
@@ -1209,7 +1243,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 sc.address_offset = 0;
                 sc.component_name = "array_element".to_string();
                 sc.symbol_type_link = None;
-                update_matrix_dim(&mut sc.matrix_dim, typeinfo, true);
+                set_matrix_dim(&mut sc.matrix_dim, typeinfo, true);
 
                 let inner_type = typeinfo.get_arraytype().unwrap_or(typeinfo);
                 if let Some(typedef_name) = self.create_typedef(inner_type, is_calib, enum_convlist)
@@ -1240,7 +1274,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 set_address_type(&mut sc.address_type, typeinfo);
                 if let Some((_, pt_type)) = typeinfo.get_pointer(&self.debug_data.types) {
                     // it might even be a pointer to an array!
-                    update_matrix_dim(&mut sc.matrix_dim, pt_type, true);
+                    set_matrix_dim(&mut sc.matrix_dim, pt_type, true);
                 }
                 let inner_type = typeinfo
                     .get_pointer(&self.debug_data.types)
@@ -1308,7 +1342,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                     // set ADDRESS_TYPE if cur_member_typeinfo is a pointer, or delete it
                     set_address_type(&mut sc.address_type, cur_type);
                     // update, set or delete MATRIX_DIM
-                    update_matrix_dim(&mut sc.matrix_dim, cur_type_nopointer, true);
+                    set_matrix_dim(&mut sc.matrix_dim, cur_type_nopointer, true);
                     // update or create the SYMBOL_TYPE_LINK of the STRUCTURE_COMPONENT
                     if let Some(symbol_type_link) = &mut sc.symbol_type_link {
                         symbol_type_link.symbol_type = cur_member_name.clone();
@@ -1631,22 +1665,6 @@ fn get_typedef_size(debug_data: &DebugData, typeinfo: &TypeInfo) -> u32 {
         pt_type.get_size() as u32
     } else {
         typeinfo.get_size() as u32
-    }
-}
-
-/// set or delete the `ADDRESS_TYPE` for any TYPEDEF_*
-fn set_address_type(address_type_opt: &mut Option<AddressType>, newtype: &TypeInfo) {
-    if let DwarfDataType::Pointer(ptsize, _) = &newtype.datatype {
-        let address_type = address_type_opt.get_or_insert(AddressType::new(AddrType::Direct));
-        address_type.address_type = match ptsize {
-            1 => AddrType::Pbyte,
-            2 => AddrType::Pword,
-            4 => AddrType::Plong,
-            8 => AddrType::Plonglong,
-            _ => AddrType::Direct,
-        };
-    } else {
-        *address_type_opt = None;
     }
 }
 
@@ -2101,12 +2119,13 @@ mod test {
 
         let mut typedef_ref_info: HashMap<String, Vec<_>> = HashMap::new();
         for (idx, inst) in a2l.project.module[0].instance.iter().enumerate() {
-            if let Ok((_, typeinfo, _)) =
+            if let Ok(sym_info) =
                 get_symbol_info(&inst.name, &inst.symbol_link, &inst.if_data, &debug_data)
             {
-                let typeinfo = typeinfo
+                let typeinfo = sym_info
+                    .typeinfo
                     .get_pointer(&debug_data.types)
-                    .map_or(typeinfo, |(_, t)| t);
+                    .map_or(sym_info.typeinfo, |(_, t)| t);
                 let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
                 typedef_ref_info
                     .entry(inst.type_ref.clone())

@@ -49,13 +49,18 @@ fn update_blob_address<'a>(
     debug_data: &'a DebugData,
 ) -> Result<&'a TypeInfo, Vec<String>> {
     match get_symbol_info(&blob.name, &blob.symbol_link, &blob.if_data, debug_data) {
-        Ok((address, symbol_datatype, symbol_name)) => {
+        Ok(sym_info) => {
             // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut blob.symbol_link, symbol_name.clone());
-            blob.start_address = address as u32;
-            update_ifdata(&mut blob.if_data, &symbol_name, symbol_datatype, address);
+            set_symbol_link(&mut blob.symbol_link, sym_info.name.clone());
+            blob.start_address = sym_info.address as u32;
+            update_ifdata(
+                &mut blob.if_data,
+                &sym_info.name,
+                sym_info.typeinfo,
+                sym_info.address,
+            );
 
-            Ok(symbol_datatype)
+            Ok(sym_info.typeinfo)
         }
         Err(errmsgs) => Err(errmsgs),
     }

@@ -90,13 +90,13 @@ fn update_instance_address<'a>(
         &instance.if_data,
         debug_data,
     ) {
-        Ok((address, symbol_typeinfo, symbol_name)) => {
+        Ok(sym_info) => {
             // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut instance.symbol_link, symbol_name.clone());
-            instance.start_address = address as u32;
+            set_symbol_link(&mut instance.symbol_link, sym_info.name.clone());
+            instance.start_address = sym_info.address as u32;
 
             let typeinfo = if let Some((pt_size, basetype)) =
-                &symbol_typeinfo.get_pointer(&debug_data.types)
+                &sym_info.typeinfo.get_pointer(&debug_data.types)
             {
                 let address_type = instance
                     .address_type
@@ -111,23 +111,33 @@ fn update_instance_address<'a>(
                 basetype
             } else {
                 instance.address_type = None;
-                symbol_typeinfo
+                sym_info.typeinfo
             };
 
             let typeinfo = if let DwarfDataType::Array { dim, arraytype, .. } = &typeinfo.datatype {
                 let matrix_dim = instance.matrix_dim.get_or_insert(MatrixDim::new());
                 matrix_dim.dim_list = dim.iter().map(|d| *d as u16).collect();
-                update_ifdata(&mut instance.if_data, &symbol_name, arraytype, address);
+                update_ifdata(
+                    &mut instance.if_data,
+                    &sym_info.name,
+                    arraytype,
+                    sym_info.address,
+                );
                 arraytype
             } else {
                 instance.matrix_dim = None;
                 typeinfo
             };
 
-            update_ifdata(&mut instance.if_data, &symbol_name, typeinfo, address);
+            update_ifdata(
+                &mut instance.if_data,
+                &sym_info.name,
+                typeinfo,
+                sym_info.address,
+            );
 
             // return the name of the linked TYPEDEF_<x>
-            Ok((instance.type_ref.clone(), symbol_typeinfo))
+            Ok((instance.type_ref.clone(), sym_info.typeinfo))
         }
         Err(errmsgs) => Err(errmsgs),
     }

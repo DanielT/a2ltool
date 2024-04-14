@@ -1,6 +1,9 @@
 use crate::dwarf::{DebugData, TypeInfo};
-use crate::ifdata;
-use a2lfile::{A2lFile, A2lObject, BitMask, EcuAddress, IfData, MatrixDim, Module, SymbolLink};
+use crate::{ifdata, A2lVersion};
+use a2lfile::{
+    A2lFile, A2lObject, AddrType, AddressType, BitMask, EcuAddress, IfData, MatrixDim, Module,
+    SymbolLink,
+};
 use std::collections::{HashMap, HashSet};
 
 mod axis_pts;
@@ -11,11 +14,11 @@ mod ifdata_update;
 mod instance;
 mod measurement;
 mod record_layout;
-mod typedef;
+pub(crate) mod typedef;
 
 use crate::datatype::{get_a2l_datatype, get_type_limits};
 use crate::dwarf::DwarfDataType;
-use crate::symbol::find_symbol;
+use crate::symbol::{find_symbol, SymbolInfo};
 use axis_pts::*;
 use blob::{cleanup_removed_blobs, update_module_blobs};
 use characteristic::*;
@@ -38,12 +41,12 @@ pub(crate) struct UpdateSumary {
 }
 
 #[derive(Debug, Clone)]
-enum TypedefReferrer {
+pub(crate) enum TypedefReferrer {
     Instance(usize),
     StructureComponent(String, String),
 }
 
-struct TypedefNames {
+pub(crate) struct TypedefNames {
     axis: HashSet<String>,
     blob: HashSet<String>,
     characteristic: HashSet<String>,
@@ -64,6 +67,7 @@ pub(crate) fn update_addresses(
     enable_structures: bool,
 ) -> UpdateSumary {
     let use_new_matrix_dim = check_version_1_70(a2l_file);
+    let version = A2lVersion::from(&*a2l_file);
 
     let mut summary = UpdateSumary::new();
     for module in &mut a2l_file.project.module {
@@ -81,13 +85,8 @@ pub(crate) fn update_addresses(
         summary.measurement_not_updated += not_updated;
 
         // update all MEASUREMENTs
-        let (updated, not_updated) = update_module_measurements(
-            module,
-            debug_data,
-            log_msgs,
-            preserve_unknown,
-            use_new_matrix_dim,
-        );
+        let (updated, not_updated) =
+            update_module_measurements(module, debug_data, log_msgs, preserve_unknown, version);
         summary.measurement_updated += updated;
         summary.measurement_not_updated += not_updated;
 
@@ -153,16 +152,14 @@ fn get_symbol_info<'a>(
     opt_symbol_link: &Option<SymbolLink>,
     ifdata_vec: &[IfData],
     debug_data: &'a DebugData,
-) -> Result<(u64, &'a TypeInfo, String), Vec<String>> {
+) -> Result<SymbolInfo<'a>, Vec<String>> {
     let mut symbol_link_errmsg = None;
     let mut ifdata_errmsg = None;
     let mut object_name_errmsg = None;
     // preferred: get symbol information from a SYMBOL_LINK attribute
     if let Some(symbol_link) = opt_symbol_link {
         match find_symbol(&symbol_link.symbol_name, debug_data) {
-            Ok((_, addr, typeinfo)) => {
-                return Ok((addr, typeinfo, symbol_link.symbol_name.clone()))
-            }
+            Ok(sym_info) => return Ok(sym_info),
             Err(errmsg) => symbol_link_errmsg = Some(errmsg),
         };
     }
@@ -172,7 +169,7 @@ fn get_symbol_info<'a>(
     // by the Vector tools are understood by some other software.
     if let Some(ifdata_symbol_name) = get_symbol_name_from_ifdata(ifdata_vec) {
         match find_symbol(&ifdata_symbol_name, debug_data) {
-            Ok((_, addr, typeinfo)) => return Ok((addr, typeinfo, ifdata_symbol_name)),
+            Ok(sym_info) => return Ok(sym_info),
             Err(errmsg) => ifdata_errmsg = Some(errmsg),
         };
     }
@@ -180,7 +177,7 @@ fn get_symbol_info<'a>(
     // If there is no SYMBOL_LINK and no (usable) IF_DATA, then maybe the object name is also the symbol name
     if opt_symbol_link.is_none() {
         match find_symbol(name, debug_data) {
-            Ok((_, addr, typeinfo)) => return Ok((addr, typeinfo, name.to_string())),
+            Ok(sym_info) => return Ok(sym_info),
             Err(errmsg) => object_name_errmsg = Some(errmsg),
         };
     }
@@ -213,7 +210,7 @@ fn log_update_errors(errorlog: &mut Vec<String>, errmsgs: Vec<String>, blockname
 }
 
 // update or create a SYMBOL_LINK for the given symbol name
-fn set_symbol_link(opt_symbol_link: &mut Option<SymbolLink>, symbol_name: String) {
+pub(crate) fn set_symbol_link(opt_symbol_link: &mut Option<SymbolLink>, symbol_name: String) {
     if let Some(symbol_link) = opt_symbol_link {
         symbol_link.symbol_name = symbol_name;
     } else {
@@ -222,7 +219,7 @@ fn set_symbol_link(opt_symbol_link: &mut Option<SymbolLink>, symbol_name: String
 }
 
 // update the MATRIX_DIM of a MEASUREMENT or CHARACTERISTIC
-fn update_matrix_dim(
+pub(crate) fn set_matrix_dim(
     opt_matrix_dim: &mut Option<MatrixDim>,
     typeinfo: &TypeInfo,
     new_format: bool,
@@ -233,7 +230,7 @@ fn update_matrix_dim(
     // either as nested arrays, each with one dimension, or as one array with multiple dimensions
     while let DwarfDataType::Array { dim, arraytype, .. } = &cur_typeinfo.datatype {
         for val in dim {
-            matrix_dim_values.push(*val as u16);
+            matrix_dim_values.push(u16::try_from(*val).unwrap_or(u16::MAX));
         }
         cur_typeinfo = &**arraytype;
     }
@@ -267,7 +264,7 @@ fn set_measurement_ecu_address(opt_ecu_address: &mut Option<EcuAddress>, address
 
 // CHARACTERISTIC and MEASUREMENT objects contain a BIT_MASK for bitfield elements
 // it will be created/updated/deleted here, depending on the new data type of the variable
-fn set_bitmask(opt_bitmask: &mut Option<BitMask>, typeinfo: &TypeInfo) {
+pub(crate) fn set_bitmask(opt_bitmask: &mut Option<BitMask>, typeinfo: &TypeInfo) {
     if let DwarfDataType::Bitfield {
         bit_offset,
         bit_size,
@@ -289,6 +286,22 @@ fn set_bitmask(opt_bitmask: &mut Option<BitMask>, typeinfo: &TypeInfo) {
     }
 }
 
+/// set or delete the `ADDRESS_TYPE`
+pub(crate) fn set_address_type(address_type_opt: &mut Option<AddressType>, newtype: &TypeInfo) {
+    if let DwarfDataType::Pointer(ptsize, _) = &newtype.datatype {
+        let address_type = address_type_opt.get_or_insert(AddressType::new(AddrType::Direct));
+        address_type.address_type = match ptsize {
+            1 => AddrType::Pbyte,
+            2 => AddrType::Pword,
+            4 => AddrType::Plong,
+            8 => AddrType::Plonglong,
+            _ => AddrType::Direct,
+        };
+    } else {
+        *address_type_opt = None;
+    }
+}
+
 // Try to get a symbol name from an IF_DATA object.
 // specifically the pseudo-standard CANAPE_EXT could be present and contain symbol information
 fn get_symbol_name_from_ifdata(ifdata_vec: &[IfData]) -> Option<String> {
@@ -304,7 +317,7 @@ fn get_symbol_name_from_ifdata(ifdata_vec: &[IfData]) -> Option<String> {
     None
 }
 
-// generate adjuste min and max limits based on the datatype.
+// generate adjusted min and max limits based on the datatype.
 // since the updater code has no knowledge how the data is handled in the application it
 // is only possible to shrink existing limits, but not expand them
 fn adjust_limits(typeinfo: &TypeInfo, old_lower_limit: f64, old_upper_limit: f64) -> (f64, f64) {

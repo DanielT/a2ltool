@@ -1,5 +1,6 @@
 use crate::dwarf::DwarfDataType;
 use crate::dwarf::{DebugData, TypeInfo};
+use crate::A2lVersion;
 use a2lfile::{A2lObject, Measurement, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -9,16 +10,17 @@ use crate::update::{
     enums::{cond_create_enum_conversion, update_enum_compu_methods},
     get_a2l_datatype, get_symbol_info,
     ifdata_update::{update_ifdata, zero_if_data},
-    log_update_errors, set_bitmask, set_measurement_ecu_address, set_symbol_link,
-    update_matrix_dim,
+    log_update_errors, set_bitmask, set_matrix_dim, set_measurement_ecu_address, set_symbol_link,
 };
+
+use super::set_address_type;
 
 pub(crate) fn update_module_measurements(
     module: &mut Module,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
-    use_new_matrix_dim: bool,
+    version: A2lVersion,
 ) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
@@ -33,12 +35,13 @@ pub(crate) fn update_module_measurements(
             match update_measurement_address(&mut measurement, debug_data) {
                 Ok(typeinfo) => {
                     // update all the information instide a MEASUREMENT
-                    update_measurement_information(
+                    update_content(
                         module,
+                        debug_data,
                         &mut measurement,
                         typeinfo,
                         &mut enum_convlist,
-                        use_new_matrix_dim,
+                        version >= A2lVersion::V1_7_0,
                     );
 
                     module.measurement.push(measurement);
@@ -73,13 +76,25 @@ pub(crate) fn update_module_measurements(
 }
 
 // update datatype, limits and dimension of a MEASURMENT
-fn update_measurement_information<'enumlist, 'typeinfo: 'enumlist>(
+pub(crate) fn update_content<'enumlist, 'typeinfo: 'enumlist>(
     module: &mut Module,
+    debug_data: &'typeinfo DebugData,
     measurement: &mut Measurement,
     typeinfo: &'typeinfo TypeInfo,
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
     use_new_matrix_dim: bool,
 ) {
+    // handle pointers - only allowed for version 1.7.0+ (the caller should take care of this precondition)
+    set_address_type(&mut measurement.address_type, typeinfo);
+    let typeinfo = typeinfo
+        .get_pointer(&debug_data.types)
+        .map_or(typeinfo, |(_, t)| t);
+
+    // handle arrays and unwrap the typeinfo
+    set_matrix_dim(&mut measurement.matrix_dim, typeinfo, use_new_matrix_dim);
+    measurement.array_size = None;
+    let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
+
     if let DwarfDataType::Enum { enumerators, .. } = &typeinfo.datatype {
         if measurement.conversion == "NO_COMPU_METHOD" {
             measurement.conversion = typeinfo
@@ -95,8 +110,8 @@ fn update_measurement_information<'enumlist, 'typeinfo: 'enumlist>(
     measurement.lower_limit = ll;
     measurement.upper_limit = ul;
 
-    update_matrix_dim(&mut measurement.matrix_dim, typeinfo, use_new_matrix_dim);
-    measurement.array_size = None;
+    measurement.datatype = get_a2l_datatype(typeinfo);
+    set_bitmask(&mut measurement.bit_mask, typeinfo);
 }
 
 // update the address of a MEASUREMENT object
@@ -110,20 +125,18 @@ fn update_measurement_address<'a>(
         &measurement.if_data,
         debug_data,
     ) {
-        Ok((address, symbol_datatype, symbol_name)) => {
+        Ok(sym_info) => {
             // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut measurement.symbol_link, symbol_name.clone());
-            set_measurement_ecu_address(&mut measurement.ecu_address, address);
-            measurement.datatype = get_a2l_datatype(symbol_datatype);
-            set_bitmask(&mut measurement.bit_mask, symbol_datatype);
+            set_symbol_link(&mut measurement.symbol_link, sym_info.name.clone());
+            set_measurement_ecu_address(&mut measurement.ecu_address, sym_info.address);
             update_ifdata(
                 &mut measurement.if_data,
-                &symbol_name,
-                symbol_datatype,
-                address,
+                &sym_info.name,
+                sym_info.typeinfo,
+                sym_info.address,
             );
 
-            Ok(symbol_datatype)
+            Ok(sym_info.typeinfo)
         }
         Err(errmsgs) => Err(errmsgs),
     }

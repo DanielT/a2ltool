@@ -29,6 +29,7 @@ pub(crate) struct VariablesIterator<'a> {
     current_var: Option<(&'a String, &'a VarInfo)>,
     type_iter: Option<TypeInfoIter<'a>>,
     use_new_arrays: bool,
+    enable_structures: bool,
 }
 
 impl<'a> TypeInfoIter<'a> {
@@ -202,7 +203,11 @@ impl<'a> Iterator for TypeInfoIter<'a> {
 }
 
 impl<'a> VariablesIterator<'a> {
-    pub(crate) fn new(debugdata: &'a DebugData, use_new_arrays: bool) -> Self {
+    pub(crate) fn new(
+        debugdata: &'a DebugData,
+        use_new_arrays: bool,
+        enable_structures: bool,
+    ) -> Self {
         let mut var_iter = debugdata.variables.iter();
         // current_var == None signals the end of iteration, so it needs to be set to the first value here
         let current_var = var_iter.next();
@@ -212,6 +217,7 @@ impl<'a> VariablesIterator<'a> {
             current_var,
             type_iter: None,
             use_new_arrays,
+            enable_structures,
         }
     }
 }
@@ -227,7 +233,13 @@ impl<'a> Iterator for VariablesIterator<'a> {
             },
         )) = self.current_var
         {
-            if self.type_iter.is_none() {
+            if self.enable_structures {
+                // don't iterate over members when enable_structures is set
+                // In this mode we only want whole data types
+                self.current_var = self.var_iter.next();
+                let typeinfo = self.debugdata.types.get(typeref);
+                Some((varname.to_string(), typeinfo, *address))
+            } else if self.type_iter.is_none() {
                 // newly set current_var, should be returned before using type_iter to return its sub-elements
                 let typeinfo = self.debugdata.types.get(typeref);
                 if let Some(ti) = typeinfo {
@@ -405,10 +417,10 @@ mod test {
             unit_names: Vec::new(),
         };
 
-        let iter = VariablesIterator::new(&debugdata, false);
+        let iter = VariablesIterator::new(&debugdata, false, false);
         for item in iter {
             println!("{}", item.0);
         }
-        assert_eq!(VariablesIterator::new(&debugdata, false).count(), 6);
+        assert_eq!(VariablesIterator::new(&debugdata, false, false).count(), 6);
     }
 }

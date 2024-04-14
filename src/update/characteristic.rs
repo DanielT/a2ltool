@@ -9,7 +9,7 @@ use crate::update::{
     enums::{cond_create_enum_conversion, update_enum_compu_methods},
     get_fnc_values_memberid, get_inner_type, get_symbol_info,
     ifdata_update::{update_ifdata, zero_if_data},
-    log_update_errors, set_bitmask, set_symbol_link, update_matrix_dim, update_record_layout,
+    log_update_errors, set_bitmask, set_matrix_dim, set_symbol_link, update_record_layout,
     RecordLayoutInfo,
 };
 
@@ -136,7 +136,7 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
     if characteristic.characteristic_type == CharacteristicType::Value
         || characteristic.characteristic_type == CharacteristicType::ValBlk
     {
-        update_matrix_dim(&mut characteristic.matrix_dim, typeinfo, use_new_matrix_dim);
+        set_matrix_dim(&mut characteristic.matrix_dim, typeinfo, use_new_matrix_dim);
         // arrays of values should have the type ValBlk, while single values should NOT have the type ValBlk
         if characteristic.characteristic_type == CharacteristicType::Value
             && characteristic.matrix_dim.is_some()
@@ -231,19 +231,19 @@ fn update_characteristic_address<'a>(
         &characteristic.if_data,
         debug_data,
     ) {
-        Ok((address, symbol_datatype, symbol_name)) => {
+        Ok(sym_info) => {
             // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut characteristic.symbol_link, symbol_name.clone());
-            characteristic.address = address as u32;
-            set_bitmask(&mut characteristic.bit_mask, symbol_datatype);
+            set_symbol_link(&mut characteristic.symbol_link, sym_info.name.clone());
+            characteristic.address = sym_info.address as u32;
+            set_bitmask(&mut characteristic.bit_mask, sym_info.typeinfo);
             update_ifdata(
                 &mut characteristic.if_data,
-                &symbol_name,
-                symbol_datatype,
-                address,
+                &sym_info.name,
+                sym_info.typeinfo,
+                sym_info.address,
             );
 
-            Ok(symbol_datatype)
+            Ok(sym_info.typeinfo)
         }
         Err(errmsgs) => Err(errmsgs),
     }
