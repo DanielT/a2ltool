@@ -451,33 +451,19 @@ impl<'elffile> DebugDataReader<'elffile> {
                             child_entry.offset().to_debug_info_offset(unit).unwrap().0;
                         if let Some(bit_offset) = get_bit_offset_attribute(child_entry) {
                             // Dwarf 2 / 3
-                            if self.endian == Endianness::Big {
-                                membertype = TypeInfo {
-                                    name: membertype.name.clone(),
-                                    unit_idx: membertype.unit_idx,
-                                    dbginfo_offset,
-                                    datatype: DwarfDataType::Bitfield {
-                                        basetype: Box::new(membertype),
-                                        bit_size: bit_size as u16,
-                                        bit_offset: bit_offset as u16,
-                                    },
-                                };
-                            } else {
-                                // Endianness::Little
-                                let type_size = membertype.get_size();
-                                let type_size_bits = type_size * 8;
-                                let bit_offset_le = type_size_bits - bit_offset - bit_size;
-                                membertype = TypeInfo {
-                                    name: membertype.name.clone(),
-                                    unit_idx: membertype.unit_idx,
-                                    dbginfo_offset,
-                                    datatype: DwarfDataType::Bitfield {
-                                        basetype: Box::new(membertype),
-                                        bit_size: bit_size as u16,
-                                        bit_offset: bit_offset_le as u16,
-                                    },
-                                };
-                            }
+                            let type_size = membertype.get_size();
+                            let type_size_bits = type_size * 8;
+                            let bit_offset_le = type_size_bits - bit_offset - bit_size;
+                            membertype = TypeInfo {
+                                name: membertype.name.clone(),
+                                unit_idx: membertype.unit_idx,
+                                dbginfo_offset,
+                                datatype: DwarfDataType::Bitfield {
+                                    basetype: Box::new(membertype),
+                                    bit_size: bit_size as u16,
+                                    bit_offset: bit_offset_le as u16,
+                                },
+                            };
                         } else if let Some(mut data_bit_offset) =
                             get_data_bit_offset_attribute(child_entry)
                         {
@@ -490,6 +476,12 @@ impl<'elffile> DebugDataReader<'elffile> {
                                 // Dwarf 4 / 5: re-calculate offset
                                 offset += (data_bit_offset / type_size_bits) * type_size;
                                 data_bit_offset %= type_size_bits;
+                            }
+                            if self.endian == Endianness::Big {
+                                // reverse the mask for big endian. Example
+                                // In: type_size 32, offset: 5, size 4 -> 0000_0000_0000_0000_0000_0001_1110_0000
+                                // Out: offset = 32 - 5 - 4 = 23       -> 0000_0111_1000_0000_0000_0000_0000_0000
+                                data_bit_offset = type_size_bits - data_bit_offset - bit_size;
                             }
                             // these values should be independent of Endianness
                             membertype = TypeInfo {
