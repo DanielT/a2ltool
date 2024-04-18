@@ -24,7 +24,7 @@ dependencies = [
 
 [[package]]
 name = "a2ltool"
-version = "1.6.0"
+version = "2.0.0"
 dependencies = [
  "a2lfile",
  "clap",

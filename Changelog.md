@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 2.0.0
+
+- upgrade to a2lfile 2.0.0
+  - fix the definition of AR_COMPONENT
+  - don't remove valid elements during cleanup
+- Create and update INSTANCEs and TYPEDEF_MEASUREMENTs if the file version is 1.7.1 and --enable-strucutres is set
+- Insert whole arrays of MEASUREMENTs and CHARACTERISTICs instead of separate items for each element if the array elements have a simple datatype
+- Items can now be inserted based on the containing elf section
+- Debug data reader improvements - extracted information should now be better and more complete
+  With assistance and fixes by @oleid - Thanks!
+- Support XCP IF_DATA up to version 1.4 (previously only version 1.2 was supported)
+- Use new array notation if the file version is 1.7.0 or newer - "[x]" instead of ".\_x\_"
+- Fix the BIT_MASK attribute for big-endian targets
+- Remove a stray debug print that caused message spam while inserting CHARACTERISTICs
+
 ## Version 1.6.0
 
 - Upgrade to a2lfile version 1.5.0
