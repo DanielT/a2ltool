@@ -399,6 +399,7 @@ mod test {
             typenames: HashMap::new(),
             demangled_names,
             unit_names: vec![Some("file_a.c".to_string()), Some("file_b.c".to_string())],
+            sections: HashMap::new(),
         };
 
         // test iter.next_sibling()

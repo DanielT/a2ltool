@@ -92,6 +92,7 @@ pub(crate) struct DebugData {
     pub(crate) typenames: HashMap<String, Vec<usize>>,
     pub(crate) demangled_names: HashMap<String, String>,
     pub(crate) unit_names: Vec<Option<String>>,
+    pub(crate) sections: HashMap<String, (u64, u64)>,
 }
 
 struct DebugDataReader<'elffile> {
@@ -100,6 +101,7 @@ struct DebugDataReader<'elffile> {
     units: UnitList<'elffile>,
     unit_names: Vec<Option<String>>,
     endian: Endianness,
+    sections: HashMap<String, (u64, u64)>,
 }
 
 impl DebugData {
@@ -109,12 +111,15 @@ impl DebugData {
         let elffile = load_elf_file(&filename.to_string_lossy(), &filedata)?;
         let dwarf = load_dwarf(&elffile)?;
 
-        let mut dbg_reader = DebugDataReader {
+        let sections = get_elf_sections(&elffile);
+
+        let dbg_reader = DebugDataReader {
             dwarf,
             verbose,
             units: UnitList::new(),
             unit_names: Vec::new(),
             endian: elffile.endianness(),
+            sections,
         };
 
         Ok(dbg_reader.read_debug_info_entries())
@@ -159,6 +164,22 @@ fn load_elf_file<'data>(
     }
 }
 
+fn get_elf_sections(elffile: &object::read::File) -> HashMap<String, (u64, u64)> {
+    let mut map = HashMap::new();
+
+    for section in elffile.sections() {
+        let addr = section.address();
+        let size = section.size();
+        if addr != 0 && size != 0 {
+            if let Ok(name) = section.name() {
+                map.insert(name.to_string(), (addr, addr + size));
+            }
+        }
+    }
+
+    map
+}
+
 // load the SWARF debug info from the .debug_<xyz> sections
 fn load_dwarf<'data>(
     elffile: &object::read::File<'data>,
@@ -195,7 +216,7 @@ fn get_endian(elffile: &object::read::File) -> RunTimeEndian {
 
 impl<'elffile> DebugDataReader<'elffile> {
     // read the debug information entries in the DWAF data to get all the global variables and their types
-    fn read_debug_info_entries(&mut self) -> DebugData {
+    fn read_debug_info_entries(mut self) -> DebugData {
         let variables = self.load_variables();
         let (types, typenames) = self.load_types(&variables);
         let varname_list: Vec<&String> = variables.keys().collect();
@@ -210,6 +231,7 @@ impl<'elffile> DebugDataReader<'elffile> {
             typenames,
             demangled_names,
             unit_names,
+            sections: self.sections,
         }
     }
 

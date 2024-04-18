@@ -359,16 +359,36 @@ fn core() -> Result<(), String> {
             || arg_matches.contains_id("INSERT_MEASUREMENT_RANGE")
             || arg_matches.contains_id("INSERT_CHARACTERISTIC_REGEX")
             || arg_matches.contains_id("INSERT_MEASUREMENT_REGEX")
+            || arg_matches.contains_id("INSERT_CHARACTERISTIC_SECTION")
+            || arg_matches.contains_id("INSERT_MEASUREMENT_SECTION")
         {
-            cond_print!(verbose, now, "Inserting new items from range/regex");
+            cond_print!(
+                verbose,
+                now,
+                "Inserting new items from range, regex, or section"
+            );
             let target_group = arg_matches
                 .get_one::<String>("TARGET_GROUP")
                 .map(|group| &**group);
 
-            let meas_ranges =
+            let mut meas_ranges =
                 range_args_to_ranges(arg_matches.get_many::<u64>("INSERT_MEASUREMENT_RANGE"));
-            let char_ranges =
+            let mut char_ranges =
                 range_args_to_ranges(arg_matches.get_many::<u64>("INSERT_CHARACTERISTIC_RANGE"));
+
+            let mut meas_section_ranges = section_args_to_ranges(
+                arg_matches.get_many::<String>("INSERT_MEASUREMENT_SECTION"),
+                debugdata,
+                verbose,
+            );
+            let mut char_section_ranges = section_args_to_ranges(
+                arg_matches.get_many::<String>("INSERT_CHARACTERISTIC_SECTION"),
+                debugdata,
+                verbose,
+            );
+            meas_ranges.append(&mut meas_section_ranges);
+            char_ranges.append(&mut char_section_ranges);
+
             let meas_regexes: Vec<&str> =
                 match arg_matches.get_many::<String>("INSERT_MEASUREMENT_REGEX") {
                     Some(values) => values.map(|x| &**x).collect(),
@@ -688,6 +708,15 @@ fn get_args() -> ArgMatches {
         .value_name("REGEX")
         .action(clap::ArgAction::Append)
     )
+    .arg(Arg::new("INSERT_CHARACTERISTIC_SECTION")
+        .help("Insert all variables from the given section as CHARACTERISTICs.")
+        .long("characteristic-section")
+        .aliases(["insert-characteristic-section"])
+        .number_of_values(1)
+        .requires("ELFFILE")
+        .value_name("SECTION")
+        .action(clap::ArgAction::Append)
+    )
     .arg(Arg::new("INSERT_MEASUREMENT")
         .help("Insert a MEASUREMENT based on a variable in the elf file. The variable name can be complex, e.g. var.element[0].subelement")
         .short('M')
@@ -717,6 +746,15 @@ fn get_args() -> ArgMatches {
         .value_name("REGEX")
         .action(clap::ArgAction::Append)
     )
+    .arg(Arg::new("INSERT_MEASUREMENT_SECTION")
+        .help("Insert all variables from the given section as MEASUREMENTs.")
+        .long("measurement-section")
+        .aliases(["insert-measurement-section"])
+        .number_of_values(1)
+        .requires("ELFFILE")
+        .value_name("SECTION")
+        .action(clap::ArgAction::Append)
+    )
     .arg(Arg::new("TARGET_GROUP")
         .help("When inserting items, put them into the group named in this option. The group will be created if it doe not exist.")
         .long("target-group")
@@ -738,7 +776,8 @@ fn get_args() -> ArgMatches {
     .group(
         ArgGroup::new("INSERT_ARGGROUP")
             .args(["INSERT_CHARACTERISTIC", "INSERT_CHARACTERISTIC_RANGE", "INSERT_CHARACTERISTIC_REGEX",
-                "INSERT_MEASUREMENT", "INSERT_MEASUREMENT_RANGE", "INSERT_MEASUREMENT_REGEX", ])
+                "INSERT_MEASUREMENT", "INSERT_MEASUREMENT_RANGE", "INSERT_MEASUREMENT_REGEX",
+                "INSERT_MEASUREMENT_SECTION", "INSERT_MEASUREMENT_SECTION", ])
             .multiple(true)
     )
     .next_line_help(false)
@@ -751,6 +790,26 @@ fn range_args_to_ranges(args: Option<ValuesRef<u64>>) -> Vec<(u64, u64)> {
         let mut addr_ranges: Vec<(u64, u64)> = Vec::new();
         for idx in (1..rangevals.len()).step_by(2) {
             addr_ranges.push((rangevals[idx - 1], rangevals[idx]));
+        }
+        addr_ranges
+    } else {
+        Vec::new()
+    }
+}
+
+fn section_args_to_ranges(
+    args: Option<ValuesRef<String>>,
+    debug_data: &DebugData,
+    verbose: u8,
+) -> Vec<(u64, u64)> {
+    if let Some(values) = args {
+        let mut addr_ranges: Vec<(u64, u64)> = Vec::new();
+        for section in values {
+            if let Some(range) = debug_data.sections.get(section).copied() {
+                addr_ranges.push(range);
+            } else if verbose > 0 {
+                println!("Cannot insert items from non-existent section {section}!");
+            }
         }
         addr_ranges
     } else {

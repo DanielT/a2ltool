@@ -351,6 +351,7 @@ mod test {
             variables: IndexMap::new(),
             demangled_names: HashMap::new(),
             unit_names: Vec::new(),
+            sections: HashMap::new(),
         };
         // global variable: uint32_t my_array[2]
         dbgdata.variables.insert(
@@ -410,6 +411,7 @@ mod test {
             variables: IndexMap::new(),
             demangled_names: HashMap::new(),
             unit_names: Vec::new(),
+            sections: HashMap::new(),
         };
         // global variable defined in C like this:
         // struct {
@@ -481,6 +483,7 @@ mod test {
             variables: IndexMap::new(),
             demangled_names: HashMap::new(),
             unit_names: Vec::new(),
+            sections: HashMap::new(),
         };
         debug_data.types.insert(
             0,
