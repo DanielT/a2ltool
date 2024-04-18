@@ -131,24 +131,22 @@ impl DebugData {
 }
 
 // open a file and mmap its content
-fn load_filedata(filename: &OsStr) -> Result<memmap::Mmap, String> {
+fn load_filedata(filename: &OsStr) -> Result<memmap2::Mmap, String> {
     let file = match File::open(filename) {
         Ok(file) => file,
         Err(error) => {
             return Err(format!(
-                "Error: could not open file {}: {}",
-                filename.to_string_lossy(),
-                error
+                "Error: could not open file {}: {error}",
+                filename.to_string_lossy()
             ))
         }
     };
 
-    match unsafe { memmap::Mmap::map(&file) } {
+    match unsafe { memmap2::Mmap::map(&file) } {
         Ok(mmap) => Ok(mmap),
         Err(err) => Err(format!(
-            "Error: Failed to map file '{}': {}",
-            filename.to_string_lossy(),
-            err
+            "Error: Failed to map file '{}': {err}",
+            filename.to_string_lossy()
         )),
     }
 }
