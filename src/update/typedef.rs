@@ -1,4 +1,4 @@
-use crate::dwarf::{DebugData, DwarfDataType, TypeInfo};
+use crate::dwarf::{make_simple_unit_name, DebugData, DwarfDataType, TypeInfo};
 use crate::update::{
     adjust_limits, get_a2l_datatype, get_fnc_values_memberid, get_inner_type, set_address_type,
     set_bitmask, set_matrix_dim, update_characteristic_axis, update_record_layout,
@@ -793,7 +793,11 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
 
         self.log_msgs
             .push(format!("creating TYPEDEF_BLOB \"{name}\""));
-        let td_blob = TypedefBlob::new(name, String::new(), typeinfo.get_size() as u32);
+        let td_blob = TypedefBlob::new(
+            name,
+            String::new(),
+            u32::try_from(typeinfo.get_size()).unwrap_or(u32::MAX),
+        );
         self.module.typedef_blob.push(td_blob);
     }
 
@@ -1063,7 +1067,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 if dim.len() == 1 {
                     let number = td_char.number.get_or_insert(Number::new(0));
                     td_char.matrix_dim = None;
-                    number.number = dim[0] as u16;
+                    number.number = u16::try_from(dim[0]).unwrap_or(u16::MAX);
                 }
                 // don't know what to do with multi-dimensional arrays, so just leave those untouched
             } else {
@@ -1389,7 +1393,8 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                         make_simple_unit_name(self.debug_data, typeinfo.unit_idx)
                     {
                         // this could fail with advanced DWARF encoding, i.e. when partial units are in use
-                        stl.symbol_type = format!("{name}{{CompileUnit:{simple_unit_name}}}");
+                        stl.symbol_type =
+                            format!("{name}{{CompileUnit:{simple_unit_name}}}{{Namespace:Global}}");
                     }
                 } else {
                     // SYMBOL_TYPE_LINK contains the bare symbol name, which can be directly replaced
@@ -1549,22 +1554,6 @@ fn get_structure_component_typeinfo<'dbg>(
     // unwrap the array member type (if any)
     let array_deref = pointer_deref.get_arraytype().unwrap_or(pointer_deref);
     Some(array_deref)
-}
-
-/// convert a full unit name, which might include a path, into a simple unit name
-/// usable in a `SYMBOL_TYPE_LINK`.
-fn make_simple_unit_name(debug_data: &DebugData, unit_idx: usize) -> Option<String> {
-    let full_name = debug_data.unit_names.get(unit_idx)?.as_deref()?;
-
-    let file_name = if let Some(pos) = full_name.rfind('\\') {
-        &full_name[(pos + 1)..]
-    } else if let Some(pos) = full_name.rfind('/') {
-        &full_name[(pos + 1)..]
-    } else {
-        full_name
-    };
-
-    Some(file_name.replace('.', "_"))
 }
 
 /// is the given typeinfo suitable to use for a `TYPEDEF_STRUCTURE`?
@@ -2101,7 +2090,7 @@ mod test {
         // get the typeinfo for variable val_ptr, a void pointer
         let typeinfo = debug_data
             .types
-            .get(&debug_data.variables.get("val_ptr").unwrap().typeref)
+            .get(&debug_data.variables.get("val_ptr").unwrap()[0].typeref)
             .unwrap();
         // create the TYPEDEF_STRUCTURE for StructA - calibration
         let name = tdu

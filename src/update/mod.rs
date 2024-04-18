@@ -1,4 +1,4 @@
-use crate::dwarf::{DebugData, TypeInfo};
+use crate::dwarf::{make_simple_unit_name, DebugData, TypeInfo};
 use crate::{ifdata, A2lVersion};
 use a2lfile::{
     A2lFile, A2lObject, AddrType, AddressType, BitMask, EcuAddress, IfData, MatrixDim, Module,
@@ -66,7 +66,6 @@ pub(crate) fn update_addresses(
     preserve_unknown: bool,
     enable_structures: bool,
 ) -> UpdateSumary {
-    let use_new_matrix_dim = check_version_1_70(a2l_file);
     let version = A2lVersion::from(&*a2l_file);
 
     let mut summary = UpdateSumary::new();
@@ -79,6 +78,7 @@ pub(crate) fn update_addresses(
             debug_data,
             log_msgs,
             preserve_unknown,
+            version,
             &mut reclayout_info,
         );
         summary.measurement_updated += updated;
@@ -96,7 +96,7 @@ pub(crate) fn update_addresses(
             debug_data,
             log_msgs,
             preserve_unknown,
-            use_new_matrix_dim,
+            version,
             &mut reclayout_info,
         );
         summary.characteristic_updated += updated;
@@ -135,15 +135,6 @@ pub(crate) fn update_addresses(
     }
 
     summary
-}
-
-// check if the file version is >= 1.70
-fn check_version_1_70(a2l_file: &A2lFile) -> bool {
-    if let Some(ver) = &a2l_file.asap2_version {
-        ver.version_no > 1 || (ver.version_no == 1 && ver.upgrade_no >= 70)
-    } else {
-        false
-    }
 }
 
 // try to get the symbol name used in the elf file, and find its address and type
@@ -207,6 +198,29 @@ fn log_update_errors(errorlog: &mut Vec<String>, errmsgs: Vec<String>, blockname
     for msg in errmsgs {
         errorlog.push(format!("Error updating {blockname} on line {line}: {msg}"));
     }
+}
+
+pub(crate) fn make_symbol_link_string(sym_info: &SymbolInfo, debug_data: &DebugData) -> String {
+    let mut name = sym_info.name.to_string();
+    if !sym_info.is_unique {
+        if let Some(funcname) = &sym_info.function_name {
+            name.push_str("{Function:");
+            name.push_str(funcname);
+            name.push('}');
+        }
+        for ns in sym_info.namespaces {
+            name.push_str("{Namespace:");
+            name.push_str(ns);
+            name.push('}');
+        }
+        if let Some(unit_name) = make_simple_unit_name(debug_data, sym_info.unit_idx) {
+            name.push_str("{CompileUnit:");
+            name.push_str(&unit_name);
+            name.push('}');
+        }
+        name.push_str("{Namespace:Global}");
+    }
+    name
 }
 
 // update or create a SYMBOL_LINK for the given symbol name

@@ -13,7 +13,7 @@ use crate::update::{
     log_update_errors, set_bitmask, set_matrix_dim, set_measurement_ecu_address, set_symbol_link,
 };
 
-use super::set_address_type;
+use super::{make_symbol_link_string, set_address_type};
 
 pub(crate) fn update_module_measurements(
     module: &mut Module,
@@ -32,7 +32,7 @@ pub(crate) fn update_module_measurements(
     for mut measurement in measurement_list {
         if measurement.var_virtual.is_none() {
             // only MEASUREMENTS that are not VIRTUAL can be updated
-            match update_measurement_address(&mut measurement, debug_data) {
+            match update_measurement_address(&mut measurement, debug_data, version) {
                 Ok(typeinfo) => {
                     // update all the information instide a MEASUREMENT
                     update_content(
@@ -118,6 +118,7 @@ pub(crate) fn update_content<'enumlist, 'typeinfo: 'enumlist>(
 fn update_measurement_address<'a>(
     measurement: &mut Measurement,
     debug_data: &'a DebugData,
+    version: A2lVersion,
 ) -> Result<&'a TypeInfo, Vec<String>> {
     match get_symbol_info(
         &measurement.name,
@@ -126,8 +127,14 @@ fn update_measurement_address<'a>(
         debug_data,
     ) {
         Ok(sym_info) => {
-            // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut measurement.symbol_link, sym_info.name.clone());
+            if version >= A2lVersion::V1_6_0 {
+                // make sure a valid SYMBOL_LINK exists
+                let symbol_link_text = make_symbol_link_string(&sym_info, debug_data);
+                set_symbol_link(&mut measurement.symbol_link, symbol_link_text);
+            } else {
+                measurement.symbol_link = None;
+            }
+
             set_measurement_ecu_address(&mut measurement.ecu_address, sym_info.address);
             update_ifdata(
                 &mut measurement.if_data,

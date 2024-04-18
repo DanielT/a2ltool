@@ -1,5 +1,5 @@
-use crate::dwarf::{DebugData, DwarfDataType, TypeInfo};
-use a2lfile::{A2lObject, AddrType, AddressType, Instance, MatrixDim, Module};
+use crate::dwarf::{DebugData, TypeInfo};
+use a2lfile::{A2lObject, Instance, Module};
 use std::collections::HashSet;
 
 use crate::update::{
@@ -8,6 +8,8 @@ use crate::update::{
     ifdata_update::{update_ifdata, zero_if_data},
     log_update_errors, set_symbol_link, TypedefNames, TypedefReferrer, TypedefsRefInfo,
 };
+
+use super::{make_symbol_link_string, set_address_type, set_matrix_dim};
 
 pub(crate) fn update_module_instances<'a>(
     module: &mut Module,
@@ -35,9 +37,12 @@ pub(crate) fn update_module_instances<'a>(
                     // Therefore the typeinfo should be transformed to the base data type by first unwrapping
                     // one pointer (if any), and then getting an array element type (if any)
                     // More complicted constructions like pointers to pointers, arrays of pointers, etc. can not be represented directly
+                    set_address_type(&mut instance.address_type, typeinfo);
                     let basetype = typeinfo
                         .get_pointer(&debug_data.types)
                         .map_or(typeinfo, |(_, t)| t);
+
+                    set_matrix_dim(&mut instance.matrix_dim, basetype, true);
                     let basetype = basetype.get_arraytype().unwrap_or(basetype);
 
                     typedef_types.entry(typedef_ref).or_default().push((
@@ -92,42 +97,15 @@ fn update_instance_address<'a>(
     ) {
         Ok(sym_info) => {
             // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut instance.symbol_link, sym_info.name.clone());
+            let symbol_link_text = make_symbol_link_string(&sym_info, debug_data);
+            set_symbol_link(&mut instance.symbol_link, symbol_link_text);
             instance.start_address = sym_info.address as u32;
 
-            let typeinfo = if let Some((pt_size, basetype)) =
-                &sym_info.typeinfo.get_pointer(&debug_data.types)
-            {
-                let address_type = instance
-                    .address_type
-                    .get_or_insert(AddressType::new(AddrType::Pbyte));
-                match pt_size {
-                    1 => address_type.address_type = AddrType::Pbyte,
-                    2 => address_type.address_type = AddrType::Pword,
-                    4 => address_type.address_type = AddrType::Plong,
-                    8 => address_type.address_type = AddrType::Plonglong,
-                    _ => instance.address_type = None,
-                }
-                basetype
-            } else {
-                instance.address_type = None;
-                sym_info.typeinfo
-            };
-
-            let typeinfo = if let DwarfDataType::Array { dim, arraytype, .. } = &typeinfo.datatype {
-                let matrix_dim = instance.matrix_dim.get_or_insert(MatrixDim::new());
-                matrix_dim.dim_list = dim.iter().map(|d| *d as u16).collect();
-                update_ifdata(
-                    &mut instance.if_data,
-                    &sym_info.name,
-                    arraytype,
-                    sym_info.address,
-                );
-                arraytype
-            } else {
-                instance.matrix_dim = None;
-                typeinfo
-            };
+            let typeinfo = sym_info
+                .typeinfo
+                .get_pointer(&debug_data.types)
+                .map_or(sym_info.typeinfo, |(_, t)| t);
+            let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
 
             update_ifdata(
                 &mut instance.if_data,

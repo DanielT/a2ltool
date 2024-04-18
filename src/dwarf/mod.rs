@@ -22,6 +22,9 @@ mod typereader;
 pub(crate) struct VarInfo {
     pub(crate) address: u64,
     pub(crate) typeref: usize,
+    pub(crate) unit_idx: usize,
+    pub(crate) function: Option<String>,
+    pub(crate) namespaces: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -84,7 +87,7 @@ pub(crate) struct UnitList<'a> {
 
 #[derive(Debug)]
 pub(crate) struct DebugData {
-    pub(crate) variables: IndexMap<String, VarInfo>,
+    pub(crate) variables: IndexMap<String, Vec<VarInfo>>,
     pub(crate) types: HashMap<usize, TypeInfo>,
     pub(crate) typenames: HashMap<String, Vec<usize>>,
     pub(crate) demangled_names: HashMap<String, String>,
@@ -211,32 +214,53 @@ impl<'elffile> DebugDataReader<'elffile> {
     }
 
     // load all global variables from the dwarf data
-    fn load_variables(&mut self) -> IndexMap<String, VarInfo> {
-        let mut variables = IndexMap::<String, VarInfo>::new();
+    fn load_variables(&mut self) -> IndexMap<String, Vec<VarInfo>> {
+        let mut variables = IndexMap::<String, Vec<VarInfo>>::new();
 
         let mut iter = self.dwarf.debug_info.units();
         while let Ok(Some(unit)) = iter.next() {
             let abbreviations = unit.abbreviations(&self.dwarf.debug_abbrev).unwrap();
             self.units.add(unit, abbreviations);
-            let (unit, abbreviations) = &self.units[self.units.list.len() - 1];
+            let unit_idx = self.units.list.len() - 1;
+            let (unit, abbreviations) = &self.units[unit_idx];
 
-            // the root of the tree inside of a unit is always a DW_TAG_compile_unit
-            // the global variables are among the immediate children of the DW_TAG_compile_unit
-            // static variable in functions are hidden further down inside of DW_TAG_subprogram[/DW_TAG_lexical_block]*
-            // we can easily find all of them by using depth-first traversal of the tree
+            // The root of the tree inside of a unit is always a DW_TAG_compile_unit or DW_TAG_partial_unit.
+            // The global variables are among the immediate children of the unit; static variables
+            // in functions are declared inside of DW_TAG_subprogram[/DW_TAG_lexical_block]*.
+            // We can easily find all of them by using depth-first traversal of the tree
             let mut entries_cursor = unit.entries(abbreviations);
             if let Ok(Some((_, entry))) = entries_cursor.next_dfs() {
-                if entry.tag() == gimli::constants::DW_TAG_compile_unit {
+                if entry.tag() == gimli::constants::DW_TAG_compile_unit
+                    || entry.tag() == gimli::constants::DW_TAG_partial_unit
+                {
                     self.unit_names
                         .push(get_name_attribute(entry, &self.dwarf, unit).ok());
                 }
             }
 
-            while let Ok(Some((_depth_delta, entry))) = entries_cursor.next_dfs() {
+            let mut depth = 0;
+            let mut context: Vec<(gimli::DwTag, Option<String>)> = Vec::new();
+            while let Ok(Some((depth_delta, entry))) = entries_cursor.next_dfs() {
+                depth += depth_delta;
+                debug_assert!(depth >= 1);
+                context.truncate((depth - 1) as usize);
+                context.push((
+                    entry.tag(),
+                    get_name_attribute(entry, &self.dwarf, unit).ok(),
+                ));
+                debug_assert_eq!(depth as usize, context.len());
+
                 if entry.tag() == gimli::constants::DW_TAG_variable {
                     match self.get_global_variable(entry, unit, abbreviations) {
                         Ok(Some((name, typeref, address))) => {
-                            variables.insert(name, VarInfo { address, typeref });
+                            let (function, namespaces) = get_varinfo_from_context(&context);
+                            variables.entry(name).or_default().push(VarInfo {
+                                address,
+                                typeref,
+                                unit_idx,
+                                function,
+                                namespaces,
+                            });
                         }
                         Ok(None) => {
                             // unremarkable, the variable is not a global variable
@@ -305,6 +329,26 @@ impl<'elffile> DebugDataReader<'elffile> {
     }
 }
 
+fn get_varinfo_from_context(
+    context: &[(gimli::DwTag, Option<String>)],
+) -> (Option<String>, Vec<String>) {
+    let function = context
+        .iter()
+        .rev()
+        .find(|(tag, _)| *tag == gimli::constants::DW_TAG_subprogram)
+        .and_then(|(_, name)| name.clone());
+    let namespaces: Vec<String> = context
+        .iter()
+        .rev()
+        .filter_map(|(tag, ns)| {
+            (*tag == gimli::constants::DW_TAG_namespace)
+                .then(|| ns.clone())
+                .flatten()
+        })
+        .collect();
+    (function, namespaces)
+}
+
 fn demangle_cpp_varnames(input: &[&String]) -> HashMap<String, String> {
     let mut demangled_symbols = HashMap::<String, String>::new();
     let demangle_opts = cpp_demangle::DemangleOptions::new()
@@ -326,6 +370,21 @@ fn demangle_cpp_varnames(input: &[&String]) -> HashMap<String, String> {
     }
 
     demangled_symbols
+}
+
+/// convert a full unit name, which might include a path, into a simple unit name
+pub(crate) fn make_simple_unit_name(debug_data: &DebugData, unit_idx: usize) -> Option<String> {
+    let full_name = debug_data.unit_names.get(unit_idx)?.as_deref()?;
+
+    let file_name = if let Some(pos) = full_name.rfind('\\') {
+        &full_name[(pos + 1)..]
+    } else if let Some(pos) = full_name.rfind('/') {
+        &full_name[(pos + 1)..]
+    } else {
+        full_name
+    };
+
+    Some(file_name.replace('.', "_"))
 }
 
 // UnitList holds a list of all UnitHeaders in the Dwarf data for convenient access
@@ -673,11 +732,11 @@ mod test {
             assert!(debugdata.variables.get("bitfield").is_some());
 
             for (_, varinfo) in &debugdata.variables {
-                assert!(debugdata.types.contains_key(&varinfo.typeref));
+                assert!(debugdata.types.contains_key(&varinfo[0].typeref));
             }
 
             let varinfo = debugdata.variables.get("class1").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
@@ -730,7 +789,7 @@ mod test {
             }
 
             let varinfo = debugdata.variables.get("class2").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
@@ -740,7 +799,7 @@ mod test {
             ));
 
             let varinfo = debugdata.variables.get("class3").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
@@ -750,7 +809,7 @@ mod test {
             ));
 
             let varinfo = debugdata.variables.get("class4").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
@@ -760,7 +819,7 @@ mod test {
             ));
 
             let varinfo = debugdata.variables.get("staticvar").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
@@ -770,7 +829,7 @@ mod test {
             ));
 
             let varinfo = debugdata.variables.get("structvar").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
@@ -780,7 +839,7 @@ mod test {
             ));
 
             let varinfo = debugdata.variables.get("bitfield").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
@@ -851,7 +910,7 @@ mod test {
                 ));
             }
             let varinfo = debugdata.variables.get("enum_var1").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
@@ -860,7 +919,7 @@ mod test {
                 }
             ));
             let varinfo = debugdata.variables.get("enum_var2").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
@@ -869,7 +928,7 @@ mod test {
                 }
             ));
             let varinfo = debugdata.variables.get("enum_var3").unwrap();
-            let typeinfo = debugdata.types.get(&varinfo.typeref).unwrap();
+            let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
             assert!(matches!(
                 typeinfo,
                 TypeInfo {

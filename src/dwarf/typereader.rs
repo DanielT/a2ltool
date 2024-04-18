@@ -22,7 +22,7 @@ impl<'elffile> DebugDataReader<'elffile> {
     // load all the types referenced by variables in given HashMap
     pub(crate) fn load_types(
         &mut self,
-        variables: &IndexMap<String, VarInfo>,
+        variables: &IndexMap<String, Vec<VarInfo>>,
     ) -> (HashMap<usize, TypeInfo>, HashMap<String, Vec<usize>>) {
         let mut typereader_data = TypeReaderData {
             types: HashMap::<usize, TypeInfo>::new(),
@@ -30,21 +30,23 @@ impl<'elffile> DebugDataReader<'elffile> {
             wip_items: Vec::new(),
         };
         // for each variable
-        for (name, VarInfo { typeref, .. }) in variables {
-            // check if the type was already loaded
-            if typereader_data.types.get(typeref).is_none() {
-                if let Some(unit_idx) = self.units.get_unit(*typeref) {
-                    // create an entries_tree iterator that makes it possible to read the DIEs of this type
-                    let dbginfo_offset = gimli::DebugInfoOffset(*typeref);
+        for (name, var_list) in variables {
+            for VarInfo { typeref, .. } in var_list {
+                // check if the type was already loaded
+                if typereader_data.types.get(typeref).is_none() {
+                    if let Some(unit_idx) = self.units.get_unit(*typeref) {
+                        // create an entries_tree iterator that makes it possible to read the DIEs of this type
+                        let dbginfo_offset = gimli::DebugInfoOffset(*typeref);
 
-                    // load one type and add it to the collection (always succeeds for correctly structured DWARF debug info)
-                    let result = self.get_type(unit_idx, dbginfo_offset, &mut typereader_data);
-                    if let Err(errmsg) = result {
-                        if self.verbose {
-                            println!("Error loading type info for variable {name}: {errmsg}");
+                        // load one type and add it to the collection (always succeeds for correctly structured DWARF debug info)
+                        let result = self.get_type(unit_idx, dbginfo_offset, &mut typereader_data);
+                        if let Err(errmsg) = result {
+                            if self.verbose {
+                                println!("Error loading type info for variable {name}: {errmsg}");
+                            }
                         }
+                        typereader_data.wip_items.clear();
                     }
-                    typereader_data.wip_items.clear();
                 }
             }
         }
@@ -78,11 +80,16 @@ impl<'elffile> DebugDataReader<'elffile> {
                 typereader_data.wip_items.truncate(wip_items_orig_len);
                 let replacement_type = TypeInfo {
                     datatype: DwarfDataType::Other(0),
-                    name: typereader_data.wip_items.last().and_then(|wip| wip.name.clone()),
+                    name: typereader_data
+                        .wip_items
+                        .last()
+                        .and_then(|wip| wip.name.clone()),
                     unit_idx: current_unit,
                     dbginfo_offset: dbginfo_offset.0,
                 };
-                typereader_data.types.insert(dbginfo_offset.0, replacement_type.clone());
+                typereader_data
+                    .types
+                    .insert(dbginfo_offset.0, replacement_type.clone());
                 Ok(replacement_type)
             }
         }

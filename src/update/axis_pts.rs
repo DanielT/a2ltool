@@ -1,5 +1,6 @@
 use crate::dwarf::DwarfDataType;
 use crate::dwarf::{DebugData, TypeInfo};
+use crate::A2lVersion;
 use a2lfile::{A2lObject, AxisPts, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -12,11 +13,14 @@ use crate::update::{
     log_update_errors, set_symbol_link, update_record_layout, RecordLayoutInfo,
 };
 
+use super::make_symbol_link_string;
+
 pub(crate) fn update_module_axis_pts(
     module: &mut Module,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
+    version: A2lVersion,
     recordlayout_info: &mut RecordLayoutInfo,
 ) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
@@ -27,7 +31,7 @@ pub(crate) fn update_module_axis_pts(
 
     std::mem::swap(&mut module.axis_pts, &mut axis_pts_list);
     for mut axis_pts in axis_pts_list {
-        match update_axis_pts_address(&mut axis_pts, debug_data) {
+        match update_axis_pts_address(&mut axis_pts, debug_data, version) {
             Ok(typeinfo) => {
                 // the variable used for the axis should be a 1-dimensional array, or a struct containing a 1-dimensional array
                 // if the type is a struct, then the AXIS_PTS_X inside the referenced RECORD_LAYOUT tells us which member of the struct to use.
@@ -111,6 +115,7 @@ pub(crate) fn update_module_axis_pts(
 fn update_axis_pts_address<'a>(
     axis_pts: &mut AxisPts,
     debug_data: &'a DebugData,
+    version: A2lVersion,
 ) -> Result<&'a TypeInfo, Vec<String>> {
     match get_symbol_info(
         &axis_pts.name,
@@ -119,8 +124,14 @@ fn update_axis_pts_address<'a>(
         debug_data,
     ) {
         Ok(sym_info) => {
-            // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut axis_pts.symbol_link, sym_info.name.clone());
+            if version >= A2lVersion::V1_6_0 {
+                // make sure a valid SYMBOL_LINK exists
+                let symbol_link_text = make_symbol_link_string(&sym_info, debug_data);
+                set_symbol_link(&mut axis_pts.symbol_link, symbol_link_text);
+            } else {
+                axis_pts.symbol_link = None;
+            }
+
             axis_pts.address = sym_info.address as u32;
             update_ifdata(
                 &mut axis_pts.if_data,

@@ -8,7 +8,9 @@ use std::collections::HashMap;
 use crate::datatype::{get_a2l_datatype, get_type_limits};
 use crate::dwarf::{DebugData, DwarfDataType, TypeInfo};
 use crate::symbol::SymbolInfo;
-use crate::update::{self, enums, set_address_type, set_bitmask, set_matrix_dim};
+use crate::update::{
+    self, enums, make_symbol_link_string, set_address_type, set_bitmask, set_matrix_dim,
+};
 use crate::A2lVersion;
 use regex::Regex;
 
@@ -84,7 +86,7 @@ pub(crate) fn insert_items(
         {
             if is_calib {
                 match insert_characteristic_sym(
-                    module, sym_name, &sym_info, &name_map, &sym_map, version,
+                    module, debug_data, sym_name, &sym_info, &name_map, &sym_map, version,
                 ) {
                     Ok(characteristic_name) => {
                         log_msgs.push(format!("Inserted CHARACTERISTIC {characteristic_name}"));
@@ -164,6 +166,7 @@ fn insert_measurement_sym(
     version: A2lVersion,
 ) -> Result<String, String> {
     // Abort if a MEASUREMENT for this symbol already exists. Warn if any other reference to the symbol exists
+    let symbol_link_text = make_symbol_link_string(sym_info, debug_data);
     let item_name = make_unique_measurement_name(module, sym_map, &sym_info.name, name_map)?;
 
     let datatype = get_a2l_datatype(sym_info.typeinfo);
@@ -182,8 +185,11 @@ fn insert_measurement_sym(
     let mut ecu_address = EcuAddress::new(sym_info.address as u32);
     ecu_address.get_layout_mut().item_location.0 .1 = true;
     new_measurement.ecu_address = Some(ecu_address);
+
     // create a SYMBOL_LINK attribute
-    new_measurement.symbol_link = Some(SymbolLink::new(sym_info.name.clone(), 0));
+    if version >= A2lVersion::V1_6_0 {
+        new_measurement.symbol_link = Some(SymbolLink::new(symbol_link_text.clone(), 0));
+    }
 
     // handle pointers - only allowed for version 1.7.0+ (the caller should take care of this precondition)
     update::set_address_type(&mut new_measurement.address_type, sym_info.typeinfo);
@@ -219,12 +225,14 @@ fn insert_measurement_sym(
 
 fn insert_characteristic_sym(
     module: &mut Module,
+    debug_data: &DebugData,
     characteristic_sym: &str,
     sym_info: &SymbolInfo,
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, ItemType>,
     version: A2lVersion,
 ) -> Result<String, String> {
+    let symbol_link_text = make_symbol_link_string(sym_info, debug_data);
     let item_name = make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map)?;
 
     let mut matrix_dim = None;
@@ -270,8 +278,10 @@ fn insert_characteristic_sym(
     // enable hex mode for the address (item 3 in the CHARACTERISTIC)
     new_characteristic.get_layout_mut().item_location.3 .1 = true;
 
-    // create a SYMBOL_LINK
-    new_characteristic.symbol_link = Some(SymbolLink::new(sym_info.name.clone(), 0));
+    if version >= A2lVersion::V1_6_0 {
+        // create a SYMBOL_LINK
+        new_characteristic.symbol_link = Some(SymbolLink::new(symbol_link_text.clone(), 0));
+    }
 
     // insert the CHARACTERISTIC into the module's list
     module.characteristic.push(new_characteristic);
@@ -487,41 +497,28 @@ pub(crate) fn insert_many<'param>(
 
     let mut debugdata_iter = debugdata.iter(use_new_arrays);
     let mut current_item = debugdata_iter.next();
-    while let Some((symbol_name, symbol_type, address)) = current_item {
-        let typeinfo = symbol_type.unwrap_or(&TypeInfo {
-            name: None,
-            unit_idx: usize::MAX,
-            datatype: DwarfDataType::Uint8,
-            dbginfo_offset: 0,
-        });
-        let sym_info = SymbolInfo {
-            name: symbol_name,
-            address,
-            typeinfo,
-        };
-        match &typeinfo.datatype {
+    while let Some(sym_info) = current_item {
+        let mut skip_children = false;
+        match &sym_info.typeinfo.datatype {
             DwarfDataType::TypeRef(_, _) | DwarfDataType::FuncPtr(_) => {}
             DwarfDataType::Other(_)
             | DwarfDataType::Pointer(_, _)
             | DwarfDataType::Struct { .. }
             | DwarfDataType::Class { .. }
             | DwarfDataType::Union { .. } => {
-                if enable_structures && check_insert_instance(&mut isupp, &sym_info, log_msgs) {
-                    current_item = debugdata_iter.next_sibling();
-                    continue;
+                if enable_structures && check_and_insert_instance(&mut isupp, &sym_info, log_msgs) {
+                    skip_children = true;
                 }
             }
             DwarfDataType::Array { arraytype, .. } => {
                 if is_simple_type(arraytype) {
-                    if check_insert_simple_type(&mut isupp, &sym_info, log_msgs) {
-                        current_item = debugdata_iter.next_sibling();
-                        continue;
+                    if check_and_insert_simple_type(&mut isupp, &sym_info, log_msgs) {
+                        skip_children = true;
                     }
                 } else if enable_structures
-                    && check_insert_instance(&mut isupp, &sym_info, log_msgs)
+                    && check_and_insert_instance(&mut isupp, &sym_info, log_msgs)
                 {
-                    current_item = debugdata_iter.next_sibling();
-                    continue;
+                    skip_children = true;
                 }
             }
             DwarfDataType::Enum { .. }
@@ -536,11 +533,16 @@ pub(crate) fn insert_many<'param>(
             | DwarfDataType::Uint32
             | DwarfDataType::Uint64
             | DwarfDataType::Bitfield { .. } => {
-                check_insert_simple_type(&mut isupp, &sym_info, log_msgs);
+                check_and_insert_simple_type(&mut isupp, &sym_info, log_msgs);
+                skip_children = true;
             }
         }
 
-        current_item = debugdata_iter.next();
+        if skip_children {
+            current_item = debugdata_iter.next_sibling();
+        } else {
+            current_item = debugdata_iter.next();
+        }
     }
 
     if let Some(group_name) = target_group {
@@ -586,7 +588,7 @@ fn is_simple_type(typeinfo: &TypeInfo) -> bool {
     )
 }
 
-fn check_insert_simple_type(
+fn check_and_insert_simple_type(
     isupp: &mut InsertSupport,
     sym_info: &SymbolInfo,
     log_msgs: &mut Vec<String>,
@@ -638,6 +640,7 @@ fn check_insert_simple_type(
     ) {
         match insert_characteristic_sym(
             isupp.module,
+            isupp.debug_data,
             &sym_info.name,
             sym_info,
             &isupp.name_map,
@@ -668,7 +671,7 @@ fn check_insert_simple_type(
     any_inserted
 }
 
-fn check_insert_instance<'dbg>(
+fn check_and_insert_instance<'dbg>(
     isupp: &mut InsertSupport<'_, 'dbg, '_>,
     sym_info: &SymbolInfo<'dbg>,
     log_msgs: &mut Vec<String>,
@@ -848,7 +851,8 @@ fn insert_instance_sym<'dbg>(
         );
 
         // create a SYMBOL_LINK
-        new_instance_sym.symbol_link = Some(SymbolLink::new(sym_info.name.clone(), 0));
+        let symbol_link_text = make_symbol_link_string(sym_info, debug_data);
+        new_instance_sym.symbol_link = Some(SymbolLink::new(symbol_link_text, 0));
 
         set_address_type(&mut new_instance_sym.address_type, sym_info.typeinfo);
         let typeinfo = sym_info

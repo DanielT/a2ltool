@@ -1,5 +1,6 @@
 use crate::dwarf::DwarfDataType;
 use crate::dwarf::{DebugData, TypeInfo};
+use crate::A2lVersion;
 use a2lfile::{A2lObject, AxisDescr, Characteristic, CharacteristicType, Module, RecordLayout};
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -13,12 +14,14 @@ use crate::update::{
     RecordLayoutInfo,
 };
 
+use super::make_symbol_link_string;
+
 pub(crate) fn update_module_characteristics(
     module: &mut Module,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
-    use_new_matrix_dim: bool,
+    version: A2lVersion,
     recordlayout_info: &mut RecordLayoutInfo,
 ) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
@@ -38,7 +41,7 @@ pub(crate) fn update_module_characteristics(
     for mut characteristic in characteristic_list {
         if characteristic.virtual_characteristic.is_none() {
             // only update the address if the CHARACTERISTIC is not a VIRTUAL_CHARACTERISTIC
-            match update_characteristic_address(&mut characteristic, debug_data) {
+            match update_characteristic_address(&mut characteristic, debug_data, version) {
                 Ok(typeinfo) => {
                     // update as much as possible of the information inside the CHARACTERISTIC
                     update_characteristic_information(
@@ -48,7 +51,7 @@ pub(crate) fn update_module_characteristics(
                         typeinfo,
                         &mut enum_convlist,
                         &axis_pts_dim,
-                        use_new_matrix_dim,
+                        version >= A2lVersion::V1_7_0,
                     );
 
                     module.characteristic.push(characteristic);
@@ -224,6 +227,7 @@ pub(crate) fn update_characteristic_axis(
 fn update_characteristic_address<'a>(
     characteristic: &mut Characteristic,
     debug_data: &'a DebugData,
+    version: A2lVersion,
 ) -> Result<&'a TypeInfo, Vec<String>> {
     match get_symbol_info(
         &characteristic.name,
@@ -232,8 +236,14 @@ fn update_characteristic_address<'a>(
         debug_data,
     ) {
         Ok(sym_info) => {
-            // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut characteristic.symbol_link, sym_info.name.clone());
+            if version >= A2lVersion::V1_6_0 {
+                // make sure a valid SYMBOL_LINK exists
+                let symbol_link_text = make_symbol_link_string(&sym_info, debug_data);
+                set_symbol_link(&mut characteristic.symbol_link, symbol_link_text);
+            } else {
+                characteristic.symbol_link = None;
+            }
+
             characteristic.address = sym_info.address as u32;
             set_bitmask(&mut characteristic.bit_mask, sym_info.typeinfo);
             update_ifdata(

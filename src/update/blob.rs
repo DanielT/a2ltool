@@ -3,7 +3,9 @@ use a2lfile::{A2lObject, Blob, Module};
 use std::collections::HashSet;
 
 use super::ifdata_update::{update_ifdata, zero_if_data};
-use super::{cleanup_item_list, get_symbol_info, log_update_errors, set_symbol_link};
+use super::{
+    cleanup_item_list, get_symbol_info, log_update_errors, make_symbol_link_string, set_symbol_link,
+};
 
 pub(crate) fn update_module_blobs(
     module: &mut Module,
@@ -51,7 +53,8 @@ fn update_blob_address<'a>(
     match get_symbol_info(&blob.name, &blob.symbol_link, &blob.if_data, debug_data) {
         Ok(sym_info) => {
             // make sure a valid SYMBOL_LINK exists
-            set_symbol_link(&mut blob.symbol_link, sym_info.name.clone());
+            let symbol_link_text = make_symbol_link_string(&sym_info, debug_data);
+            set_symbol_link(&mut blob.symbol_link, symbol_link_text);
             blob.start_address = sym_info.address as u32;
             update_ifdata(
                 &mut blob.if_data,

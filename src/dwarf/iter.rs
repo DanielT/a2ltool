@@ -1,4 +1,5 @@
 use crate::dwarf::{DebugData, DwarfDataType, TypeInfo, VarInfo};
+use crate::symbol::SymbolInfo;
 use std::collections::HashMap;
 use std::fmt::Write;
 
@@ -13,8 +14,9 @@ pub(crate) struct TypeInfoIter<'dbg> {
 
 pub(crate) struct VariablesIterator<'dbg> {
     debugdata: &'dbg DebugData,
-    var_iter: indexmap::map::Iter<'dbg, String, VarInfo>,
-    current_var: Option<(&'dbg String, &'dbg VarInfo)>,
+    var_iter: indexmap::map::Iter<'dbg, String, Vec<VarInfo>>,
+    current_var: Option<(&'dbg String, &'dbg Vec<VarInfo>)>,
+    position: usize,
     type_iter: Option<TypeInfoIter<'dbg>>,
     use_new_arrays: bool,
 }
@@ -144,46 +146,59 @@ impl<'dbg> TypeInfoIter<'dbg> {
 }
 
 impl<'dbg> Iterator for VariablesIterator<'dbg> {
-    type Item = (String, Option<&'dbg TypeInfo>, u64);
+    type Item = SymbolInfo<'dbg>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((
-            varname,
-            VarInfo {
-                address, typeref, ..
-            },
-        )) = self.current_var
-        {
-            if self.type_iter.is_none() {
-                // newly set current_var, should be returned before using type_iter to return its sub-elements
-                let typeinfo = self.debugdata.types.get(typeref);
-                if let Some(ti) = typeinfo {
+        if let Some((varname, list)) = self.current_var {
+            if self.position < list.len() {
+                let varinfo = &list[self.position];
+                let is_unique = list.len() == 1;
+
+                if self.type_iter.is_none() {
+                    // newly set current_var, should be returned before using type_iter to return its sub-elements
+                    let typeinfo = self
+                        .debugdata
+                        .types
+                        .get(&varinfo.typeref)
+                        .unwrap_or(&Self::DEFAULT_TYPEINFO);
                     self.type_iter = Some(TypeInfoIter::new(
                         &self.debugdata.types,
-                        ti,
+                        typeinfo,
                         self.use_new_arrays,
                     ));
-                } else {
-                    self.type_iter = None;
-                    self.current_var = self.var_iter.next();
-                }
-                Some((varname.to_string(), typeinfo, *address))
-            } else {
-                // currently iterating over sub-elements described by the type_iter
-                if let Some((type_name, type_info, offset)) =
+                    Some(SymbolInfo {
+                        name: varname.to_string(),
+                        address: varinfo.address,
+                        typeinfo,
+                        unit_idx: varinfo.unit_idx,
+                        function_name: &varinfo.function,
+                        namespaces: &varinfo.namespaces,
+                        is_unique,
+                    })
+                } else if let Some((var_component_name, typeinfo, offset)) =
                     self.type_iter.as_mut().unwrap().next()
                 {
-                    Some((
-                        format!("{varname}{type_name}"),
-                        Some(type_info),
-                        *address + offset,
-                    ))
+                    Some(SymbolInfo {
+                        name: format!("{varname}{var_component_name}"),
+                        address: varinfo.address + offset,
+                        typeinfo,
+                        unit_idx: varinfo.unit_idx,
+                        function_name: &varinfo.function,
+                        namespaces: &varinfo.namespaces,
+                        is_unique,
+                    })
                 } else {
-                    // reached the end of this type_iter, try to advance var_iter to get a new current_var
-                    self.current_var = self.var_iter.next();
+                    // reached the end of this type_iter, try to advance to the next position within the list
+                    self.position += 1;
                     self.type_iter = None;
                     self.next()
                 }
+            } else {
+                // reached the end of this var list, try to advance var_iter to get a new current_var
+                self.current_var = self.var_iter.next();
+                self.position = 0;
+                self.type_iter = None;
+                self.next()
             }
         } else {
             // current_var is None -> reached the end
@@ -193,6 +208,13 @@ impl<'dbg> Iterator for VariablesIterator<'dbg> {
 }
 
 impl<'dbg> VariablesIterator<'dbg> {
+    const DEFAULT_TYPEINFO: TypeInfo = TypeInfo {
+        name: None,
+        unit_idx: usize::MAX,
+        datatype: DwarfDataType::Sint16,
+        dbginfo_offset: 0,
+    };
+
     pub(crate) fn new(debugdata: &'dbg DebugData, use_new_arrays: bool) -> Self {
         let mut var_iter = debugdata.variables.iter();
         // current_var == None signals the end of iteration, so it needs to be set to the first value here
@@ -201,12 +223,13 @@ impl<'dbg> VariablesIterator<'dbg> {
             debugdata,
             var_iter,
             current_var,
+            position: 0,
             type_iter: None,
             use_new_arrays,
         }
     }
 
-    pub(crate) fn next_sibling(&mut self) -> Option<(String, Option<&'dbg TypeInfo>, u64)> {
+    pub(crate) fn next_sibling(&mut self) -> Option<SymbolInfo<'dbg>> {
         if let Some(type_iter) = &mut self.type_iter {
             type_iter.up();
         }
@@ -302,34 +325,55 @@ mod test {
 
     #[test]
     fn test_varinfo_iter() {
-        let mut variables = IndexMap::<String, VarInfo>::new();
+        let mut variables = IndexMap::<String, Vec<VarInfo>>::new();
         variables.insert(
             "var_a".to_string(),
-            VarInfo {
+            vec![VarInfo {
                 address: 1,
                 typeref: 0,
-            },
+                unit_idx: 0,
+                function: None,
+                namespaces: vec![],
+            }],
         );
         variables.insert(
             "var_b".to_string(),
-            VarInfo {
+            vec![VarInfo {
                 address: 2,
                 typeref: 0,
-            },
+                unit_idx: 0,
+                function: None,
+                namespaces: vec![],
+            }],
         );
         variables.insert(
             "var_c".to_string(),
-            VarInfo {
-                address: 3,
-                typeref: 1,
-            },
+            vec![
+                VarInfo {
+                    address: 3,
+                    typeref: 1,
+                    unit_idx: 0,
+                    function: None,
+                    namespaces: vec![],
+                },
+                VarInfo {
+                    address: 33,
+                    typeref: 1,
+                    unit_idx: 1,
+                    function: None,
+                    namespaces: vec![],
+                },
+            ],
         );
         variables.insert(
             "var_d_wo_type_info".to_string(),
-            VarInfo {
+            vec![VarInfo {
                 address: 4,
                 typeref: 404, // some number with no correspondence in the types hash map
-            },
+                unit_idx: 0,
+                function: None,
+                namespaces: vec![],
+            }],
         );
 
         let mut types = HashMap::<usize, TypeInfo>::new();
@@ -354,13 +398,23 @@ mod test {
             types,
             typenames: HashMap::new(),
             demangled_names,
-            unit_names: Vec::new(),
+            unit_names: vec![Some("file_a.c".to_string()), Some("file_b.c".to_string())],
         };
 
-        let iter = VariablesIterator::new(&debugdata, false);
-        for item in iter {
-            println!("{}", item.0);
+        // test iter.next_sibling()
+        assert_eq!(VariablesIterator::new(&debugdata, false).count(), 9);
+
+        let mut iter = VariablesIterator::new(&debugdata, false);
+        let mut current = iter.next();
+        let mut count = 0;
+        while let Some(sym_info) = current {
+            count += 1;
+            if matches!(&sym_info.typeinfo.datatype, DwarfDataType::Struct { .. }) {
+                current = iter.next_sibling();
+            } else {
+                current = iter.next();
+            }
         }
-        assert_eq!(VariablesIterator::new(&debugdata, false).count(), 6);
+        assert_eq!(count, 5);
     }
 }
