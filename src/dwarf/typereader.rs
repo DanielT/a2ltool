@@ -228,6 +228,13 @@ impl<'elffile> DebugDataReader<'elffile> {
                     Some("p_function".to_string()),
                 )
             }
+            gimli::constants::DW_TAG_unspecified_type => {
+                // ?
+                (
+                    DwarfDataType::Other(get_byte_size_attribute(entry).unwrap_or(0)),
+                    None,
+                )
+            }
             other_tag => {
                 return Err(format!(
                     "unexpected DWARF tag {other_tag} in type definition"
