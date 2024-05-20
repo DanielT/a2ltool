@@ -296,7 +296,11 @@ pub(crate) fn set_bitmask(opt_bitmask: &mut Option<BitMask>, typeinfo: &TypeInfo
             *opt_bitmask = Some(bm);
         }
     } else {
-        *opt_bitmask = None;
+        // if there was a bitmask already configured, it is probably an unexplicit bitfield (a bit
+        // mask is configured in the a2l, but in the code, it is an integer with hardcoded shift and
+        // mask), so we should not remove the bitmask from the a2l otherwise the configuration will
+        // be lost
+        //*opt_bitmask = None;
     }
 }
 
