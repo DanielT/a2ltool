@@ -1,8 +1,8 @@
 use crate::dwarf::{make_simple_unit_name, DebugData, TypeInfo};
 use crate::{ifdata, A2lVersion};
 use a2lfile::{
-    A2lFile, A2lObject, AddrType, AddressType, BitMask, EcuAddress, IfData, MatrixDim, Module,
-    SymbolLink,
+    A2lFile, A2lObject, AddrType, AddressType, BitMask, CompuMethod, EcuAddress, IfData, MatrixDim,
+    Module, SymbolLink,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -71,6 +71,12 @@ pub(crate) fn update_addresses(
     let mut summary = UpdateSumary::new();
     for module in &mut a2l_file.project.module {
         let mut reclayout_info = RecordLayoutInfo::build(module);
+        let compu_method_index = module
+            .compu_method
+            .iter()
+            .enumerate()
+            .map(|(idx, item)| (item.name.clone(), idx))
+            .collect::<HashMap<_, _>>();
 
         // update all AXIS_PTS
         let (updated, not_updated) = update_module_axis_pts(
@@ -80,13 +86,20 @@ pub(crate) fn update_addresses(
             preserve_unknown,
             version,
             &mut reclayout_info,
+            &compu_method_index,
         );
         summary.measurement_updated += updated;
         summary.measurement_not_updated += not_updated;
 
         // update all MEASUREMENTs
-        let (updated, not_updated) =
-            update_module_measurements(module, debug_data, log_msgs, preserve_unknown, version);
+        let (updated, not_updated) = update_module_measurements(
+            module,
+            debug_data,
+            log_msgs,
+            preserve_unknown,
+            version,
+            &compu_method_index,
+        );
         summary.measurement_updated += updated;
         summary.measurement_not_updated += not_updated;
 
@@ -98,6 +111,7 @@ pub(crate) fn update_addresses(
             preserve_unknown,
             version,
             &mut reclayout_info,
+            &compu_method_index,
         );
         summary.characteristic_updated += updated;
         summary.characteristic_not_updated += not_updated;
@@ -130,6 +144,7 @@ pub(crate) fn update_addresses(
                 typedef_ref_info,
                 typedef_names,
                 &mut reclayout_info,
+                &compu_method_index,
             );
         }
     }
@@ -338,9 +353,69 @@ fn get_symbol_name_from_ifdata(ifdata_vec: &[IfData]) -> Option<String> {
 // generate adjusted min and max limits based on the datatype.
 // since the updater code has no knowledge how the data is handled in the application it
 // is only possible to shrink existing limits, but not expand them
-fn adjust_limits(typeinfo: &TypeInfo, old_lower_limit: f64, old_upper_limit: f64) -> (f64, f64) {
+fn adjust_limits(
+    typeinfo: &TypeInfo,
+    old_lower_limit: f64,
+    old_upper_limit: f64,
+    opt_compu_method: Option<&CompuMethod>,
+) -> (f64, f64) {
     let (mut new_lower_limit, mut new_upper_limit) =
         get_type_limits(typeinfo, old_lower_limit, old_upper_limit);
+
+    if let Some(cm) = opt_compu_method {
+        match cm.conversion_type {
+            a2lfile::ConversionType::Form => {
+                // formula-based compu method - discard the type based limits and continue using the original limits
+                // This is the sanest approach, since a2ltool does not implement a parser for mathematical expressions
+                new_lower_limit = old_lower_limit;
+                new_upper_limit = old_upper_limit;
+            }
+            a2lfile::ConversionType::Linear => {
+                // for a linear compu method, the limits are physical values
+                // f(x)=ax + b; PHYS = f(INT)
+                if let Some(c) = &cm.coeffs_linear {
+                    if c.a >= 0.0 {
+                        new_lower_limit = c.a * new_lower_limit + c.b;
+                        new_upper_limit = c.a * new_upper_limit + c.b;
+                    } else {
+                        // factor a is negative, so the lower and upper limits are swapped
+                        new_upper_limit = c.a * new_lower_limit + c.b;
+                        new_lower_limit = c.a * new_upper_limit + c.b;
+                    }
+                }
+            }
+            a2lfile::ConversionType::RatFunc => {
+                // f(x)=(ax^2 + bx + c)/(dx^2 + ex + f); INT = f(PHYS)
+                if let Some(c) = &cm.coeffs {
+                    // we're only handling the simple linear case here
+                    if c.a == 0.0 && c.d == 0.0 && c.e == 0.0 && c.f != 0.0 {
+                        // now the rational function is reduced to
+                        //   y = (bx + c) / f
+                        // which can be inverted to
+                        //   x = (fy - c) / b
+                        let func = |y: f64| (c.f * y - c.c) / c.b;
+                        new_lower_limit = func(new_lower_limit);
+                        new_upper_limit = func(new_upper_limit);
+                        if new_lower_limit > new_upper_limit {
+                            std::mem::swap(&mut new_lower_limit, &mut new_upper_limit);
+                        }
+                    } else {
+                        // complex formula:
+                        // revert the limits to the input values, so that they don't get adjusted
+                        new_lower_limit = old_lower_limit;
+                        new_upper_limit = old_upper_limit;
+                    }
+                }
+            }
+            a2lfile::ConversionType::Identical
+            | a2lfile::ConversionType::TabIntp
+            | a2lfile::ConversionType::TabNointp
+            | a2lfile::ConversionType::TabVerb => {
+                // identical and all table-based compu methods have direct int-to-phys mapping
+                // no need to adjust the calculated limits
+            }
+        }
+    }
 
     // if non-zero limits exist, then the limits can only shrink, but not grow
     // if the limits are both zero, then the maximum range allowed by the datatype is used
@@ -422,5 +497,54 @@ impl TypedefNames {
             || self.characteristic.contains(name)
             || self.blob.contains(name)
             || self.axis.contains(name)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::adjust_limits;
+    use crate::dwarf::{DwarfDataType, TypeInfo};
+    use a2lfile::{Coeffs, CoeffsLinear, CompuMethod, ConversionType};
+
+    #[test]
+    fn test_adjust_limits() {
+        let typeinfo = TypeInfo {
+            name: None,
+            unit_idx: 0,
+            datatype: DwarfDataType::Uint8,
+            dbginfo_offset: 0,
+        };
+        let mut compu_method = CompuMethod::new(
+            "name".to_string(),
+            "".to_string(),
+            ConversionType::Linear,
+            "".to_string(),
+            "".to_string(),
+        );
+        compu_method.coeffs_linear = Some(CoeffsLinear::new(0.1, 10.0));
+
+        let (lower, upper) = adjust_limits(&typeinfo, 0.0, 100.0, Some(&compu_method));
+        assert_eq!(lower, 10.0);
+        assert_eq!(upper, 35.5);
+
+        // see issue #32: the calculated value range for a uint8 variable can be much larger than 0-255
+        let typeinfo = TypeInfo {
+            name: None,
+            unit_idx: 0,
+            datatype: DwarfDataType::Uint8,
+            dbginfo_offset: 0,
+        };
+        let mut compu_method = CompuMethod::new(
+            "name".to_string(),
+            "".to_string(),
+            ConversionType::RatFunc,
+            "".to_string(),
+            "".to_string(),
+        );
+        compu_method.coeffs = Some(Coeffs::new(0., 0.025, 0., 0., 0., 1.0));
+
+        let (lower, upper) = adjust_limits(&typeinfo, 0.0, 0.0, Some(&compu_method));
+        assert_eq!(lower, 0.0);
+        assert_eq!(upper, 10200.0);
     }
 }

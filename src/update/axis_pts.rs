@@ -22,6 +22,7 @@ pub(crate) fn update_module_axis_pts(
     preserve_unknown: bool,
     version: A2lVersion,
     recordlayout_info: &mut RecordLayoutInfo,
+    compu_method_index: &HashMap<String, usize>,
 ) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
     let mut removed_items = HashSet::<String>::new();
@@ -70,8 +71,15 @@ pub(crate) fn update_module_axis_pts(
                         _ => {}
                     }
 
-                    let (ll, ul) =
-                        adjust_limits(inner_typeinfo, axis_pts.lower_limit, axis_pts.upper_limit);
+                    let opt_compu_method = compu_method_index
+                        .get(&axis_pts.conversion)
+                        .and_then(|idx| module.compu_method.get(*idx));
+                    let (ll, ul) = adjust_limits(
+                        inner_typeinfo,
+                        axis_pts.lower_limit,
+                        axis_pts.upper_limit,
+                        opt_compu_method,
+                    );
                     axis_pts.lower_limit = ll;
                     axis_pts.upper_limit = ul;
                 }

@@ -31,7 +31,7 @@ enum TypeQuality {
     SymTypeLinkOnly,
 }
 
-struct TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
+struct TypedefUpdater<'dbg, 'a2l, 'rl, 'log, 'cm> {
     // --- provided input ---
     /// the a2l module that is processed by the TypedefUpdater
     module: &'a2l mut Module,
@@ -45,6 +45,8 @@ struct TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
     typedef_ref_info: TypedefsRefInfo<'dbg>,
     /// array of strings used to output log messages
     log_msgs: &'log mut Vec<String>,
+    /// name to index mapping for CompuMethods
+    compu_method_index: &'cm HashMap<String, usize>,
 
     // --- computed data ---
     /// all TYPEDEF_STRUCTURES, extracted from the module during the update for access by name
@@ -76,6 +78,7 @@ pub(crate) fn update_module_typedefs<'a>(
     typedef_ref_info: TypedefsRefInfo<'a>,
     typedef_names: TypedefNames,
     recordlayout_info: &mut RecordLayoutInfo,
+    compu_method_index: &HashMap<String, usize>,
 ) {
     let updater = TypedefUpdater::new(
         module,
@@ -84,6 +87,7 @@ pub(crate) fn update_module_typedefs<'a>(
         typedef_names,
         recordlayout_info,
         typedef_ref_info,
+        compu_method_index,
     );
 
     updater.process_typedefs(preserve_unknown, false);
@@ -107,6 +111,7 @@ pub(crate) fn create_new_typedefs<'a>(
             .push((Some(typeinfo), TypedefReferrer::Instance(*instance_idx)));
     }
 
+    let dummy_cm_index = HashMap::new();
     let updater = TypedefUpdater::new(
         module,
         debug_data,
@@ -114,12 +119,13 @@ pub(crate) fn create_new_typedefs<'a>(
         typedef_names,
         &mut recordlayout_info,
         typedef_ref_info,
+        &dummy_cm_index,
     );
 
     updater.process_typedefs(true, true);
 }
 
-impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
+impl<'dbg, 'a2l, 'rl, 'log, 'cm> TypedefUpdater<'dbg, 'a2l, 'rl, 'log, 'cm> {
     /// create a new `TypedefUpdater`
     pub(crate) fn new(
         module: &'a2l mut Module,
@@ -128,6 +134,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
         typedef_names: TypedefNames,
         recordlayout_info: &'rl mut RecordLayoutInfo,
         typedef_ref_info: TypedefsRefInfo<'dbg>,
+        compu_method_index: &'cm HashMap<String, usize>,
     ) -> Self {
         let axis_pts_dim: HashMap<String, u16> = module
             .axis_pts
@@ -143,6 +150,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             module,
             debug_data,
             log_msgs,
+            compu_method_index,
             typedef_names,
             recordlayout_info,
             typedef_ref_info,
@@ -1053,7 +1061,16 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             }
             set_bitmask(&mut td_char.bit_mask, inner_typeinfo);
 
-            let (ll, ul) = adjust_limits(inner_typeinfo, td_char.lower_limit, td_char.upper_limit);
+            let opt_compu_method = self
+                .compu_method_index
+                .get(&td_char.conversion)
+                .and_then(|idx| self.module.compu_method.get(*idx));
+            let (ll, ul) = adjust_limits(
+                inner_typeinfo,
+                td_char.lower_limit,
+                td_char.upper_limit,
+                opt_compu_method,
+            );
             td_char.lower_limit = ll;
             td_char.upper_limit = ul;
         }
@@ -1164,7 +1181,16 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             enum_convlist.insert(td_meas.conversion.clone(), meas_type);
         }
 
-        let (ll, ul) = adjust_limits(meas_type, td_meas.lower_limit, td_meas.upper_limit);
+        let opt_compu_method = self
+            .compu_method_index
+            .get(&td_meas.conversion)
+            .and_then(|idx| self.module.compu_method.get(*idx));
+        let (ll, ul) = adjust_limits(
+            meas_type,
+            td_meas.lower_limit,
+            td_meas.upper_limit,
+            opt_compu_method,
+        );
         td_meas.lower_limit = ll;
         td_meas.upper_limit = ul;
 
@@ -1832,6 +1858,7 @@ mod test {
         let (mut a2l, debug_data, names, mut reclayout) =
             test_setup("tests/update_test1.a2l", "tests/elffiles/update_test.elf");
         let mut msgs = Vec::new();
+        let dummy_cm_index = HashMap::new();
         let mut tdu = TypedefUpdater::new(
             &mut a2l.project.module[0],
             &debug_data,
@@ -1839,6 +1866,7 @@ mod test {
             names,
             &mut reclayout,
             HashMap::new(),
+            &dummy_cm_index,
         );
 
         tdu.typedef_names.structure = HashSet::new();
@@ -1866,6 +1894,7 @@ mod test {
             test_setup("tests/update_test1.a2l", "tests/elffiles/update_test.elf");
         let num_structs = a2l.project.module[0].typedef_structure.len();
         let mut msgs = Vec::new();
+        let dummy_cm_index = HashMap::new();
         let mut tdu = TypedefUpdater::new(
             &mut a2l.project.module[0],
             &debug_data,
@@ -1873,6 +1902,7 @@ mod test {
             names,
             &mut reclayout,
             HashMap::new(),
+            &dummy_cm_index,
         );
 
         tdu.typedef_names.structure = HashSet::new();
@@ -1902,6 +1932,7 @@ mod test {
         let (mut a2l, debug_data, names, mut reclayout) =
             test_setup("tests/update_test2.a2l", "tests/elffiles/update_test.elf");
         let mut msgs = Vec::new();
+        let dummy_cm_index = HashMap::new();
         let mut tdu = TypedefUpdater::new(
             &mut a2l.project.module[0],
             &debug_data,
@@ -1909,6 +1940,7 @@ mod test {
             names,
             &mut reclayout,
             HashMap::new(),
+            &dummy_cm_index,
         );
 
         tdu.typedef_names.structure = HashSet::new();
@@ -1966,6 +1998,7 @@ mod test {
             .push((Some(structb_typeinfo), TypedefReferrer::Instance(0)));
 
         let mut msgs = Vec::new();
+        let dummy_cm_index = HashMap::new();
         let mut tdu = TypedefUpdater::new(
             &mut a2l.project.module[0],
             &debug_data,
@@ -1973,6 +2006,7 @@ mod test {
             typedef_names,
             &mut recordlayout_info,
             typedef_ref_info,
+            &dummy_cm_index,
         );
 
         tdu.typedef_names.structure = HashSet::new();
@@ -1997,6 +2031,7 @@ mod test {
         let typedef_names = TypedefNames::new(&a2l.project.module[0]);
         let mut recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
         let mut msgs = Vec::new();
+        let dummy_cm_index = HashMap::new();
         let mut tdu = TypedefUpdater::new(
             &mut a2l.project.module[0],
             &debug_data,
@@ -2004,6 +2039,7 @@ mod test {
             typedef_names,
             &mut recordlayout_info,
             HashMap::new(),
+            &dummy_cm_index,
         );
         let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
 
@@ -2070,6 +2106,7 @@ mod test {
         let typedef_names = TypedefNames::new(&a2l.project.module[0]);
         let mut recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
         let mut msgs = Vec::new();
+        let dummy_cm_index = HashMap::new();
         let mut tdu = TypedefUpdater::new(
             &mut a2l.project.module[0],
             &debug_data,
@@ -2077,6 +2114,7 @@ mod test {
             typedef_names,
             &mut recordlayout_info,
             HashMap::new(),
+            &dummy_cm_index,
         );
         let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
 
@@ -2132,6 +2170,7 @@ mod test {
             typedef_ref_info,
             names,
             &mut reclayout,
+            &HashMap::new(),
         );
 
         let mut log_msgs = Vec::new();

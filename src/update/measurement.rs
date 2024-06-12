@@ -21,6 +21,7 @@ pub(crate) fn update_module_measurements(
     log_msgs: &mut Vec<String>,
     preserve_unknown: bool,
     version: A2lVersion,
+    compu_method_index: &HashMap<String, usize>,
 ) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
@@ -42,6 +43,7 @@ pub(crate) fn update_module_measurements(
                         typeinfo,
                         &mut enum_convlist,
                         version >= A2lVersion::V1_7_0,
+                        compu_method_index,
                     );
 
                     module.measurement.push(measurement);
@@ -83,6 +85,7 @@ pub(crate) fn update_content<'enumlist, 'typeinfo: 'enumlist>(
     typeinfo: &'typeinfo TypeInfo,
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
     use_new_matrix_dim: bool,
+    compu_method_index: &HashMap<String, usize>,
 ) {
     // handle pointers - only allowed for version 1.7.0+ (the caller should take care of this precondition)
     set_address_type(&mut measurement.address_type, typeinfo);
@@ -106,7 +109,15 @@ pub(crate) fn update_content<'enumlist, 'typeinfo: 'enumlist>(
         enum_convlist.insert(measurement.conversion.clone(), typeinfo);
     }
 
-    let (ll, ul) = adjust_limits(typeinfo, measurement.lower_limit, measurement.upper_limit);
+    let opt_compu_method = compu_method_index
+        .get(&measurement.conversion)
+        .and_then(|idx| module.compu_method.get(*idx));
+    let (ll, ul) = adjust_limits(
+        typeinfo,
+        measurement.lower_limit,
+        measurement.upper_limit,
+        opt_compu_method,
+    );
     measurement.lower_limit = ll;
     measurement.upper_limit = ul;
 

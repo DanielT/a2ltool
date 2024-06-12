@@ -23,6 +23,7 @@ pub(crate) fn update_module_characteristics(
     preserve_unknown: bool,
     version: A2lVersion,
     recordlayout_info: &mut RecordLayoutInfo,
+    compu_method_index: &HashMap<String, usize>,
 ) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
     let mut removed_items = HashSet::<String>::new();
@@ -52,6 +53,7 @@ pub(crate) fn update_module_characteristics(
                         &mut enum_convlist,
                         &axis_pts_dim,
                         version >= A2lVersion::V1_7_0,
+                        compu_method_index,
                     );
 
                     module.characteristic.push(characteristic);
@@ -98,6 +100,7 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
     axis_pts_dim: &HashMap<String, u16>,
     use_new_matrix_dim: bool,
+    compu_method_index: &HashMap<String, usize>,
 ) {
     let member_id = get_fnc_values_memberid(module, recordlayout_info, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
@@ -113,10 +116,14 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
             enum_convlist.insert(characteristic.conversion.clone(), inner_typeinfo);
         }
 
+        let opt_compu_method = compu_method_index
+            .get(&characteristic.conversion)
+            .and_then(|idx| module.compu_method.get(*idx));
         let (ll, ul) = adjust_limits(
             inner_typeinfo,
             characteristic.lower_limit,
             characteristic.upper_limit,
+            opt_compu_method,
         );
         characteristic.lower_limit = ll;
         characteristic.upper_limit = ul;
