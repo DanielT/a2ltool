@@ -264,10 +264,17 @@ impl<'elffile> DebugDataReader<'elffile> {
                 depth += depth_delta;
                 debug_assert!(depth >= 1);
                 context.truncate((depth - 1) as usize);
-                context.push((
-                    entry.tag(),
-                    get_name_attribute(entry, &self.dwarf, unit).ok(),
-                ));
+                let tag = entry.tag();
+                // It's essential to only get those names that might actually be needed.
+                // Getting all names unconditionally doubled the runtime of the program
+                // as a result of countless useless string allocations and deallocations.
+                if tag == gimli::constants::DW_TAG_namespace
+                    || tag == gimli::constants::DW_TAG_subprogram
+                {
+                    context.push((tag, get_name_attribute(entry, &self.dwarf, unit).ok()));
+                } else {
+                    context.push((tag, None));
+                }
                 debug_assert_eq!(depth as usize, context.len());
 
                 if entry.tag() == gimli::constants::DW_TAG_variable {
