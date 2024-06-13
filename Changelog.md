@@ -1,11 +1,17 @@
 # Changelog
 
+## Version 2.0.1
+
+- Fix issue #30: don't remove the BIT_MASK from elements during update (by @louiscaron)
+- Fix issue #32: the COMPU_METHOD must be taken into account while updating the data limits
+- Fix: Performance regression from version 2.0.0
+
 ## Version 2.0.0
 
 - upgrade to a2lfile 2.0.0
   - fix the definition of AR_COMPONENT
   - don't remove valid elements during cleanup
-- Create and update INSTANCEs and TYPEDEF_MEASUREMENTs if the file version is 1.7.1 and --enable-strucutres is set
+- Create and update INSTANCEs and TYPEDEF_MEASUREMENTs if the file version is 1.7.1 and --enable-structures is set
 - Insert whole arrays of MEASUREMENTs and CHARACTERISTICs instead of separate items for each element if the array elements have a simple datatype
 - Items can now be inserted based on the containing elf section
 - Debug data reader improvements - extracted information should now be better and more complete
