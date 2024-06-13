@@ -9,23 +9,20 @@ use crate::update::{
     log_update_errors, set_symbol_link, TypedefNames, TypedefReferrer, TypedefsRefInfo,
 };
 
-use super::{make_symbol_link_string, set_address_type, set_matrix_dim};
+use super::{make_symbol_link_string, set_address_type, set_matrix_dim, UpdateInfo};
 
-pub(crate) fn update_module_instances<'a>(
-    module: &mut Module,
-    debug_data: &'a DebugData,
-    log_msgs: &mut Vec<String>,
-    preserve_unknown: bool,
+pub(crate) fn update_module_instances<'dbg>(
+    info: &mut UpdateInfo<'_, 'dbg, '_>,
     nameset: &TypedefNames,
-) -> (u32, u32, TypedefsRefInfo<'a>) {
+) -> (u32, u32, TypedefsRefInfo<'dbg>) {
     let mut removed_items = HashSet::<String>::new();
     let mut instance_list = Vec::new();
     let mut instance_updated: u32 = 0;
     let mut instance_not_updated: u32 = 0;
     let mut typedef_types = TypedefsRefInfo::new();
-    std::mem::swap(&mut module.instance, &mut instance_list);
+    std::mem::swap(&mut info.module.instance, &mut instance_list);
     for mut instance in instance_list {
-        match update_instance_address(&mut instance, debug_data) {
+        match update_instance_address(&mut instance, info.debug_data) {
             Ok((typedef_ref, typeinfo)) => {
                 if nameset.contains(&typedef_ref) {
                     // Each INSTANCE can have:
@@ -39,7 +36,7 @@ pub(crate) fn update_module_instances<'a>(
                     // More complicted constructions like pointers to pointers, arrays of pointers, etc. can not be represented directly
                     set_address_type(&mut instance.address_type, typeinfo);
                     let basetype = typeinfo
-                        .get_pointer(&debug_data.types)
+                        .get_pointer(&info.debug_data.types)
                         .map_or(typeinfo, |(_, t)| t);
 
                     set_matrix_dim(&mut instance.matrix_dim, basetype, true);
@@ -47,30 +44,30 @@ pub(crate) fn update_module_instances<'a>(
 
                     typedef_types.entry(typedef_ref).or_default().push((
                         Some(basetype),
-                        TypedefReferrer::Instance(module.instance.len()),
+                        TypedefReferrer::Instance(info.module.instance.len()),
                     ));
 
-                    module.instance.push(instance);
+                    info.module.instance.push(instance);
                     instance_updated += 1;
-                } else if preserve_unknown {
-                    module.instance.push(instance);
+                } else if info.preserve_unknown {
+                    info.module.instance.push(instance);
                     instance_updated += 1;
                 } else {
-                    log_msgs.push(format!("Error updating INSTANCE on line {}: type ref {} does not refer to any TYPEDEF_*", instance.get_line(), instance.type_ref));
+                    info.log_msgs.push(format!("Error updating INSTANCE on line {}: type ref {} does not refer to any TYPEDEF_*", instance.get_line(), instance.type_ref));
                     instance_not_updated += 1;
                 }
             }
             Err(errmsgs) => {
-                log_update_errors(log_msgs, errmsgs, "INSTANCE", instance.get_line());
+                log_update_errors(info.log_msgs, errmsgs, "INSTANCE", instance.get_line());
 
-                if preserve_unknown {
+                if info.preserve_unknown {
                     instance.start_address = 0;
                     zero_if_data(&mut instance.if_data);
                     typedef_types
                         .entry(instance.type_ref.clone())
                         .or_default()
-                        .push((None, TypedefReferrer::Instance(module.instance.len())));
-                    module.instance.push(instance);
+                        .push((None, TypedefReferrer::Instance(info.module.instance.len())));
+                    info.module.instance.push(instance);
                 } else {
                     // item is removed implicitly, because it is not added back to the list
                     removed_items.insert(instance.name.clone());
@@ -79,7 +76,7 @@ pub(crate) fn update_module_instances<'a>(
             }
         }
     }
-    cleanup_removed_instances(module, &removed_items);
+    cleanup_removed_instances(info.module, &removed_items);
 
     (instance_updated, instance_not_updated, typedef_types)
 }

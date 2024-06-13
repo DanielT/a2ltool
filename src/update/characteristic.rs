@@ -10,19 +10,12 @@ use crate::update::{
     enums::{cond_create_enum_conversion, update_enum_compu_methods},
     get_fnc_values_memberid, get_inner_type, get_symbol_info,
     ifdata_update::{update_ifdata, zero_if_data},
-    log_update_errors, set_bitmask, set_matrix_dim, set_symbol_link, update_record_layout,
-    RecordLayoutInfo,
+    log_update_errors, make_symbol_link_string, set_bitmask, set_matrix_dim, set_symbol_link,
+    update_record_layout, RecordLayoutInfo, UpdateInfo,
 };
 
-use super::make_symbol_link_string;
-
 pub(crate) fn update_module_characteristics(
-    module: &mut Module,
-    debug_data: &DebugData,
-    log_msgs: &mut Vec<String>,
-    preserve_unknown: bool,
-    version: A2lVersion,
-    recordlayout_info: &mut RecordLayoutInfo,
+    info: &mut UpdateInfo,
     compu_method_index: &HashMap<String, usize>,
 ) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
@@ -32,45 +25,47 @@ pub(crate) fn update_module_characteristics(
     let mut characteristic_not_updated: u32 = 0;
 
     // store the max_axis_points of each AXIS_PTS, so that the AXIS_DESCRs inside of CHARACTERISTICS can be updated to match
-    let axis_pts_dim: HashMap<String, u16> = module
+    let axis_pts_dim: HashMap<String, u16> = info
+        .module
         .axis_pts
         .iter()
         .map(|item| (item.name.clone(), item.max_axis_points))
         .collect();
 
-    std::mem::swap(&mut module.characteristic, &mut characteristic_list);
+    std::mem::swap(&mut info.module.characteristic, &mut characteristic_list);
     for mut characteristic in characteristic_list {
         if characteristic.virtual_characteristic.is_none() {
             // only update the address if the CHARACTERISTIC is not a VIRTUAL_CHARACTERISTIC
-            match update_characteristic_address(&mut characteristic, debug_data, version) {
+            match update_characteristic_address(&mut characteristic, info.debug_data, info.version)
+            {
                 Ok(typeinfo) => {
                     // update as much as possible of the information inside the CHARACTERISTIC
                     update_characteristic_information(
-                        module,
-                        recordlayout_info,
+                        info.module,
+                        &mut info.reclayout_info,
                         &mut characteristic,
                         typeinfo,
                         &mut enum_convlist,
                         &axis_pts_dim,
-                        version >= A2lVersion::V1_7_0,
+                        info.version >= A2lVersion::V1_7_0,
                         compu_method_index,
                     );
 
-                    module.characteristic.push(characteristic);
+                    info.module.characteristic.push(characteristic);
                     characteristic_updated += 1;
                 }
                 Err(errmsgs) => {
                     log_update_errors(
-                        log_msgs,
+                        info.log_msgs,
                         errmsgs,
                         "CHARACTERISTIC",
                         characteristic.get_line(),
                     );
 
-                    if preserve_unknown {
+                    if info.preserve_unknown {
                         characteristic.address = 0;
                         zero_if_data(&mut characteristic.if_data);
-                        module.characteristic.push(characteristic);
+                        info.module.characteristic.push(characteristic);
                     } else {
                         // item is removed implicitly, because it is not added back to the list
                         removed_items.insert(characteristic.name.clone());
@@ -80,18 +75,19 @@ pub(crate) fn update_module_characteristics(
             }
         } else {
             // computed CHARACTERISTICS with a VIRTUAL_CHARACTERISTIC block shouldn't have an address and don't need to be updated
-            module.characteristic.push(characteristic);
+            info.module.characteristic.push(characteristic);
         }
     }
 
     // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in CHARACTERISTICs
-    update_enum_compu_methods(module, &enum_convlist);
-    cleanup_removed_characteristics(module, &removed_items);
+    update_enum_compu_methods(info.module, &enum_convlist);
+    cleanup_removed_characteristics(info.module, &removed_items);
 
     (characteristic_updated, characteristic_not_updated)
 }
 
 // update as much as possible of the information inside the CHARACTERISTIC
+#[allow(clippy::too_many_arguments)]
 fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
     module: &mut Module,
     recordlayout_info: &mut RecordLayoutInfo,

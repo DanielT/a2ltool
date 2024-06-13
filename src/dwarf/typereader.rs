@@ -33,7 +33,7 @@ impl<'elffile> DebugDataReader<'elffile> {
         for (name, var_list) in variables {
             for VarInfo { typeref, .. } in var_list {
                 // check if the type was already loaded
-                if typereader_data.types.get(typeref).is_none() {
+                if !typereader_data.types.contains_key(typeref) {
                     if let Some(unit_idx) = self.units.get_unit(*typeref) {
                         // create an entries_tree iterator that makes it possible to read the DIEs of this type
                         let dbginfo_offset = gimli::DebugInfoOffset(*typeref);
@@ -313,12 +313,9 @@ impl<'elffile> DebugDataReader<'elffile> {
                     } else {
                         0
                     }
-                } else if let Some(count) = get_count_attribute(child_entry) {
-                    // clang generates DW_AT_count instead of DW_AT_ubound
-                    count
                 } else {
-                    // unknown size of this array dimension
-                    0
+                    // clang generates DW_AT_count instead of DW_AT_ubound
+                    get_count_attribute(child_entry).unwrap_or_default()
                 };
                 dim.push(count);
             } else if child_entry.tag() == gimli::constants::DW_TAG_enumeration_type {

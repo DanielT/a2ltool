@@ -237,7 +237,7 @@ fn make_unique_reclayout_name(
     initial_name: String,
     recordlayout_info: &RecordLayoutInfo,
 ) -> String {
-    if recordlayout_info.idxmap.get(&initial_name).is_some() {
+    if recordlayout_info.idxmap.contains_key(&initial_name) {
         // the record layout name already exists. Now we want to extend the name to make it unique
         // e.g. BASIC_RECORD_LAYOUT to BASIC_RECORD_LAYOUT_UPDATED
         // if there are multiple BASIC_RECORD_LAYOUT_UPDATED we want to continue with BASIC_RECORD_LAYOUT_UPDATED.2, .3 , etc
@@ -256,7 +256,7 @@ fn make_unique_reclayout_name(
         };
         let mut outname = basename.clone();
         let mut counter = 1;
-        while recordlayout_info.idxmap.get(&outname).is_some() {
+        while recordlayout_info.idxmap.contains_key(&outname) {
             counter += 1;
             outname = format!("{basename}.{counter}");
         }

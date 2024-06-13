@@ -10,18 +10,13 @@ use crate::update::{
     enums::{cond_create_enum_conversion, update_enum_compu_methods},
     get_axis_pts_x_memberid, get_inner_type, get_symbol_info,
     ifdata_update::{update_ifdata, zero_if_data},
-    log_update_errors, set_symbol_link, update_record_layout, RecordLayoutInfo,
+    log_update_errors, set_symbol_link, update_record_layout,
 };
 
-use super::make_symbol_link_string;
+use super::{make_symbol_link_string, UpdateInfo};
 
 pub(crate) fn update_module_axis_pts(
-    module: &mut Module,
-    debug_data: &DebugData,
-    log_msgs: &mut Vec<String>,
-    preserve_unknown: bool,
-    version: A2lVersion,
-    recordlayout_info: &mut RecordLayoutInfo,
+    info: &mut UpdateInfo,
     compu_method_index: &HashMap<String, usize>,
 ) -> (u32, u32) {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
@@ -30,14 +25,17 @@ pub(crate) fn update_module_axis_pts(
     let mut axis_pts_updated: u32 = 0;
     let mut axis_pts_not_updated: u32 = 0;
 
-    std::mem::swap(&mut module.axis_pts, &mut axis_pts_list);
+    std::mem::swap(&mut info.module.axis_pts, &mut axis_pts_list);
     for mut axis_pts in axis_pts_list {
-        match update_axis_pts_address(&mut axis_pts, debug_data, version) {
+        match update_axis_pts_address(&mut axis_pts, info.debug_data, info.version) {
             Ok(typeinfo) => {
                 // the variable used for the axis should be a 1-dimensional array, or a struct containing a 1-dimensional array
                 // if the type is a struct, then the AXIS_PTS_X inside the referenced RECORD_LAYOUT tells us which member of the struct to use.
-                let member_id =
-                    get_axis_pts_x_memberid(module, recordlayout_info, &axis_pts.deposit_record);
+                let member_id = get_axis_pts_x_memberid(
+                    info.module,
+                    &info.reclayout_info,
+                    &axis_pts.deposit_record,
+                );
                 if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
                     match &inner_typeinfo.datatype {
                         DwarfDataType::Array { dim, arraytype, .. } => {
@@ -57,7 +55,7 @@ pub(crate) fn update_module_axis_pts(
                                         .clone();
                                 }
                                 cond_create_enum_conversion(
-                                    module,
+                                    info.module,
                                     &axis_pts.conversion,
                                     enumerators,
                                 );
@@ -73,7 +71,7 @@ pub(crate) fn update_module_axis_pts(
 
                     let opt_compu_method = compu_method_index
                         .get(&axis_pts.conversion)
-                        .and_then(|idx| module.compu_method.get(*idx));
+                        .and_then(|idx| info.module.compu_method.get(*idx));
                     let (ll, ul) = adjust_limits(
                         inner_typeinfo,
                         axis_pts.lower_limit,
@@ -86,23 +84,23 @@ pub(crate) fn update_module_axis_pts(
 
                 // update the data type in the referenced RECORD_LAYOUT
                 axis_pts.deposit_record = update_record_layout(
-                    module,
-                    recordlayout_info,
+                    info.module,
+                    &mut info.reclayout_info,
                     &axis_pts.deposit_record,
                     typeinfo,
                 );
 
                 // put the updated AXIS_PTS back on the module's list
-                module.axis_pts.push(axis_pts);
+                info.module.axis_pts.push(axis_pts);
                 axis_pts_updated += 1;
             }
             Err(errmsgs) => {
-                log_update_errors(log_msgs, errmsgs, "AXIS_PTS", axis_pts.get_line());
+                log_update_errors(info.log_msgs, errmsgs, "AXIS_PTS", axis_pts.get_line());
 
-                if preserve_unknown {
+                if info.preserve_unknown {
                     axis_pts.address = 0;
                     zero_if_data(&mut axis_pts.if_data);
-                    module.axis_pts.push(axis_pts);
+                    info.module.axis_pts.push(axis_pts);
                 } else {
                     // item is removed implicitly, because it is not added back to the list
                     removed_items.insert(axis_pts.name.clone());
@@ -113,8 +111,8 @@ pub(crate) fn update_module_axis_pts(
     }
 
     // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in MEASUREMENTs etc.
-    update_enum_compu_methods(module, &enum_convlist);
-    cleanup_removed_axis_pts(module, &removed_items);
+    update_enum_compu_methods(info.module, &enum_convlist);
+    cleanup_removed_axis_pts(info.module, &removed_items);
 
     (axis_pts_updated, axis_pts_not_updated)
 }

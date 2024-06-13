@@ -54,6 +54,15 @@ pub(crate) struct TypedefNames {
     structure: HashSet<String>,
 }
 
+pub(crate) struct UpdateInfo<'a2l, 'dbg, 'log> {
+    pub(crate) module: &'a2l mut Module,
+    pub(crate) debug_data: &'dbg DebugData,
+    pub(crate) log_msgs: &'log mut Vec<String>,
+    pub(crate) preserve_unknown: bool,
+    pub(crate) version: A2lVersion,
+    pub(crate) reclayout_info: RecordLayoutInfo,
+}
+
 type TypedefsRefInfo<'a> = HashMap<String, Vec<(Option<&'a TypeInfo>, TypedefReferrer)>>;
 
 // perform an address update.
@@ -70,8 +79,18 @@ pub(crate) fn update_addresses(
 
     let mut summary = UpdateSumary::new();
     for module in &mut a2l_file.project.module {
-        let mut reclayout_info = RecordLayoutInfo::build(module);
-        let compu_method_index = module
+        let reclayout_info = RecordLayoutInfo::build(module);
+        let mut info = UpdateInfo {
+            module,
+            debug_data,
+            log_msgs,
+            preserve_unknown,
+            version,
+            reclayout_info,
+        };
+
+        let compu_method_index = info
+            .module
             .compu_method
             .iter()
             .enumerate()
@@ -79,71 +98,39 @@ pub(crate) fn update_addresses(
             .collect::<HashMap<_, _>>();
 
         // update all AXIS_PTS
-        let (updated, not_updated) = update_module_axis_pts(
-            module,
-            debug_data,
-            log_msgs,
-            preserve_unknown,
-            version,
-            &mut reclayout_info,
-            &compu_method_index,
-        );
+        let (updated, not_updated) = update_module_axis_pts(&mut info, &compu_method_index);
         summary.measurement_updated += updated;
         summary.measurement_not_updated += not_updated;
 
         // update all MEASUREMENTs
-        let (updated, not_updated) = update_module_measurements(
-            module,
-            debug_data,
-            log_msgs,
-            preserve_unknown,
-            version,
-            &compu_method_index,
-        );
+        let (updated, not_updated) = update_module_measurements(&mut info, &compu_method_index);
         summary.measurement_updated += updated;
         summary.measurement_not_updated += not_updated;
 
         // update all CHARACTERISTICs
-        let (updated, not_updated) = update_module_characteristics(
-            module,
-            debug_data,
-            log_msgs,
-            preserve_unknown,
-            version,
-            &mut reclayout_info,
-            &compu_method_index,
-        );
+        let (updated, not_updated) = update_module_characteristics(&mut info, &compu_method_index);
         summary.characteristic_updated += updated;
         summary.characteristic_not_updated += not_updated;
 
         // update all BLOBs
         let (updated, not_updated) =
-            update_module_blobs(module, debug_data, log_msgs, preserve_unknown);
+            update_module_blobs(info.module, debug_data, info.log_msgs, preserve_unknown);
         summary.blob_updated += updated;
         summary.blob_not_updated += not_updated;
 
-        let typedef_names = TypedefNames::new(module);
+        let typedef_names = TypedefNames::new(info.module);
 
         // update all INSTANCEs
-        let (updated, not_updated, typedef_ref_info) = update_module_instances(
-            module,
-            debug_data,
-            log_msgs,
-            preserve_unknown,
-            &typedef_names,
-        );
+        let (updated, not_updated, typedef_ref_info) =
+            update_module_instances(&mut info, &typedef_names);
         summary.instance_updated += updated;
         summary.instance_not_updated += not_updated;
 
         if enable_structures {
             update_module_typedefs(
-                module,
-                debug_data,
-                log_msgs,
-                preserve_unknown,
+                &mut info,
                 typedef_ref_info,
                 typedef_names,
-                &mut reclayout_info,
                 &compu_method_index,
             );
         }

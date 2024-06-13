@@ -1,8 +1,9 @@
 use crate::dwarf::{make_simple_unit_name, DebugData, DwarfDataType, TypeInfo};
+use crate::update::enums::{cond_create_enum_conversion, update_enum_compu_methods};
 use crate::update::{
     adjust_limits, get_a2l_datatype, get_fnc_values_memberid, get_inner_type, set_address_type,
     set_bitmask, set_matrix_dim, update_characteristic_axis, update_record_layout,
-    RecordLayoutInfo, TypedefNames, TypedefReferrer, TypedefsRefInfo,
+    RecordLayoutInfo, TypedefNames, TypedefReferrer, TypedefsRefInfo, UpdateInfo,
 };
 use a2lfile::{
     A2lObject, AddrType, CharacteristicType, FncValues, IndexMode, Module, Number, RecordLayout,
@@ -14,8 +15,6 @@ use indexmap::{IndexMap, IndexSet};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
-
-use crate::update::enums::{cond_create_enum_conversion, update_enum_compu_methods};
 
 type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
 
@@ -70,27 +69,23 @@ struct TypedefUpdater<'dbg, 'a2l, 'rl, 'log, 'cm> {
 pub(crate) const FLAG_CREATE_CALIB: &str = "||calib||";
 pub(crate) const FLAG_CREATE_MEAS: &str = "||meas||";
 
-pub(crate) fn update_module_typedefs<'a>(
-    module: &mut Module,
-    debug_data: &'a DebugData,
-    log_msgs: &mut Vec<String>,
-    preserve_unknown: bool,
-    typedef_ref_info: TypedefsRefInfo<'a>,
+pub(crate) fn update_module_typedefs(
+    info: &mut UpdateInfo,
+    typedef_ref_info: TypedefsRefInfo,
     typedef_names: TypedefNames,
-    recordlayout_info: &mut RecordLayoutInfo,
     compu_method_index: &HashMap<String, usize>,
 ) {
     let updater = TypedefUpdater::new(
-        module,
-        debug_data,
-        log_msgs,
+        info.module,
+        info.debug_data,
+        info.log_msgs,
         typedef_names,
-        recordlayout_info,
+        &mut info.reclayout_info,
         typedef_ref_info,
         compu_method_index,
     );
 
-    updater.process_typedefs(preserve_unknown, false);
+    updater.process_typedefs(info.preserve_unknown, false);
 }
 
 pub(crate) fn create_new_typedefs<'a>(
@@ -1833,7 +1828,8 @@ mod test {
     use super::{update_module_typedefs, TypedefUpdater};
     use crate::{
         dwarf::{DebugData, TypeInfo},
-        update::{get_symbol_info, RecordLayoutInfo, TypedefNames, TypedefReferrer},
+        update::{get_symbol_info, RecordLayoutInfo, TypedefNames, TypedefReferrer, UpdateInfo},
+        A2lVersion,
     };
     use a2lfile::A2lFile;
     use std::{
@@ -2141,7 +2137,7 @@ mod test {
 
     #[test]
     fn test_update() {
-        let (mut a2l, debug_data, names, mut reclayout) =
+        let (mut a2l, debug_data, names, reclayout) =
             test_setup("tests/update_test3.a2l", "tests/elffiles/update_test.elf");
 
         let mut typedef_ref_info: HashMap<String, Vec<_>> = HashMap::new();
@@ -2161,17 +2157,17 @@ mod test {
             }
         }
 
+        let version = A2lVersion::from(&a2l);
         let mut log_msgs = Vec::new();
-        update_module_typedefs(
-            &mut a2l.project.module[0],
-            &debug_data,
-            &mut log_msgs,
-            false,
-            typedef_ref_info,
-            names,
-            &mut reclayout,
-            &HashMap::new(),
-        );
+        let mut info = UpdateInfo {
+            module: &mut a2l.project.module[0],
+            debug_data: &debug_data,
+            log_msgs: &mut log_msgs,
+            preserve_unknown: false,
+            version,
+            reclayout_info: reclayout,
+        };
+        update_module_typedefs(&mut info, typedef_ref_info, names, &HashMap::new());
 
         let mut log_msgs = Vec::new();
         let mut reference_a2l =

@@ -13,14 +13,10 @@ use crate::update::{
     log_update_errors, set_bitmask, set_matrix_dim, set_measurement_ecu_address, set_symbol_link,
 };
 
-use super::{make_symbol_link_string, set_address_type};
+use super::{make_symbol_link_string, set_address_type, UpdateInfo};
 
 pub(crate) fn update_module_measurements(
-    module: &mut Module,
-    debug_data: &DebugData,
-    log_msgs: &mut Vec<String>,
-    preserve_unknown: bool,
-    version: A2lVersion,
+    info: &mut UpdateInfo,
     compu_method_index: &HashMap<String, usize>,
 ) -> (u32, u32) {
     let mut removed_items = HashSet::<String>::new();
@@ -29,33 +25,38 @@ pub(crate) fn update_module_measurements(
     let mut measurement_updated: u32 = 0;
     let mut measurement_not_updated: u32 = 0;
 
-    std::mem::swap(&mut module.measurement, &mut measurement_list);
+    std::mem::swap(&mut info.module.measurement, &mut measurement_list);
     for mut measurement in measurement_list {
         if measurement.var_virtual.is_none() {
             // only MEASUREMENTS that are not VIRTUAL can be updated
-            match update_measurement_address(&mut measurement, debug_data, version) {
+            match update_measurement_address(&mut measurement, info.debug_data, info.version) {
                 Ok(typeinfo) => {
                     // update all the information instide a MEASUREMENT
                     update_content(
-                        module,
-                        debug_data,
+                        info.module,
+                        info.debug_data,
                         &mut measurement,
                         typeinfo,
                         &mut enum_convlist,
-                        version >= A2lVersion::V1_7_0,
+                        info.version >= A2lVersion::V1_7_0,
                         compu_method_index,
                     );
 
-                    module.measurement.push(measurement);
+                    info.module.measurement.push(measurement);
                     measurement_updated += 1;
                 }
                 Err(errmsgs) => {
-                    log_update_errors(log_msgs, errmsgs, "MEASUREMENT", measurement.get_line());
+                    log_update_errors(
+                        info.log_msgs,
+                        errmsgs,
+                        "MEASUREMENT",
+                        measurement.get_line(),
+                    );
 
-                    if preserve_unknown {
+                    if info.preserve_unknown {
                         measurement.ecu_address = None;
                         zero_if_data(&mut measurement.if_data);
-                        module.measurement.push(measurement);
+                        info.module.measurement.push(measurement);
                     } else {
                         // item is removed implicitly, because it is not added back to the list
                         // but we need to track the name of the removed item so that references to it can be deleted
@@ -66,13 +67,13 @@ pub(crate) fn update_module_measurements(
             }
         } else {
             // VIRTUAL MEASUREMENTS don't need an address
-            module.measurement.push(measurement);
+            info.module.measurement.push(measurement);
         }
     }
 
     // update COMPU_VTABs and COMPU_VTAB_RANGEs based on the data types used in MEASUREMENTs
-    update_enum_compu_methods(module, &enum_convlist);
-    cleanup_removed_measurements(module, &removed_items);
+    update_enum_compu_methods(info.module, &enum_convlist);
+    cleanup_removed_measurements(info.module, &removed_items);
 
     (measurement_updated, measurement_not_updated)
 }
