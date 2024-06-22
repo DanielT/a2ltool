@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 2.0.2
+
+- update to a2lfile 2.1.0
+  - add handling for /include inside A2ML (by @louiscaron)
+  - fix multi-level /include inside A2L
+
 ## Version 2.0.1
 
 - Fix issue #30: don't remove the BIT_MASK from elements during update (by @louiscaron)
