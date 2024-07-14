@@ -1,6 +1,6 @@
 [package]
 name = "a2ltool"
-version = "2.0.1"
+version = "2.0.2"
 authors = ["Daniel Thaler <daniel@dthaler.de>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -17,6 +17,7 @@ cpp_demangle = "0.4.3"
 regex = "1"
 indexmap = "2.2.0"
 fxhash = "0.2.1"
+argfile = { version ="0.2.0", features=["response"]}
 
 [profile.release]
 panic = "abort"

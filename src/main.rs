@@ -1,3 +1,4 @@
+use argfile;
 use clap::{builder::ValueParser, parser::ValuesRef, Arg, ArgGroup, ArgMatches, Command};
 
 use a2lfile::{A2lError, A2lFile, A2lObject};
@@ -541,6 +542,12 @@ fn load_or_create_a2l(
 // set up the entire command line handling.
 // fortunately clap makes this painless
 fn get_args() -> ArgMatches {
+    let args = std::env::args_os();
+    let args = argfile::expand_args_from(args, argfile::parse_response, argfile::PREFIX)
+        .unwrap_or_else(|err| {
+            println!("invalid response file: {err}: {}", err.kind());
+            std::env::args_os().into_iter().collect()
+        });
     Command::new("a2ltool")
     .version(env!("CARGO_PKG_VERSION"))
     .about("Reads, writes and modifies A2L files")
@@ -781,7 +788,7 @@ fn get_args() -> ArgMatches {
             .multiple(true)
     )
     .next_line_help(false)
-    .get_matches()
+    .get_matches_from(args)
 }
 
 fn range_args_to_ranges(args: Option<ValuesRef<u64>>) -> Vec<(u64, u64)> {
