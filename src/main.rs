@@ -788,6 +788,7 @@ fn get_args() -> ArgMatches {
             .multiple(true)
     )
     .next_line_help(false)
+    .after_help("Use @filename to read a response file, which may contain any of the command line arguments.")
     .get_matches_from(args)
 }
 
