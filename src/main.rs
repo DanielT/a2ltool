@@ -1,4 +1,3 @@
-use argfile;
 use clap::{builder::ValueParser, parser::ValuesRef, Arg, ArgGroup, ArgMatches, Command};
 
 use a2lfile::{A2lError, A2lFile, A2lObject};
@@ -546,7 +545,7 @@ fn get_args() -> ArgMatches {
     let args = argfile::expand_args_from(args, argfile::parse_response, argfile::PREFIX)
         .unwrap_or_else(|err| {
             println!("invalid response file: {err}: {}", err.kind());
-            std::env::args_os().into_iter().collect()
+            std::env::args_os().collect()
         });
     Command::new("a2ltool")
     .version(env!("CARGO_PKG_VERSION"))

@@ -18,7 +18,7 @@ struct TypeReaderData {
     wip_items: Vec<WipItemInfo>,
 }
 
-impl<'elffile> DebugDataReader<'elffile> {
+impl DebugDataReader<'_> {
     // load all the types referenced by variables in given HashMap
     pub(crate) fn load_types(
         &mut self,
