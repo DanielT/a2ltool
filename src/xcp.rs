@@ -1,12 +1,12 @@
 use std::ffi::OsStr;
 
 use crate::ifdata::{
-    A2mlVector, Address2, Channel, Cmd, CycleRepetition, Daq2, EvServ, FlxSlotId, HostName,
-    InitialCmdBuffer, InitialResErrBuffer, Ipv6, LpduId, MaxFlxLenBuf, Offset, PoolBuffer, ResErr,
-    Stim2, TCP_IP_Parameters, UDP_IP_Parameters, Xcp, XcpOnCan, XcpOnFlx, XcpOnTcpIp, XcpOnUdpIp,
-    XcpPacket,
+    A2mlVector, Address2, CAN_Parameters, Channel, Cmd, CycleRepetition, Daq2, EvServ,
+    FLX_Parameters, FlxSlotId, HostName, InitialCmdBuffer, InitialResErrBuffer, Ipv6, LpduId,
+    MaxFlxLenBuf, Offset, PoolBuffer, ResErr, Stim2, TCP_IP_Parameters, UDP_IP_Parameters, XCPplus,
+    Xcp, XcpPacket,
 };
-use a2lfile::A2lFile;
+use a2lfile::{A2lFile, A2lObject};
 
 pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
     let multi_module = a2l_file.project.module.len() > 1;
@@ -20,9 +20,19 @@ pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
 
         let mut found = false;
         for ifdata in &module.if_data {
+            if !ifdata.ifdata_valid {
+                println!(
+                    "Warning: the IF_DATA block on line {} is not valid",
+                    ifdata.get_layout().line
+                );
+            }
             if let Some(decoded_ifdata) = A2mlVector::load_from_ifdata(ifdata) {
                 if let Some(xcp) = &decoded_ifdata.xcp {
                     print_xcp(xcp);
+                    found = true;
+                }
+                if let Some(xcpplus) = &decoded_ifdata.xcpplus {
+                    print_xcpplus(xcpplus);
                     found = true;
                 }
             }
@@ -37,40 +47,57 @@ pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
 
 fn print_xcp(xcp: &Xcp) {
     if let Some(xcp_on_can) = &xcp.xcp_on_can {
-        print_xcp_on_can(xcp_on_can);
+        print_xcp_on_can(&xcp_on_can.can_parameters);
     }
 
     if let Some(xcp_on_flx) = &xcp.xcp_on_flx {
-        print_xcp_on_flx(xcp_on_flx);
+        print_xcp_on_flx(&xcp_on_flx.flx_parameters);
     }
 
     if let Some(xcp_on_tcp_ip) = &xcp.xcp_on_tcp_ip {
-        print_xcp_on_tcp_ip(xcp_on_tcp_ip);
+        print_xcp_on_tcp_ip(&xcp_on_tcp_ip.tcp_ip_parameters);
     }
 
     if let Some(xcp_on_udp_ip) = &xcp.xcp_on_udp_ip {
-        print_xcp_on_udp_ip(xcp_on_udp_ip);
+        print_xcp_on_udp_ip(&xcp_on_udp_ip.udp_ip_parameters);
+    }
+}
+fn print_xcpplus(xcpplus: &XCPplus) {
+    for xcp_on_can in &xcpplus.xcp_on_can {
+        print_xcp_on_can(&xcp_on_can.can_parameters);
+    }
+
+    for xcp_on_flx in &xcpplus.xcp_on_flx {
+        print_xcp_on_flx(&xcp_on_flx.flx_parameters);
+    }
+
+    for xcp_on_tcp_ip in &xcpplus.xcp_on_tcp_ip {
+        print_xcp_on_tcp_ip(&xcp_on_tcp_ip.tcp_ip_parameters);
+    }
+
+    for xcp_on_udp_ip in &xcpplus.xcp_on_udp_ip {
+        print_xcp_on_udp_ip(&xcp_on_udp_ip.udp_ip_parameters);
     }
 }
 
-fn print_xcp_on_can(xcp_on_can: &XcpOnCan) {
+fn print_xcp_on_can(can_parameters: &CAN_Parameters) {
     println!("  XCP on CAN:");
-    if let Some(can_id_master) = &xcp_on_can.can_parameters.can_id_master {
+    if let Some(can_id_master) = &can_parameters.can_id_master {
         println!(
             "    CAN id master: 0x{:X}",
             (can_id_master.value & 0x1fff_ffff)
         );
     }
-    if let Some(can_id_slave) = &xcp_on_can.can_parameters.can_id_slave {
+    if let Some(can_id_slave) = &can_parameters.can_id_slave {
         println!(
             "    CAN id slave: 0x{:X}",
             (can_id_slave.value & 0x1fff_ffff)
         );
     }
-    if let Some(baudrate) = &xcp_on_can.can_parameters.baudrate {
+    if let Some(baudrate) = &can_parameters.baudrate {
         println!("    CAN baudrate: {} kbps", baudrate.value / 1000);
     }
-    if let Some(can_fd) = &xcp_on_can.can_parameters.can_fd {
+    if let Some(can_fd) = &can_parameters.can_fd {
         println!("    CAN-FD enabled:");
         if let Some(baudrate) = &can_fd.can_fd_data_transfer_baudrate {
             println!("      CAN-FD data baudrate: {} kbps", baudrate.value / 1000);
@@ -81,13 +108,13 @@ fn print_xcp_on_can(xcp_on_can: &XcpOnCan) {
     }
 }
 
-fn print_xcp_on_flx(xcp_on_flx: &XcpOnFlx) {
+fn print_xcp_on_flx(flx_parameters: &FLX_Parameters) {
     println!("  XCP on Flexray");
-    if !xcp_on_flx.flx_parameters.fibex_file.is_empty() {
-        println!("    fibex file: {}", xcp_on_flx.flx_parameters.fibex_file);
+    if !flx_parameters.fibex_file.is_empty() {
+        println!("    fibex file: {}", flx_parameters.fibex_file);
     }
 
-    if let Some(buffer) = &xcp_on_flx.flx_parameters.initial_cmd_buffer {
+    if let Some(buffer) = &flx_parameters.initial_cmd_buffer {
         let InitialCmdBuffer {
             flx_buf,
             max_flx_len_buf,
@@ -99,7 +126,7 @@ fn print_xcp_on_flx(xcp_on_flx: &XcpOnFlx) {
         print_xcp_on_flx_buffer(*flx_buf, max_flx_len_buf, lpdu_id, xcp_packet);
     }
 
-    if let Some(buffer) = &xcp_on_flx.flx_parameters.initial_res_err_buffer {
+    if let Some(buffer) = &flx_parameters.initial_res_err_buffer {
         let InitialResErrBuffer {
             flx_buf,
             max_flx_len_buf,
@@ -111,7 +138,7 @@ fn print_xcp_on_flx(xcp_on_flx: &XcpOnFlx) {
         print_xcp_on_flx_buffer(*flx_buf, max_flx_len_buf, lpdu_id, xcp_packet);
     }
 
-    for buffer in &xcp_on_flx.flx_parameters.pool_buffer {
+    for buffer in &flx_parameters.pool_buffer {
         let PoolBuffer {
             flx_buf,
             max_flx_len_buf,
@@ -268,36 +295,24 @@ fn print_xcp_on_flx_buffer(
     }
 }
 
-fn print_xcp_on_tcp_ip(xcp_on_tcp_ip: &XcpOnTcpIp) {
-    let XcpOnTcpIp {
-        tcp_ip_parameters:
-            TCP_IP_Parameters {
-                host_name,
-                address,
-                ipv6,
-                port,
-                ..
-            },
-        ..
-    } = xcp_on_tcp_ip;
+fn print_xcp_on_tcp_ip(tcp_ip_parameters: &TCP_IP_Parameters) {
     println!("  XCP on TCP/IP");
-    print_xcp_on_ip_common(host_name, address, ipv6, *port);
+    print_xcp_on_ip_common(
+        &tcp_ip_parameters.host_name,
+        &tcp_ip_parameters.address,
+        &tcp_ip_parameters.ipv6,
+        tcp_ip_parameters.port,
+    );
 }
 
-fn print_xcp_on_udp_ip(xcp_on_udp_ip: &XcpOnUdpIp) {
-    let XcpOnUdpIp {
-        udp_ip_parameters:
-            UDP_IP_Parameters {
-                host_name,
-                address,
-                ipv6,
-                port,
-                ..
-            },
-        ..
-    } = xcp_on_udp_ip;
+fn print_xcp_on_udp_ip(udp_ip_parameters: &UDP_IP_Parameters) {
     println!("  XCP on UDP/IP");
-    print_xcp_on_ip_common(host_name, address, ipv6, *port);
+    print_xcp_on_ip_common(
+        &udp_ip_parameters.host_name,
+        &udp_ip_parameters.address,
+        &udp_ip_parameters.ipv6,
+        udp_ip_parameters.port,
+    );
 }
 
 fn print_xcp_on_ip_common(
