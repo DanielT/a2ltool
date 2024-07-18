@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 2.1.0
+
+- Enable the use of response files on the command line, useing an @filename argument
+- display XCPplus parameters in --show-xcp
+
 ## Version 2.0.2
 
 - update to a2lfile 2.1.0
