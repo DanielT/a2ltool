@@ -1,6 +1,6 @@
 use crate::dwarf::{DwarfDataType, TypeInfo};
 use crate::ifdata;
-use a2lfile::IfData;
+use a2lfile::{A2lObject, IfData};
 
 // check if there is a CANAPE_EXT in the IF_DATA vec and update it if it exists
 pub(crate) fn update_ifdata(
@@ -29,6 +29,10 @@ fn update_ifdata_canape_ext(
     typeinfo: &TypeInfo,
 ) {
     if let Some(link_map) = &mut canape_ext.link_map {
+        if link_map.address == 0 {
+            // if the address was previously "0" then force it to be displayed as hex after the update
+            link_map.get_layout_mut().item_location.1.1 = true;
+        }
         link_map.address = address as i32;
         link_map.symbol_name = symbol_name.to_string();
         match &typeinfo.datatype {

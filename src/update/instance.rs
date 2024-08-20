@@ -96,6 +96,11 @@ fn update_instance_address<'a>(
             // make sure a valid SYMBOL_LINK exists
             let symbol_link_text = make_symbol_link_string(&sym_info, debug_data);
             set_symbol_link(&mut instance.symbol_link, symbol_link_text);
+
+            if instance.start_address == 0 {
+                // if the start address was previously "0" then force it to be displayed as hex after the update
+                instance.get_layout_mut().item_location.3.1 = true;
+            }
             instance.start_address = sym_info.address as u32;
 
             let typeinfo = sym_info

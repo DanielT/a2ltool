@@ -138,6 +138,10 @@ fn update_axis_pts_address<'a>(
                 axis_pts.symbol_link = None;
             }
 
+            if axis_pts.address == 0 {
+                // if the address was previously "0" then force it to be displayed as hex after the update
+                axis_pts.get_layout_mut().item_location.2.1 = true;
+            }
             axis_pts.address = sym_info.address as u32;
             update_ifdata(
                 &mut axis_pts.if_data,

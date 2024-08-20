@@ -272,6 +272,10 @@ pub(crate) fn set_matrix_dim(
 // this is created or updated here
 fn set_measurement_ecu_address(opt_ecu_address: &mut Option<EcuAddress>, address: u64) {
     if let Some(ecu_address) = opt_ecu_address {
+        if ecu_address.address == 0 {
+            // force hex output for the address, if the address was set as "0" (decimal)
+            ecu_address.get_layout_mut().item_location.0.1 = true;
+        }
         ecu_address.address = address as u32;
     } else {
         *opt_ecu_address = Some(EcuAddress::new(address as u32));

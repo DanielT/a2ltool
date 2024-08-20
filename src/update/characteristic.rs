@@ -247,6 +247,9 @@ fn update_characteristic_address<'a>(
                 characteristic.symbol_link = None;
             }
 
+            if characteristic.address == 0 {
+                characteristic.get_layout_mut().item_location.3.1 = true;
+            }
             characteristic.address = sym_info.address as u32;
             set_bitmask(&mut characteristic.bit_mask, sym_info.typeinfo);
             update_ifdata(
