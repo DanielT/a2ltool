@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 2.1.1
+
+- Bugfix: Don't fail to read DWARF type info if it contains any of the attributes packed, atomic, restrict, or immutable.
+- During update, set ECU_ADDRESSes that were "0" to hexadecimal display mode
+
 ## Version 2.1.0
 
 - Enable the use of response files on the command line, useing an @filename argument
