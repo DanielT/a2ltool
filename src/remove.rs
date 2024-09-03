@@ -11,8 +11,7 @@ pub(crate) fn remove_items(
         .iter()
         .map(|re| {
             // extend the regex to match only the whole string, not just a substring
-            let extended_regex =
-            if !re.starts_with('^') && !re.ends_with('$') {
+            let extended_regex = if !re.starts_with('^') && !re.ends_with('$') {
                 format!("^{re}$")
             } else {
                 re.to_string()

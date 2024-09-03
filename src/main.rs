@@ -273,11 +273,7 @@ fn core() -> Result<(), String> {
         for msg in log_msgs {
             cond_print!(verbose, now, msg);
         }
-        cond_print!(
-            verbose,
-            now,
-            format!("Removed {} items", removed_count)
-        );
+        cond_print!(verbose, now, format!("Removed {} items", removed_count));
     }
 
     if let Some(debugdata) = &elf_info {

@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 2.2.0
+
+- upgrade to a2lfile 2.2.0
+  - Bugfix: during merges, some items might be renamed to prevent name collisions, but not all references to renamed items were updated inside of TYPEDEF_*
+  - Successfully parse non-standard a2l files which contain hex-encoded integers where the parser expects a float value. (by @louiscaron)
+- Add the ability to remove items by regex. This will remove any CHARACTERISTIC, MEASUREMENT or INSTANCE whose name matches.
+  Removal happens before insertion, if both are done in the same run.
+- Change the behavior of insertion by regex: the regex must match the whole variable name, instead of any substring inside it.
+  This makes insertion more precise, but some regexes that worked previously will need to be extended with .*
+
 ## Version 2.1.1
 
 - Bugfix: Don't fail to read DWARF type info if it contains any of the attributes packed, atomic, restrict, or immutable.
