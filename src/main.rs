@@ -12,6 +12,7 @@ mod datatype;
 mod dwarf;
 mod ifdata;
 mod insert;
+mod remove;
 mod symbol;
 mod update;
 mod version;
@@ -258,6 +259,25 @@ fn core() -> Result<(), String> {
     if merge_includes {
         a2l_file.merge_includes();
         cond_print!(verbose, now, "Include directives have been merged\n");
+    }
+
+    // remove items if --remove was given
+    if arg_matches.contains_id("REMOVE_REGEX") {
+        let regexes: Vec<&str> = match arg_matches.get_many::<String>("REMOVE_REGEX") {
+            Some(values) => values.map(|x| &**x).collect(),
+            None => Vec::new(),
+        };
+
+        let mut log_msgs: Vec<String> = Vec::new();
+        let removed_count = remove::remove_items(&mut a2l_file, &regexes, &mut log_msgs);
+        for msg in log_msgs {
+            cond_print!(verbose, now, msg);
+        }
+        cond_print!(
+            verbose,
+            now,
+            format!("Removed {} items", removed_count)
+        );
     }
 
     if let Some(debugdata) = &elf_info {
@@ -767,6 +787,14 @@ fn get_args() -> ArgMatches {
         .number_of_values(1)
         .requires("INSERT_ARGGROUP")
         .value_name("GROUP")
+    )
+    .arg(Arg::new("REMOVE_REGEX")
+        .help("Remove any CHARACTERISTICs, MEASUREMENTs and INSTANCEs whose name matches the given regex.")
+        .short('R')
+        .long("remove")
+        .number_of_values(1)
+        .value_name("REGEX")
+        .action(clap::ArgAction::Append)
     )
     .group(
         ArgGroup::new("INPUT_ARGGROUP")
