@@ -483,13 +483,25 @@ pub(crate) fn insert_many<'param>(
     };
     // compile the regular expressions
     for expr in measurement_regexes {
-        match Regex::new(expr) {
+        // extend the regex to match only the whole string, not just a substring
+        let extended_regex = if !expr.starts_with('^') && !expr.ends_with('$') {
+            format!("^{expr}$")
+        } else {
+            expr.to_string()
+        };
+        match Regex::new(&extended_regex) {
             Ok(compiled_re) => isupp.compiled_meas_re.push(compiled_re),
             Err(error) => println!("Invalid regex \"{expr}\": {error}"),
         }
     }
     for expr in characteristic_regexes {
-        match Regex::new(expr) {
+        // extend the regex to match only the whole string, not just a substring
+        let extended_regex = if !expr.starts_with('^') && !expr.ends_with('$') {
+            format!("^{expr}$")
+        } else {
+            expr.to_string()
+        };
+        match Regex::new(&extended_regex) {
             Ok(compiled_re) => isupp.compiled_char_re.push(compiled_re),
             Err(error) => println!("Invalid regex \"{expr}\": {error}"),
         }
