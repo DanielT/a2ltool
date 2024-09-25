@@ -421,3 +421,15 @@ pub(crate) fn get_type_attribute(
         _ => Err("failed to get DIE tree".to_string()),
     }
 }
+
+// get the DW_AT_declaration attribute
+pub(crate) fn get_declaration_attribute(
+    entry: &DebuggingInformationEntry<SliceType, usize>,
+) -> Option<bool> {
+    let decl_attr = get_attr_value(entry, gimli::constants::DW_AT_declaration)?;
+    if let gimli::AttributeValue::Flag(flag) = decl_attr {
+        Some(flag)
+    } else {
+        None
+    }
+}

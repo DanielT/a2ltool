@@ -114,6 +114,21 @@ impl DebugDataReader<'_> {
         let entries_tree_node = entries_tree.root().map_err(|err| err.to_string())?;
         let entry = entries_tree_node.entry();
         let typename = get_name_attribute(entry, &self.dwarf, unit).ok();
+        let is_declaration = get_declaration_attribute(entry).unwrap_or(false);
+
+        if is_declaration {
+            // This is a declaration, not a definition. This happens when a type is declared but not defined
+            // e.g. "struct foo;" in a header file.
+            // We can't do anything with this - return a dummy type, and don't store it in the types map.
+            return Ok(TypeInfo {
+                datatype: DwarfDataType::Other(0),
+                name: typename,
+                unit_idx: current_unit,
+                dbginfo_offset: dbginfo_offset.0,
+            });
+        }
+
+        // track in-progress items to prevent infinite recursion
         typereader_data.wip_items.push(WipItemInfo::new(
             dbginfo_offset.0,
             typename.clone(),
