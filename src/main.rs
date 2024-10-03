@@ -63,7 +63,10 @@ macro_rules! ext_println {
 fn main() {
     match core() {
         Ok(()) => {}
-        Err(err) => println!("{err}"),
+        Err(err) => {
+            println!("{err}");
+            std::process::exit(1);
+        }
     }
 }
 
@@ -167,6 +170,11 @@ fn core() -> Result<(), String> {
                     log_msgs.len()
                 )
             );
+
+            // in strict mode, exit with error if there are any problems
+            if strict {
+                return Err("Exiting because strict mode is enabled.".to_string());
+            }
         }
     }
 
@@ -202,34 +210,41 @@ fn core() -> Result<(), String> {
 
     // merge at the module level
     if let Some(merge_modules) = arg_matches.get_many::<OsString>("MERGEMODULE") {
-        for mergemodule in merge_modules {
-            let mut merge_log_msgs = Vec::<A2lError>::new();
-            let mergeresult = a2lfile::load(mergemodule, None, &mut merge_log_msgs, strict);
-            if let Ok(mut merge_a2l) = mergeresult {
+        for merge_module_path in merge_modules {
+            let mut load_log_msgs = Vec::<A2lError>::new();
+            let load_result = a2lfile::load(merge_module_path, None, &mut load_log_msgs, strict);
+
+            if let Ok(mut merge_a2l) = load_result {
+                // display any log messages from the load
+                for msg in load_log_msgs {
+                    cond_print!(verbose, now, msg.to_string());
+                }
+                // merge the module
                 a2l_file.merge_modules(&mut merge_a2l);
                 cond_print!(
                     verbose,
                     now,
                     format!(
                         "Merged A2l objects from \"{}\"\n",
-                        mergemodule.to_string_lossy()
+                        merge_module_path.to_string_lossy()
                     )
                 );
-            } else if let Ok(mut other_module) = a2lfile::load_fragment_file(mergemodule) {
+            } else if let Ok(mut other_module) = a2lfile::load_fragment_file(merge_module_path) {
+                // failed to load the file as a full A2L file, but loaded it as a module fragment
                 a2l_file.project.module[0].merge(&mut other_module);
                 cond_print!(
                     verbose,
                     now,
                     format!(
                         "Merged A2l objects from \"{}\"\n",
-                        mergemodule.to_string_lossy()
+                        merge_module_path.to_string_lossy()
                     )
                 );
             } else {
                 return Err(format!(
                     "Failed to load \"{}\" for merging: {}\n",
-                    mergemodule.to_string_lossy(),
-                    mergeresult.unwrap_err()
+                    merge_module_path.to_string_lossy(),
+                    load_result.unwrap_err()
                 ));
             }
         }
