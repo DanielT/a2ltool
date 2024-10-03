@@ -7,6 +7,7 @@ A tool to edit, merge and update a2l files
 - update the addresses of measurement variables and tunable parameters (characteristics) based on the elf file containing the compiled embedded application
 - merge multiple a2l files into a single file
 - add new measurements or characteristics based on the elf file
+- check a2l files for consistency
 - display XCP connection parameters embedded in the a2l file, if any exist
 - maintain the formatting and ordering of items in the a2l file during manipulation, so that the diff between the original and the updated/modified file is as small as possible
 - Supports files up to a2l version 1.71 (current)
@@ -48,6 +49,10 @@ A tool to edit, merge and update a2l files
 ### Change the version of an a2l file, while deleting any incompatible elements
 
 `a2ltool input.a2l --a2lversion 1.5.1 --output downgraded.a2l`
+
+### Check an a2lfile for consistency
+
+`a2ltool input.a2l --check --strict`
 
 ### Use response files containing command arguments
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## Version 2.3.0
+
+- Bugfix: Handle the case of incomplete DWARF type info
+  C allows incomplete type declarations. For example "struct foo;" without a definition only tells the compiler that his type exists, and results in a stub type entry with the attribute DW_AT_declaration in the DWARF data.
+- upgrade to a2lfile 2.3.1
+  - change the behavior of merge for GROUPS and FUNCTION
+    Previously, if two GROUPS in a merge had the same name, then the incoming group was renamed with the suffix ".MERGE".
+    Now the content for GROUPs/FUNCTIONs with the same name is combined.
+  - a2l checker improvements: fix several bugs, and handle some additional cases
+- In strict mode, any problems detected by `--check` now cause a2ltool to exit with an error code.
+  Outside of strict mode, `--check` remains informational.
+
 ## Version 2.2.0
 
 - upgrade to a2lfile 2.2.0
@@ -8,7 +20,7 @@
 - Add the ability to remove items by regex. This will remove any CHARACTERISTIC, MEASUREMENT or INSTANCE whose name matches.
   Removal happens before insertion, if both are done in the same run.
 - Change the behavior of insertion by regex: the regex must match the whole variable name, instead of any substring inside it.
-  This makes insertion more precise, but some regexes that worked previously will need to be extended with .*
+  This makes insertion more precise, but some regexes that worked previously will need to be extended with `.*`
 
 ## Version 2.1.1
 
@@ -17,14 +29,14 @@
 
 ## Version 2.1.0
 
-- Enable the use of response files on the command line, useing an @filename argument
-- display XCPplus parameters in --show-xcp
+- Enable the use of response files on the command line, using an `@filename` argument
+- display XCPplus parameters in `--show-xcp`
 
 ## Version 2.0.2
 
 - update to a2lfile 2.1.0
-  - add handling for /include inside A2ML (by @louiscaron)
-  - fix multi-level /include inside A2L
+  - add handling for `/include` inside A2ML (by @louiscaron)
+  - fix multi-level `/include` inside A2L
 
 ## Version 2.0.1
 
@@ -37,7 +49,7 @@
 - upgrade to a2lfile 2.0.0
   - fix the definition of AR_COMPONENT
   - don't remove valid elements during cleanup
-- Create and update INSTANCEs and TYPEDEF_MEASUREMENTs if the file version is 1.7.1 and --enable-structures is set
+- Create and update INSTANCEs and TYPEDEF_MEASUREMENTs if the file version is 1.7.1 and `--enable-structures` is set
 - Insert whole arrays of MEASUREMENTs and CHARACTERISTICs instead of separate items for each element if the array elements have a simple datatype
 - Items can now be inserted based on the containing elf section
 - Debug data reader improvements - extracted information should now be better and more complete
@@ -74,7 +86,7 @@ Previous versions were unable to handle some strings with double "" escapes, e.g
 
 ## Version 1.4.3
 
-Improve the formatting of the --help message by
+Improve the formatting of the `--help` message by
 
 - enabling color
 - enabling automatic wrapping of the descriptons
@@ -85,7 +97,7 @@ Add basic usage examples to the README, since some people seemed confused
 
 Upgrade to the a2lfile crate version 1.3.3. This brings:
 
-- The double quotes around filenames in /include are no longer mandatory; quotes are only required if the path contains spaces.
+- The double quotes around filenames in `/include` are no longer mandatory; quotes are only required if the path contains spaces.
   Fixed by @jl-rbpt
 - The a2ml parser had a bug that prevented the datatype uint64 from being recognized
 - Handling of USER_RIGHTS block during merging is improved, so that duplicate blocks will not be created any more
@@ -116,27 +128,27 @@ Upgrade to the a2lfile crate version 1.3.0. This brings:
 
 ## Version 1.2.0
 
-- add --cleanup wich cleans up unused or useless items in the file
+- add `--cleanup` wich cleans up unused or useless items in the file
    It removes empty groups and functions, as well as unused compu_methods, compu_tabs, record_layouts and units.
-- add --target-group which allows new items created by --measurement[...] and --characteristic[...] to be directly added to a group
+- add `--target-group` which allows new items created by `--measurement[...]` and `--characteristic[...]` to be directly added to a group
 - minor formatting improvements
 
 ## Version 1.1.0
 
-- rename --insert-characteristic to --characteristic and --insert-measurement to --measurement.
-   The old nemaes remain as aliases, though they are not shown by --help
-- add --measurement-range and --characteristic-range. Each of these takes a start address and
+- rename `--insert-characteristic` to `--characteristic` and `--insert-measurement` to `--measurement`.
+   The old names remain as aliases, though they are not shown by `--help`.
+- add `--measurement-range` and `--characteristic-range`. Each of these takes a start address and
    an end address and inserts all variables found in this range into the a2l file.
-- add --measurement-regex and --characteristic-regex. Each of these takes a regex pattern.
+- add `--measurement-regex` and `--characteristic-regex`. Each of these takes a regex pattern.
    Any variable matching the pattern will be inserted into the a2l file.
-   Example: [...] --characteristic-regex "TuningData" [...] would insert TuningData1 and TuningData2, and also DefaultTuningData
-   Example: [...] --measurement-regex "^TestVar\\.\_0\_.*" [...] would insert TestVar.\_0_.member, but not TestVar.\_1_.member
+   Example: `[...] --characteristic-regex "TuningData" [...]` would insert TuningData1 and TuningData2, and also DefaultTuningData
+   Example: `[...] --measurement-regex "^TestVar\._0_.*" [...]` would insert TestVar.\_0_.member, but not TestVar.\_1_.member
 - Bugfix: the output path is no longer restricted to valid utf-8
 
 ## Version 1.0.1
 
 - fix a bug where referring to array elements using angle brackets (array[0]) did not work corrctly
-- fix a bug in --insert-characteristic and --insert-measurement where these could only reference variables, but not array elements or struct members
+- fix a bug in `--insert-characteristic` and `--insert-measurement` where these could only reference variables, but not array elements or struct members
 - allow creating new a2l files using the option --create
 
 ## Version 1.0.0
