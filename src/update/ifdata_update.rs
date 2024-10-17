@@ -88,10 +88,10 @@ fn update_ifdata_canape_ext(
             }
             DwarfDataType::Enum { size, .. } => {
                 match *size {
-                    1 => link_map.datatype = 0x87,
-                    2 => link_map.datatype = 0x8f,
-                    4 => link_map.datatype = 0x8f,
-                    8 => link_map.datatype = 0xbf,
+                    1 => link_map.datatype = 0x87, // 0x40 | 0x07 -> unsigned, 8 bits
+                    2 => link_map.datatype = 0x8f, // 0x40 | 0x0f -> unsigned, 16 bits
+                    4 => link_map.datatype = 0x9f, // 0x40 | 0x1f -> unsigned, 32 bits
+                    8 => link_map.datatype = 0xbf, // 0x40 | 0x3f -> unsigned, 64 bits
                     _ => link_map.datatype = 0,
                 }
                 link_map.bit_offset = 0;
