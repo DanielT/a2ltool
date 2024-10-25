@@ -2164,6 +2164,8 @@ mod test {
             debug_data: &debug_data,
             log_msgs: &mut log_msgs,
             preserve_unknown: false,
+            strict_update: false,
+            full_update: true,
             version,
             reclayout_info: reclayout,
         };

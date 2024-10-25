@@ -27,6 +27,19 @@ use measurement::*;
 use record_layout::*;
 use typedef::update_module_typedefs;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UpdateType {
+    Full,
+    Addresses,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UpdateMode {
+    Default,
+    Strict,
+    Preserve,
+}
+
 pub(crate) struct UpdateSumary {
     pub(crate) measurement_updated: u32,
     pub(crate) measurement_not_updated: u32,
@@ -59,6 +72,8 @@ pub(crate) struct UpdateInfo<'a2l, 'dbg, 'log> {
     pub(crate) debug_data: &'dbg DebugData,
     pub(crate) log_msgs: &'log mut Vec<String>,
     pub(crate) preserve_unknown: bool,
+    pub(crate) strict_update: bool,
+    pub(crate) full_update: bool,
     pub(crate) version: A2lVersion,
     pub(crate) reclayout_info: RecordLayoutInfo,
 }
@@ -68,14 +83,18 @@ type TypedefsRefInfo<'a> = HashMap<String, Vec<(Option<&'a TypeInfo>, TypedefRef
 // perform an address update.
 // This update can be destructive (any object that cannot be updated will be discarded)
 // or non-destructive (addresses of invalid objects will be set to zero).
-pub(crate) fn update_addresses(
+pub(crate) fn update_a2l(
     a2l_file: &mut A2lFile,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
-    preserve_unknown: bool,
+    update_type: UpdateType,
+    update_mode: UpdateMode,
     enable_structures: bool,
 ) -> UpdateSumary {
     let version = A2lVersion::from(&*a2l_file);
+    let preserve_unknown = update_mode == UpdateMode::Preserve;
+    let strict_update = update_mode == UpdateMode::Strict;
+    let full_update = update_type == UpdateType::Full;
 
     let mut summary = UpdateSumary::new();
     for module in &mut a2l_file.project.module {
@@ -85,6 +104,8 @@ pub(crate) fn update_addresses(
             debug_data,
             log_msgs,
             preserve_unknown,
+            strict_update,
+            full_update,
             version,
             reclayout_info,
         };
@@ -113,8 +134,7 @@ pub(crate) fn update_addresses(
         summary.characteristic_not_updated += not_updated;
 
         // update all BLOBs
-        let (updated, not_updated) =
-            update_module_blobs(info.module, debug_data, info.log_msgs, preserve_unknown);
+        let (updated, not_updated) = update_module_blobs(&mut info);
         summary.blob_updated += updated;
         summary.blob_not_updated += not_updated;
 
@@ -126,7 +146,7 @@ pub(crate) fn update_addresses(
         summary.instance_updated += updated;
         summary.instance_not_updated += not_updated;
 
-        if enable_structures {
+        if full_update && enable_structures {
             update_module_typedefs(
                 &mut info,
                 typedef_ref_info,
@@ -274,7 +294,7 @@ fn set_measurement_ecu_address(opt_ecu_address: &mut Option<EcuAddress>, address
     if let Some(ecu_address) = opt_ecu_address {
         if ecu_address.address == 0 {
             // force hex output for the address, if the address was set as "0" (decimal)
-            ecu_address.get_layout_mut().item_location.0.1 = true;
+            ecu_address.get_layout_mut().item_location.0 .1 = true;
         }
         ecu_address.address = address as u32;
     } else {

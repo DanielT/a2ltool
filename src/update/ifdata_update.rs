@@ -3,30 +3,29 @@ use crate::ifdata;
 use a2lfile::{A2lObject, IfData};
 
 // check if there is a CANAPE_EXT in the IF_DATA vec and update it if it exists
-pub(crate) fn update_ifdata(
+pub(crate) fn update_ifdata_address(
     ifdata_vec: &mut Vec<IfData>,
     symbol_name: &str,
-    datatype: &TypeInfo,
     address: u64,
 ) {
     for ifdata in ifdata_vec {
         if let Some(mut decoded_ifdata) = ifdata::A2mlVector::load_from_ifdata(ifdata) {
             if let Some(canape_ext) = &mut decoded_ifdata.canape_ext {
-                update_ifdata_canape_ext(canape_ext, address, symbol_name, datatype);
+                update_ifdata_address_canape_ext(canape_ext, address, symbol_name);
                 decoded_ifdata.store_to_ifdata(ifdata);
             } else if let Some(asap1b_ccp) = &mut decoded_ifdata.asap1b_ccp {
-                update_ifdata_asap1b_ccp(asap1b_ccp, address, datatype);
+                update_ifdata_address_asap1b_ccp(asap1b_ccp, address);
                 decoded_ifdata.store_to_ifdata(ifdata);
             }
         }
     }
 }
 
-fn update_ifdata_canape_ext(
+
+fn update_ifdata_address_canape_ext(
     canape_ext: &mut ifdata::CanapeExt,
     address: u64,
     symbol_name: &str,
-    typeinfo: &TypeInfo,
 ) {
     if let Some(link_map) = &mut canape_ext.link_map {
         if link_map.address == 0 {
@@ -35,6 +34,46 @@ fn update_ifdata_canape_ext(
         }
         link_map.address = address as i32;
         link_map.symbol_name = symbol_name.to_string();
+        // these can be set to valid values later on by update_ifdata_type_canape_ext
+        link_map.datatype = 0;
+        link_map.bit_offset = 0;
+        link_map.datatype_valid = 0;
+    }
+}
+
+
+fn update_ifdata_address_asap1b_ccp(asap1b_ccp: &mut ifdata::Asap1bCcp, address: u64) {
+    if let Some(dp_blob) = &mut asap1b_ccp.dp_blob {
+        dp_blob.address_extension = 0;
+        dp_blob.base_address = address as u32;
+        dp_blob.size = 0;
+    }
+}
+
+
+// check if there is a CANAPE_EXT in the IF_DATA vec and update it if it exists
+pub(crate) fn update_ifdata_type(
+    ifdata_vec: &mut Vec<IfData>,
+    datatype: &TypeInfo,
+) {
+    for ifdata in ifdata_vec {
+        if let Some(mut decoded_ifdata) = ifdata::A2mlVector::load_from_ifdata(ifdata) {
+            if let Some(canape_ext) = &mut decoded_ifdata.canape_ext {
+                update_ifdata_type_canape_ext(canape_ext, datatype);
+                decoded_ifdata.store_to_ifdata(ifdata);
+            } else if let Some(asap1b_ccp) = &mut decoded_ifdata.asap1b_ccp {
+                update_ifdata_type_asap1b_ccp(asap1b_ccp, datatype);
+                decoded_ifdata.store_to_ifdata(ifdata);
+            }
+        }
+    }
+}
+
+fn update_ifdata_type_canape_ext(
+    canape_ext: &mut ifdata::CanapeExt,
+    typeinfo: &TypeInfo,
+) {
+    if let Some(link_map) = &mut canape_ext.link_map {
         match &typeinfo.datatype {
             DwarfDataType::Uint8 => {
                 link_map.datatype = 0x87;
@@ -114,7 +153,7 @@ fn update_ifdata_canape_ext(
                 link_map.datatype_valid = 1;
             }
             DwarfDataType::Array { arraytype, .. } => {
-                update_ifdata_canape_ext(canape_ext, address, symbol_name, arraytype);
+                update_ifdata_type_canape_ext(canape_ext, arraytype);
             }
             _ => {
                 link_map.datatype = 0;
@@ -125,11 +164,8 @@ fn update_ifdata_canape_ext(
     }
 }
 
-fn update_ifdata_asap1b_ccp(asap1b_ccp: &mut ifdata::Asap1bCcp, address: u64, typeinfo: &TypeInfo) {
+fn update_ifdata_type_asap1b_ccp(asap1b_ccp: &mut ifdata::Asap1bCcp, typeinfo: &TypeInfo) {
     if let Some(dp_blob) = &mut asap1b_ccp.dp_blob {
-        dp_blob.address_extension = 0;
-        dp_blob.base_address = address as u32;
-
         match &typeinfo.datatype {
             DwarfDataType::Uint8 | DwarfDataType::Sint8 => dp_blob.size = 1,
             DwarfDataType::Uint16 | DwarfDataType::Sint16 => dp_blob.size = 2,
@@ -140,6 +176,9 @@ fn update_ifdata_asap1b_ccp(asap1b_ccp: &mut ifdata::Asap1bCcp, address: u64, ty
                 dp_blob.size = 8;
             }
             DwarfDataType::Enum { size, .. } => dp_blob.size = *size as u32,
+            DwarfDataType::Array { arraytype, .. } => {
+                update_ifdata_type_asap1b_ccp(asap1b_ccp, arraytype);
+            }
             _ => {
                 // size is not set because we don't know
                 // for example if the datatype is Struct, then the record_layout must be taken into the calculation

@@ -1,5 +1,7 @@
+use crate::datatype::get_a2l_datatype;
 use crate::dwarf::DwarfDataType;
 use crate::dwarf::{DebugData, TypeInfo};
+use crate::symbol::SymbolInfo;
 use crate::A2lVersion;
 use a2lfile::{A2lObject, AxisDescr, Characteristic, CharacteristicType, Module, RecordLayout};
 use std::collections::HashMap;
@@ -9,7 +11,7 @@ use crate::update::{
     adjust_limits, cleanup_item_list,
     enums::{cond_create_enum_conversion, update_enum_compu_methods},
     get_fnc_values_memberid, get_inner_type, get_symbol_info,
-    ifdata_update::{update_ifdata, zero_if_data},
+    ifdata_update::{update_ifdata_address, update_ifdata_type, zero_if_data},
     log_update_errors, make_symbol_link_string, set_bitmask, set_matrix_dim, set_symbol_link,
     update_record_layout, RecordLayoutInfo, UpdateInfo,
 };
@@ -36,20 +38,50 @@ pub(crate) fn update_module_characteristics(
     for mut characteristic in characteristic_list {
         if characteristic.virtual_characteristic.is_none() {
             // only update the address if the CHARACTERISTIC is not a VIRTUAL_CHARACTERISTIC
-            match update_characteristic_address(&mut characteristic, info.debug_data, info.version)
-            {
-                Ok(typeinfo) => {
-                    // update as much as possible of the information inside the CHARACTERISTIC
-                    update_characteristic_information(
-                        info.module,
-                        &mut info.reclayout_info,
+            match get_symbol_info(
+                &characteristic.name,
+                &characteristic.symbol_link,
+                &characteristic.if_data,
+                info.debug_data,
+            ) {
+                Ok(sym_info) => {
+                    update_characteristic_address(
                         &mut characteristic,
-                        typeinfo,
-                        &mut enum_convlist,
-                        &axis_pts_dim,
-                        info.version >= A2lVersion::V1_7_0,
-                        compu_method_index,
+                        info.debug_data,
+                        info.version,
+                        &sym_info,
                     );
+
+                    update_ifdata_address(
+                        &mut characteristic.if_data,
+                        &sym_info.name,
+                        sym_info.address,
+                    );
+
+                    if info.full_update {
+                        // update the data type of the CHARACTERISTIC object
+                        update_ifdata_type(&mut characteristic.if_data, sym_info.typeinfo);
+
+                        // update as much as possible of the information inside the CHARACTERISTIC
+                        update_characteristic_datatype(
+                            info.module,
+                            &mut info.reclayout_info,
+                            &mut characteristic,
+                            sym_info.typeinfo,
+                            &mut enum_convlist,
+                            &axis_pts_dim,
+                            info.version >= A2lVersion::V1_7_0,
+                            compu_method_index,
+                        );
+                    } else if info.strict_update {
+                        // verify that the data type of the CHARACTERISTIC object is still correct
+                        verify_characteristic_datatype(
+                            info,
+                            &characteristic,
+                            sym_info,
+                            compu_method_index,
+                        );
+                    }
 
                     info.module.characteristic.push(characteristic);
                     characteristic_updated += 1;
@@ -86,9 +118,30 @@ pub(crate) fn update_module_characteristics(
     (characteristic_updated, characteristic_not_updated)
 }
 
+// update the address of a CHARACTERISTIC
+fn update_characteristic_address<'dbg>(
+    characteristic: &mut Characteristic,
+    debug_data: &'dbg DebugData,
+    version: A2lVersion,
+    sym_info: &SymbolInfo<'dbg>,
+) {
+    if version >= A2lVersion::V1_6_0 {
+        // make sure a valid SYMBOL_LINK exists
+        let symbol_link_text = make_symbol_link_string(&sym_info, debug_data);
+        set_symbol_link(&mut characteristic.symbol_link, symbol_link_text);
+    } else {
+        characteristic.symbol_link = None;
+    }
+
+    if characteristic.address == 0 {
+        characteristic.get_layout_mut().item_location.3 .1 = true;
+    }
+    characteristic.address = sym_info.address as u32;
+}
+
 // update as much as possible of the information inside the CHARACTERISTIC
 #[allow(clippy::too_many_arguments)]
-fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
+fn update_characteristic_datatype<'enumlist, 'typeinfo: 'enumlist>(
     module: &mut Module,
     recordlayout_info: &mut RecordLayoutInfo,
     characteristic: &mut Characteristic,
@@ -123,6 +176,8 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
         );
         characteristic.lower_limit = ll;
         characteristic.upper_limit = ul;
+
+        set_bitmask(&mut characteristic.bit_mask, inner_typeinfo);
     }
 
     // Patch up incomplete characteristics: Curve, Map, Cuboid, Cube4 and Cube5 all require AXIS_DESCR to function correctly
@@ -142,7 +197,11 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
     if characteristic.characteristic_type == CharacteristicType::Value
         || characteristic.characteristic_type == CharacteristicType::ValBlk
     {
-        set_matrix_dim(&mut characteristic.matrix_dim, typeinfo, use_new_matrix_dim);
+        set_matrix_dim(
+            &mut characteristic.matrix_dim,
+            typeinfo,
+            use_new_matrix_dim,
+        );
         // arrays of values should have the type ValBlk, while single values should NOT have the type ValBlk
         if characteristic.characteristic_type == CharacteristicType::Value
             && characteristic.matrix_dim.is_some()
@@ -165,6 +224,7 @@ fn update_characteristic_information<'enumlist, 'typeinfo: 'enumlist>(
     } else {
         None
     };
+
     update_characteristic_axis(
         &mut characteristic.axis_descr,
         record_layout,
@@ -226,42 +286,106 @@ pub(crate) fn update_characteristic_axis(
     }
 }
 
-// update the address of a CHARACTERISTIC
-fn update_characteristic_address<'a>(
-    characteristic: &mut Characteristic,
-    debug_data: &'a DebugData,
-    version: A2lVersion,
-) -> Result<&'a TypeInfo, Vec<String>> {
-    match get_symbol_info(
-        &characteristic.name,
-        &characteristic.symbol_link,
-        &characteristic.if_data,
-        debug_data,
-    ) {
-        Ok(sym_info) => {
-            if version >= A2lVersion::V1_6_0 {
-                // make sure a valid SYMBOL_LINK exists
-                let symbol_link_text = make_symbol_link_string(&sym_info, debug_data);
-                set_symbol_link(&mut characteristic.symbol_link, symbol_link_text);
-            } else {
-                characteristic.symbol_link = None;
+fn verify_characteristic_datatype<'dbg>(
+    info: &mut UpdateInfo<'_, 'dbg, '_>,
+    characteristic: &Characteristic,
+    sym_info: SymbolInfo<'dbg>,
+    compu_method_index: &HashMap<String, usize>,
+) {
+    let mut bad_characteristic = false;
+    let member_id =
+        get_fnc_values_memberid(&info.module, &info.reclayout_info, &characteristic.deposit);
+    if let Some(inner_typeinfo) = get_inner_type(sym_info.typeinfo, member_id) {
+        if let DwarfDataType::Enum { .. } = &inner_typeinfo.datatype {
+            if characteristic.conversion == "NO_COMPU_METHOD" {
+                bad_characteristic = true;
             }
-
-            if characteristic.address == 0 {
-                characteristic.get_layout_mut().item_location.3.1 = true;
-            }
-            characteristic.address = sym_info.address as u32;
-            set_bitmask(&mut characteristic.bit_mask, sym_info.typeinfo);
-            update_ifdata(
-                &mut characteristic.if_data,
-                &sym_info.name,
-                sym_info.typeinfo,
-                sym_info.address,
-            );
-
-            Ok(sym_info.typeinfo)
         }
-        Err(errmsgs) => Err(errmsgs),
+
+        let opt_compu_method = compu_method_index
+            .get(&characteristic.conversion)
+            .and_then(|idx| info.module.compu_method.get(*idx));
+        let (ll, ul) = adjust_limits(
+            inner_typeinfo,
+            characteristic.lower_limit,
+            characteristic.upper_limit,
+            opt_compu_method,
+        );
+        if ll != characteristic.lower_limit || ul != characteristic.upper_limit {
+            bad_characteristic = true;
+        }
+
+        let mut dummy_bitmask = characteristic.bit_mask.clone();
+        set_bitmask(&mut dummy_bitmask, inner_typeinfo);
+
+        let mut dummy_matrix_dim = characteristic.matrix_dim.clone();
+        match characteristic.characteristic_type {
+            CharacteristicType::Value => {
+                // a scalar value should not have a matrix dimension, either before or after the update
+                set_matrix_dim(&mut dummy_matrix_dim, inner_typeinfo, false);
+                if dummy_matrix_dim.is_some()
+                    || characteristic.matrix_dim.is_some()
+                    || characteristic.number.is_some()
+                {
+                    bad_characteristic = true;
+                }
+            }
+            CharacteristicType::ValBlk => {
+                // the matrix dim of a ValBlk must exist and remain unchanged
+                set_matrix_dim(&mut dummy_matrix_dim, inner_typeinfo, false);
+                if characteristic.matrix_dim.is_none()
+                    || dummy_matrix_dim != characteristic.matrix_dim
+                {
+                    bad_characteristic = true;
+                }
+            }
+            CharacteristicType::Map
+            | CharacteristicType::Curve
+            | CharacteristicType::Cuboid
+            | CharacteristicType::Cube4
+            | CharacteristicType::Cube5 => {
+                // map ... cube5 should each have axis_descr describing their axes
+                if characteristic.axis_descr.is_empty() {
+                    bad_characteristic = true;
+                }
+            }
+            CharacteristicType::Ascii => {
+                // no extra checks for ASCII
+            }
+        }
+
+        // check if the data type of the deposit record is correct
+        // to do this, we need to look up the record layout, and get its fnc_values
+        if let Some(fnc_values) = info
+            .reclayout_info
+            .idxmap
+            .get(&characteristic.deposit)
+            .and_then(|rl_idx| info.module.record_layout.get(*rl_idx))
+            .and_then(|rl| rl.fnc_values.as_ref())
+        {
+            let a2l_datatype = get_a2l_datatype(inner_typeinfo);
+            if a2l_datatype != fnc_values.datatype {
+                bad_characteristic = true;
+            }
+        } else {
+            // no record layout found, or no fnc_values in the record layout: the characteristic is invalid
+            bad_characteristic = true;
+        }
+    } else {
+        // no inner type found: the characteristic is invalid
+        bad_characteristic = true;
+    }
+
+    if bad_characteristic {
+        log_update_errors(
+            info.log_msgs,
+            vec![format!(
+                "Data type of CHARACTERISTIC {} is not correct",
+                characteristic.name
+            )],
+            "CHARACTERISTIC",
+            characteristic.get_line(),
+        );
     }
 }
 

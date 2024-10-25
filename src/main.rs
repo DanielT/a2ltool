@@ -7,6 +7,7 @@ use std::{
     fmt::Display,
     time::Instant,
 };
+use update::{UpdateMode, UpdateType};
 
 mod datatype;
 mod dwarf;
@@ -97,12 +98,6 @@ fn core() -> Result<(), String> {
     let show_xcp = *arg_matches
         .get_one::<bool>("SHOW_XCP")
         .expect("option show-xcp must always exist");
-    let update = *arg_matches
-        .get_one::<bool>("UPDATE")
-        .expect("option update must always exist");
-    let update_preserve = *arg_matches
-        .get_one::<bool>("SAFE_UPDATE")
-        .expect("option update-preserve must always exist");
     let enable_structures = *arg_matches
         .get_one::<bool>("ENABLE_STRUCTURES")
         .expect("option enable-structures must always exist");
@@ -119,6 +114,7 @@ fn core() -> Result<(), String> {
         .get_one::<bool>("MERGEINCLUDES")
         .expect("option merge-includes must always exist");
     let verbose = arg_matches.get_count("VERBOSE");
+    let opt_update_type = arg_matches.get_one::<UpdateType>("UPDATE_TYPE");
 
     let now = Instant::now();
     cond_print!(
@@ -293,18 +289,27 @@ fn core() -> Result<(), String> {
 
     if let Some(debugdata) = &elf_info {
         // update addresses
-        if update || update_preserve {
+        if let Some(update_type) = opt_update_type {
+            let update_mode = arg_matches.get_one::<UpdateMode>("UPDATE_MODE").unwrap_or(&UpdateMode::Default);
+
             let mut log_msgs = Vec::<String>::new();
-            let summary = update::update_addresses(
+            let summary = update::update_a2l(
                 &mut a2l_file,
                 debugdata,
                 &mut log_msgs,
-                update_preserve,
+                *update_type,
+                *update_mode,
                 enable_structures,
             );
 
-            for msg in log_msgs {
-                cond_print!(verbose, now, msg);
+            // force the display of messages if strict mode is on, but verbose is not
+            let show_messages = if verbose > 0 || update_mode != &UpdateMode::Strict {
+                verbose
+            } else {
+                1
+            };
+            for msg in &log_msgs {
+                cond_print!(show_messages, now, msg);
             }
 
             cond_print!(verbose, now, "Address update done\nSummary:");
@@ -348,6 +353,11 @@ fn core() -> Result<(), String> {
                     summary.instance_updated, summary.instance_not_updated
                 )
             );
+
+            // in strict mode, exit with error if there are any problems
+            if update_mode == &UpdateMode::Strict && !log_msgs.is_empty() {
+                return Err("Exiting because strict mode is enabled.".to_string());
+            }
         }
 
         // create new items
@@ -640,21 +650,34 @@ fn get_args() -> ArgMatches {
         .number_of_values(0)
         .action(clap::ArgAction::SetTrue)
     )
-    .arg(Arg::new("UPDATE")
-        .help("Update the addresses of all objects in the A2L file based on the elf file.\nObjects that cannot be found in the elf file will be deleted.\nThe arg --elffile must be present.")
+    .arg(Arg::new("UPDATE_TYPE")
+        .help("Update the A2L file based on the elf file. The update type can be one of:
+  FULL: Update the address and type info of all items. This is the default.
+  ADDRESSES: Update only the addresses.
+The arg --elffile must be present.")
         .short('u')
         .long("update")
-        .number_of_values(0)
-        .action(clap::ArgAction::SetTrue)
+        .value_parser(UpdateTypeParser)
+        .num_args(0..=1)
+        .action(clap::ArgAction::Append)
+        .default_missing_value("FULL")
         .requires("ELFFILE")
     )
-    .arg(Arg::new("SAFE_UPDATE")
-        .help("Update the addresses of all objects in the A2L file based on the elf file.\nObjects that cannot be found in the elf file will be preserved; their adresses will be set to zero.\nThe arg --elffile must be present.")
-        .long("update-preserve")
-        .number_of_values(0)
-        .action(clap::ArgAction::SetTrue)
+    .arg(Arg::new("UPDATE_MODE")
+        .help("Update the A2L file based on the elf file. Action can be one of:
+  DEFAULT: Unknown objects are removed, invalid settings are updated.
+  STRICT: Unknown objects or invalid settings trigger an error.
+  PRESERVE: Unknown objects are preserved, with the address set to zero.
+The arg --update must be present.")
+        .long("update-mode")
+        .value_parser(UpdateModeParser)
+        .num_args(0..=1)
+        .action(clap::ArgAction::Append)
+        .default_missing_value("DEFAULT")
         .requires("ELFFILE")
+        .requires("UPDATE_TYPE")
     )
+    
     .arg(Arg::new("ENABLE_STRUCTURES")
         .help("Enable the the use of INSTANCE, TYPEDEF_STRUCTURE & co. for all operations. Requires a2l version 1.7.1")
         .short('t')
@@ -814,11 +837,6 @@ fn get_args() -> ArgMatches {
             .required(true)
      )
     .group(
-        ArgGroup::new("UPDATE_ARGGROUP")
-            .args(["UPDATE", "SAFE_UPDATE"])
-            .multiple(false)
-    )
-    .group(
         ArgGroup::new("INSERT_ARGGROUP")
             .args(["INSERT_CHARACTERISTIC", "INSERT_CHARACTERISTIC_RANGE", "INSERT_CHARACTERISTIC_REGEX",
                 "INSERT_MEASUREMENT", "INSERT_MEASUREMENT_RANGE", "INSERT_MEASUREMENT_REGEX",
@@ -965,6 +983,78 @@ impl Display for A2lVersion {
             A2lVersion::V1_6_1 => f.write_str("1.6.1"),
             A2lVersion::V1_7_0 => f.write_str("1.7.0"),
             A2lVersion::V1_7_1 => f.write_str("1.7.1"),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct UpdateModeParser;
+
+impl clap::builder::TypedValueParser for UpdateModeParser {
+    type Value = UpdateMode;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        match value.to_string_lossy().as_ref() {
+            "DEFAULT" => Ok(UpdateMode::Default),
+            "STRICT" => Ok(UpdateMode::Strict),
+            "PRESERVE" => Ok(UpdateMode::Preserve),
+            _ => {
+                let mut err =
+                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                if let Some(arg) = arg {
+                    err.insert(
+                        clap::error::ContextKind::InvalidArg,
+                        clap::error::ContextValue::String(arg.to_string()),
+                    );
+                }
+                let strval = value.to_string_lossy();
+                err.insert(
+                    clap::error::ContextKind::InvalidValue,
+                    clap::error::ContextValue::String(String::from(strval)),
+                );
+                Err(err)
+            }
+        }
+    }
+}
+
+
+#[derive(Clone, Copy)]
+struct UpdateTypeParser;
+
+impl clap::builder::TypedValueParser for UpdateTypeParser {
+    type Value = UpdateType;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        match value.to_string_lossy().as_ref() {
+            "FULL" => Ok(UpdateType::Full),
+            "ADDRESSES" => Ok(UpdateType::Addresses),
+            _ => {
+                let mut err =
+                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                if let Some(arg) = arg {
+                    err.insert(
+                        clap::error::ContextKind::InvalidArg,
+                        clap::error::ContextValue::String(arg.to_string()),
+                    );
+                }
+                let strval = value.to_string_lossy();
+                err.insert(
+                    clap::error::ContextKind::InvalidValue,
+                    clap::error::ContextValue::String(String::from(strval)),
+                );
+                Err(err)
+            }
         }
     }
 }
