@@ -109,7 +109,16 @@ impl DebugData {
     pub(crate) fn load(filename: &OsStr, verbose: bool) -> Result<Self, String> {
         let filedata = load_filedata(filename)?;
         let elffile = load_elf_file(&filename.to_string_lossy(), &filedata)?;
+
+        if elffile.sections().find(|section| section.name() == Ok(".debug_info")).is_none() {
+            return Err(format!("Error: {} does not contain DWARF2+ debug info. The section .debug_info is missing.", filename.to_string_lossy()));
+        }
+
         let dwarf = load_dwarf(&elffile)?;
+
+        if !verify_dwarf_compile_units(&dwarf) {
+            return Err(format!("Error: {} does not contain DWARF2+ debug info - zero compile units contain debug info.", filename.to_string_lossy()));
+        }
 
         let sections = get_elf_sections(&elffile);
 
@@ -185,6 +194,17 @@ fn load_dwarf<'data>(
     // Dwarf::load takes two closures / functions and uses them to load all the required debug sections
     let loader = |section: gimli::SectionId| get_file_section_reader(elffile, section.name());
     gimli::Dwarf::load(loader)
+}
+
+// verify that the dwarf data is valid
+fn verify_dwarf_compile_units(dwarf: &gimli::Dwarf<SliceType>) -> bool {
+    let mut units_iter = dwarf.debug_info.units();
+    let mut units_count = 0;
+    while let Ok(Some(_)) = units_iter.next() {
+        units_count += 1;
+    }
+
+    units_count > 0
 }
 
 // get a section from the elf file.
