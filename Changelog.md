@@ -1,5 +1,21 @@
 # Changelog
 
+## Version 2.4.0
+
+- Document and validate the ability to use exe/DWARF2+ files, which are produced by MinGW gcc.
+  In practice support for these files has always existed because the `object` crate transparently supports getting sections from exe files.
+- Allow greater control over the a2l update process
+  - The option `--update` can now take an argument `FULL` or `ADDRESSES` (if the argument is not provided it defaults to `FULL`)
+    Mode `FULL` updates addresses, datatypes, upper and lower limits, etc. It is a comprehensive update of all information in the a2l file.
+    The mode `ADDRESSES` only updates the addresses, leaving everything else untouched.
+  - The option `--upate-preserve` has been removed. Instead there is not `--update-mode`, which works in combination with `--update`
+    Update mode `STRICT` verifies all information in the al2 file. If anything other than the addresses would be modified, then a2lfile reports an error.
+    Update mode `PRESERVE` PRESERVE behaves like --update-preserve, and keeps unknown objects.
+    Update mode `DEFAULT` (or omitting the option entirely) allows incorrect information, and discards invalid blocks.
+- Upgrade to a2lfile 2.3.2
+  - Bugfix: Escape codes \r, \n and \t in quoted strings were not handled correctly while writing files
+- Bugfix: support the case where a compiler omits type information after the volatile tag for "volatile void*"
+
 ## Version 2.3.0
 
 - Bugfix: Handle the case of incomplete DWARF type info
