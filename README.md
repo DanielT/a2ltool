@@ -26,13 +26,17 @@ A tool to edit, merge and update a2l files
 
 `a2ltool file1.a2l --merge-includes --output flat.a2l`
 
-### Update the addresses in an a2l file
+### Update the addresses and other data in an a2l file
 
 `a2ltool input.a2l --elffile input.elf --update --output updated.a2l`
 
-### Update the addresses in an a2l file, while keeping invalid elements
+### Update the addresses and other data in an a2l file, while keeping invalid elements
 
-`a2ltool input.a2l --elffile input.elf --update-preserve --output updated.a2l`
+`a2ltool input.a2l --elffile input.elf --update --update-mode PRESERVE --output updated.a2l`
+
+### Update only the addresses in an a2l file, and exit with an error if any other a2l elements are incorrect
+
+`a2ltool input.a2l --elffile input.elf --update ADDRESSES --update-mode STRICT --output updated.a2l`
 
 ### Create a new a2l file and add a characteristic from an elf file to it
 
