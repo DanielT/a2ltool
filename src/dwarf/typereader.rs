@@ -222,30 +222,26 @@ impl DebugDataReader<'_> {
                 let reftype = self.get_type(new_cur_unit, dbginfo_offset, typereader_data)?;
                 (reftype.datatype, None)
             }
-            gimli::constants::DW_TAG_const_type => {
+            gimli::constants::DW_TAG_const_type
+            | gimli::constants::DW_TAG_volatile_type
+            | gimli::constants::DW_TAG_packed_type
+            | gimli::constants::DW_TAG_restrict_type
+            | gimli::constants::DW_TAG_immutable_type
+            | gimli::constants::DW_TAG_atomic_type => {
+                // ignore these tags, they don't matter in the context of a2l files
+                // note: some compilers might omit the type reference if the type is void / void*
                 if let Ok((new_cur_unit, dbginfo_offset)) =
                     get_type_attribute(entry, &self.units, current_unit)
                 {
                     let typeinfo = self.get_type(new_cur_unit, dbginfo_offset, typereader_data)?;
                     (typeinfo.datatype, typeinfo.name)
                 } else {
-                    // const void*
+                    // const void* / volatile void* / packed void*???
                     (
                         DwarfDataType::Other(u64::from(unit.encoding().address_size)),
                         None,
                     )
                 }
-            }
-            gimli::constants::DW_TAG_volatile_type
-            | gimli::constants::DW_TAG_packed_type
-            | gimli::constants::DW_TAG_restrict_type
-            | gimli::constants::DW_TAG_immutable_type
-            | gimli::constants::DW_TAG_atomic_type => {
-                // ignore these tags, they don't matter in the context of a2l files
-                let (new_cur_unit, dbginfo_offset) =
-                    get_type_attribute(entry, &self.units, current_unit)?;
-                let typeinfo = self.get_type(new_cur_unit, dbginfo_offset, typereader_data)?;
-                (typeinfo.datatype, typeinfo.name)
             }
             gimli::constants::DW_TAG_subroutine_type => {
                 // function pointer
