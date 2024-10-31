@@ -116,6 +116,10 @@ fn core() -> Result<(), String> {
     let verbose = arg_matches.get_count("VERBOSE");
     let opt_update_type = arg_matches.get_one::<UpdateType>("UPDATE_TYPE");
 
+    if arg_matches.get_one::<bool>("SAFE_UPDATE").is_some() {
+        return Err("Error: The option --update-preserve is deprecated. Use --update-mode PRESERVE instead.".to_string());
+    }
+
     let now = Instant::now();
     cond_print!(
         verbose,
@@ -679,7 +683,12 @@ The arg --update must be present.")
         .requires("ELFFILE")
         .requires("UPDATE_TYPE")
     )
-    
+    .arg(Arg::new("SAFE_UPDATE")
+        .long("update-preserve")
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
+        .hide(true)
+    )
     .arg(Arg::new("ENABLE_STRUCTURES")
         .help("Enable the the use of INSTANCE, TYPEDEF_STRUCTURE & co. for all operations. Requires a2l version 1.7.1")
         .short('t')
@@ -837,7 +846,12 @@ The arg --update must be present.")
             .args(["INPUT", "CREATE"])
             .multiple(false)
             .required(true)
-     )
+    )
+    .group(
+        ArgGroup::new("UPDATE_ARGGROUP")
+            .args(["UPDATE_TYPE", "SAFE_UPDATE"])
+            .multiple(false)
+    )
     .group(
         ArgGroup::new("INSERT_ARGGROUP")
             .args(["INSERT_CHARACTERISTIC", "INSERT_CHARACTERISTIC_RANGE", "INSERT_CHARACTERISTIC_REGEX",
