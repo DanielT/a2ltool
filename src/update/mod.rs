@@ -4,7 +4,9 @@ use a2lfile::{
     A2lFile, A2lObject, AddrType, AddressType, BitMask, CompuMethod, EcuAddress, IfData, MatrixDim,
     Module, SymbolLink,
 };
+use instance::update_all_module_instances;
 use std::collections::{HashMap, HashSet};
+use std::ops::AddAssign;
 
 mod axis_pts;
 mod blob;
@@ -20,13 +22,26 @@ use crate::datatype::{get_a2l_datatype, get_type_limits};
 use crate::dwarf::DwarfDataType;
 use crate::symbol::{find_symbol, SymbolInfo};
 use axis_pts::*;
-use blob::{cleanup_removed_blobs, update_module_blobs};
+use blob::{cleanup_removed_blobs, update_all_module_blobs};
 use characteristic::*;
-use instance::update_module_instances;
 use measurement::*;
 use record_layout::*;
 use typedef::update_module_typedefs;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UpdateType {
+    Full,
+    Addresses,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UpdateMode {
+    Default,
+    Strict,
+    Preserve,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct UpdateSumary {
     pub(crate) measurement_updated: u32,
     pub(crate) measurement_not_updated: u32,
@@ -54,13 +69,40 @@ pub(crate) struct TypedefNames {
     structure: HashSet<String>,
 }
 
-pub(crate) struct UpdateInfo<'a2l, 'dbg, 'log> {
-    pub(crate) module: &'a2l mut Module,
+#[derive(Debug, Clone, PartialEq)]
+enum UpdateResult {
+    Updated,
+    SymbolNotFound {
+        blocktype: &'static str,
+        name: String,
+        line: u32,
+        errors: Vec<String>,
+    },
+    InvalidDataType {
+        blocktype: &'static str,
+        name: String,
+        line: u32,
+    },
+}
+
+// the data used by the a2l update has been split into two parts.
+// The A2lUpdateInfo struct contains the data that is constant for the whole update process.
+#[derive(Debug)]
+pub(crate) struct A2lUpdateInfo<'dbg> {
     pub(crate) debug_data: &'dbg DebugData,
-    pub(crate) log_msgs: &'log mut Vec<String>,
     pub(crate) preserve_unknown: bool,
+    pub(crate) strict_update: bool,
+    pub(crate) full_update: bool,
     pub(crate) version: A2lVersion,
-    pub(crate) reclayout_info: RecordLayoutInfo,
+    pub(crate) enable_structures: bool,
+    pub(crate) compu_method_index: HashMap<String, usize>,
+}
+
+// This struct contains the data that is modified / updated during the a2l update process.
+#[derive(Debug)]
+pub(crate) struct A2lUpdater<'a2l> {
+    module: &'a2l mut Module,
+    reclayout_info: RecordLayoutInfo,
 }
 
 type TypedefsRefInfo<'a> = HashMap<String, Vec<(Option<&'a TypeInfo>, TypedefReferrer)>>;
@@ -68,75 +110,126 @@ type TypedefsRefInfo<'a> = HashMap<String, Vec<(Option<&'a TypeInfo>, TypedefRef
 // perform an address update.
 // This update can be destructive (any object that cannot be updated will be discarded)
 // or non-destructive (addresses of invalid objects will be set to zero).
-pub(crate) fn update_addresses(
+pub(crate) fn update_a2l(
     a2l_file: &mut A2lFile,
     debug_data: &DebugData,
     log_msgs: &mut Vec<String>,
-    preserve_unknown: bool,
+    update_type: UpdateType,
+    update_mode: UpdateMode,
     enable_structures: bool,
-) -> UpdateSumary {
+) -> (UpdateSumary, bool) {
     let version = A2lVersion::from(&*a2l_file);
-
     let mut summary = UpdateSumary::new();
+    let mut strict_error = false;
     for module in &mut a2l_file.project.module {
-        let reclayout_info = RecordLayoutInfo::build(module);
-        let mut info = UpdateInfo {
-            module,
+        let (mut data, update_info) = init_update(
             debug_data,
-            log_msgs,
-            preserve_unknown,
+            module,
             version,
+            update_type,
+            update_mode,
+            enable_structures,
+        );
+        let (module_summary, module_strict_error) = run_update(&mut data, &update_info, log_msgs);
+        summary += module_summary;
+        strict_error |= module_strict_error;
+    }
+    (summary, strict_error)
+}
+
+pub fn init_update<'a2l, 'dbg>(
+    debug_data: &'dbg DebugData,
+    module: &'a2l mut Module,
+    version: A2lVersion,
+    update_type: UpdateType,
+    update_mode: UpdateMode,
+    enable_structures: bool,
+) -> (A2lUpdater<'a2l>, A2lUpdateInfo<'dbg>) {
+    let preserve_unknown = update_mode == UpdateMode::Preserve;
+    let strict_update = update_mode == UpdateMode::Strict;
+    let full_update = update_type == UpdateType::Full;
+    let reclayout_info = RecordLayoutInfo::build(module);
+
+    let compu_method_index = module
+        .compu_method
+        .iter()
+        .enumerate()
+        .map(|(idx, item)| (item.name.clone(), idx))
+        .collect::<HashMap<_, _>>();
+    (
+        A2lUpdater {
+            module,
             reclayout_info,
-        };
+        },
+        A2lUpdateInfo {
+            debug_data,
+            preserve_unknown,
+            strict_update,
+            full_update,
+            version,
+            enable_structures,
+            compu_method_index,
+        },
+    )
+}
 
-        let compu_method_index = info
-            .module
-            .compu_method
-            .iter()
-            .enumerate()
-            .map(|(idx, item)| (item.name.clone(), idx))
-            .collect::<HashMap<_, _>>();
+fn run_update(
+    data: &mut A2lUpdater,
+    info: &A2lUpdateInfo,
+    log_msgs: &mut Vec<String>,
+) -> (UpdateSumary, bool) {
+    let mut summary = UpdateSumary::new();
+    let mut strict_error = false;
 
-        // update all AXIS_PTS
-        let (updated, not_updated) = update_module_axis_pts(&mut info, &compu_method_index);
-        summary.measurement_updated += updated;
-        summary.measurement_not_updated += not_updated;
+    // update all AXIS_PTS
+    let result = update_all_module_axis_pts(data, info);
+    strict_error |= result.iter().any(|r| r != &UpdateResult::Updated);
+    let (updated, not_updated) = log_update_results(log_msgs, &result);
+    summary.axis_pts_updated += updated;
+    summary.axis_pts_not_updated += not_updated;
 
-        // update all MEASUREMENTs
-        let (updated, not_updated) = update_module_measurements(&mut info, &compu_method_index);
-        summary.measurement_updated += updated;
-        summary.measurement_not_updated += not_updated;
+    // update all MEASUREMENTs
+    let results = update_all_module_measurements(data, info);
+    strict_error |= results.iter().any(|r| r != &UpdateResult::Updated);
+    let (updated, not_updated) = log_update_results(log_msgs, &results);
+    summary.measurement_updated += updated;
+    summary.measurement_not_updated += not_updated;
 
-        // update all CHARACTERISTICs
-        let (updated, not_updated) = update_module_characteristics(&mut info, &compu_method_index);
-        summary.characteristic_updated += updated;
-        summary.characteristic_not_updated += not_updated;
+    // update all CHARACTERISTICs
+    let results = update_all_module_characteristics(data, info);
+    strict_error |= results.iter().any(|r| r != &UpdateResult::Updated);
+    let (updated, not_updated) = log_update_results(log_msgs, &results);
+    summary.characteristic_updated += updated;
+    summary.characteristic_not_updated += not_updated;
 
-        // update all BLOBs
-        let (updated, not_updated) =
-            update_module_blobs(info.module, debug_data, info.log_msgs, preserve_unknown);
-        summary.blob_updated += updated;
-        summary.blob_not_updated += not_updated;
+    // update all BLOBs
+    let results = update_all_module_blobs(data, info);
+    strict_error |= results.iter().any(|r| r != &UpdateResult::Updated);
+    let (updated, not_updated) = log_update_results(log_msgs, &results);
+    summary.blob_updated += updated;
+    summary.blob_not_updated += not_updated;
 
-        let typedef_names = TypedefNames::new(info.module);
+    let typedef_names = TypedefNames::new(data.module);
 
-        // update all INSTANCEs
-        let (updated, not_updated, typedef_ref_info) =
-            update_module_instances(&mut info, &typedef_names);
-        summary.instance_updated += updated;
-        summary.instance_not_updated += not_updated;
+    // update all INSTANCEs
+    let (update_result, typedef_ref_info) = update_all_module_instances(data, info, &typedef_names);
+    strict_error |= results.iter().any(|r| r != &UpdateResult::Updated);
+    let (updated, not_updated) = log_update_results(log_msgs, &update_result);
+    summary.instance_updated += updated;
+    summary.instance_not_updated += not_updated;
 
-        if enable_structures {
-            update_module_typedefs(
-                &mut info,
-                typedef_ref_info,
-                typedef_names,
-                &compu_method_index,
-            );
-        }
+    if info.full_update && info.enable_structures {
+        update_module_typedefs(
+            info,
+            data.module,
+            log_msgs,
+            typedef_ref_info,
+            typedef_names,
+            &mut data.reclayout_info,
+        );
     }
 
-    summary
+    (summary, strict_error)
 }
 
 // try to get the symbol name used in the elf file, and find its address and type
@@ -200,6 +293,42 @@ fn log_update_errors(errorlog: &mut Vec<String>, errmsgs: Vec<String>, blockname
     for msg in errmsgs {
         errorlog.push(format!("Error updating {blockname} on line {line}: {msg}"));
     }
+}
+
+fn log_update_results(errorlog: &mut Vec<String>, results: &[UpdateResult]) -> (u32, u32) {
+    let mut updated = 0;
+    let mut not_updated = 0;
+    for result in results {
+        match result {
+            UpdateResult::Updated => updated += 1,
+            UpdateResult::SymbolNotFound {
+                blocktype,
+                name,
+                line,
+                errors,
+            } => {
+                for err in errors {
+                    errorlog.push(format!(
+                        "Error updating {blocktype} {name} on line {line}: {err}",
+                    ));
+                }
+                log_update_errors(errorlog, errors.clone(), blocktype, *line);
+                not_updated += 1;
+            }
+            UpdateResult::InvalidDataType {
+                blocktype,
+                name,
+                line,
+            } => {
+                errorlog.push(format!(
+                    "Error updating {blocktype} {name} on line {line}: data type has changed",
+                ));
+                updated += 1;
+            }
+        }
+    }
+
+    (updated, not_updated)
 }
 
 pub(crate) fn make_symbol_link_string(sym_info: &SymbolInfo, debug_data: &DebugData) -> String {
@@ -274,7 +403,7 @@ fn set_measurement_ecu_address(opt_ecu_address: &mut Option<EcuAddress>, address
     if let Some(ecu_address) = opt_ecu_address {
         if ecu_address.address == 0 {
             // force hex output for the address, if the address was set as "0" (decimal)
-            ecu_address.get_layout_mut().item_location.0.1 = true;
+            ecu_address.get_layout_mut().item_location.0 .1 = true;
         }
         ecu_address.address = address as u32;
     } else {
@@ -491,11 +620,30 @@ impl TypedefNames {
     }
 }
 
+impl AddAssign for UpdateSumary {
+    fn add_assign(&mut self, other: Self) {
+        self.axis_pts_not_updated += other.axis_pts_not_updated;
+        self.axis_pts_updated += other.axis_pts_updated;
+        self.blob_not_updated += other.blob_not_updated;
+        self.blob_updated += other.blob_updated;
+        self.characteristic_not_updated += other.characteristic_not_updated;
+        self.characteristic_updated += other.characteristic_updated;
+        self.measurement_not_updated += other.measurement_not_updated;
+        self.measurement_updated += other.measurement_updated;
+        self.instance_not_updated += other.instance_not_updated;
+        self.instance_updated += other.instance_updated;
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::adjust_limits;
-    use crate::dwarf::{DwarfDataType, TypeInfo};
+    use super::*;
+    use crate::{
+        dwarf::{DwarfDataType, TypeInfo},
+        A2lVersion,
+    };
     use a2lfile::{Coeffs, CoeffsLinear, CompuMethod, ConversionType};
+    use std::ffi::OsString;
 
     #[test]
     fn test_adjust_limits() {
@@ -537,5 +685,405 @@ mod test {
         let (lower, upper) = adjust_limits(&typeinfo, 0.0, 0.0, Some(&compu_method));
         assert_eq!(lower, 0.0);
         assert_eq!(upper, 10200.0);
+    }
+
+    fn test_setup(a2l_name: &str) -> (crate::dwarf::DebugData, a2lfile::A2lFile) {
+        let mut log_msgs = Vec::new();
+        let a2l = a2lfile::load(a2l_name, None, &mut log_msgs, true).unwrap();
+        let debug_data =
+            crate::dwarf::DebugData::load(&OsString::from("tests/elffiles/update_test.elf"), false)
+                .unwrap();
+        (debug_data, a2l)
+    }
+
+    #[test]
+    fn test_update_axis_pts_ok() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let result = update_all_module_axis_pts(&mut data, &info);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 3);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 3);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+
+        // test full update
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Full,
+            UpdateMode::Default,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let result = update_all_module_axis_pts(&mut data, &info);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 3);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 3);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+    }
+
+    #[test]
+    fn test_update_axis_pts_bad() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            true,
+        );
+        let result = update_all_module_axis_pts(&mut data, &info);
+        assert_eq!(result.len(), 4);
+        assert!(matches!(result[0], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[1], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[2], UpdateResult::Updated));
+        assert!(matches!(result[3], UpdateResult::SymbolNotFound { .. }));
+    }
+
+    #[test]
+    fn test_update_blob_ok() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let result = update_all_module_blobs(&mut data, &info);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 2);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 2);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+
+        // test full update
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Full,
+            UpdateMode::Default,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let result = update_all_module_blobs(&mut data, &info);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 2);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 2);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+    }
+
+    #[test]
+    fn test_update_blob_bad() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            true,
+        );
+        let result = update_all_module_blobs(&mut data, &info);
+        assert_eq!(result.len(), 3);
+        assert!(matches!(result[0], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[1], UpdateResult::Updated));
+        assert!(matches!(result[2], UpdateResult::SymbolNotFound { .. }));
+    }
+
+    #[test]
+    fn test_update_characteristic_ok() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let result = update_all_module_characteristics(&mut data, &info);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 6);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 6);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+
+        // test full update
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Full,
+            UpdateMode::Default,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let result = update_all_module_characteristics(&mut data, &info);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 6);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 6);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+    }
+
+    #[test]
+    fn test_update_characteristic_bad() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            true,
+        );
+        let result = update_all_module_characteristics(&mut data, &info);
+        assert_eq!(result.len(), 7);
+        assert!(matches!(result[0], UpdateResult::InvalidDataType { .. }));
+        // assert!(matches!(result[1], UpdateResult::InvalidDataType { .. })); // verify currently does not check the size in AXIS_DESCR
+        assert!(matches!(result[2], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[3], UpdateResult::Updated));
+        assert!(matches!(result[4], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[5], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[6], UpdateResult::SymbolNotFound { .. }));
+    }
+
+    #[test]
+    fn test_update_instance_ok() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let typedef_names = TypedefNames::new(&data.module);
+        let (result, _) = update_all_module_instances(&mut data, &info, &typedef_names);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 1);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 1);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+
+        // test full update
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Full,
+            UpdateMode::Default,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let typedef_names = TypedefNames::new(&data.module);
+        let (result, _) = update_all_module_instances(&mut data, &info, &typedef_names);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 1);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 1);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+    }
+
+    #[test]
+    fn test_update_instance_bad() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            true,
+        );
+        let typedef_names = TypedefNames::new(&data.module);
+        let (result, _) = update_all_module_instances(&mut data, &info, &typedef_names);
+        assert_eq!(result.len(), 3);
+        assert!(matches!(result[0], UpdateResult::Updated));
+        assert!(matches!(result[1], UpdateResult::Updated));
+        assert!(matches!(result[2], UpdateResult::SymbolNotFound { .. }));
+    }
+
+    #[test]
+    fn test_update_measurement_ok() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Full,
+            UpdateMode::Default,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let result = update_all_module_measurements(&mut data, &info);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 5);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 5);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+
+        // test full update
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Full,
+            UpdateMode::Default,
+            true,
+        );
+
+        let mut log_msgs = Vec::new();
+        let result = update_all_module_measurements(&mut data, &info);
+        assert!(result.iter().all(|r| r == &UpdateResult::Updated));
+        assert_eq!(result.len(), 5);
+        let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
+        assert_eq!(updated, 5);
+        assert_eq!(not_updated, 0);
+        assert!(log_msgs.is_empty());
+    }
+
+    #[test]
+    fn test_update_measurement_bad() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+
+        // test address only update, in strict mode
+        let version = A2lVersion::from(&a2l);
+        let (mut data, info) = init_update(
+            &debug_data,
+            &mut a2l.project.module[0],
+            version,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            true,
+        );
+        let result = update_all_module_measurements(&mut data, &info);
+        assert_eq!(result.len(), 6);
+        assert!(matches!(result[0], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[1], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[2], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[3], UpdateResult::Updated));
+        assert!(matches!(result[4], UpdateResult::Updated));
+        assert!(matches!(result[5], UpdateResult::SymbolNotFound { .. }));
+    }
+
+    #[test]
+    fn test_update_a2l_ok() {
+        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+
+        // test address only update, in strict mode
+        let mut log_msgs = Vec::new();
+        let (summary, strict_error) = update_a2l(
+            &mut a2l,
+            &debug_data,
+            &mut log_msgs,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            false,
+        );
+        assert_eq!(strict_error, false);
+        assert_eq!(summary.axis_pts_not_updated, 0);
+        assert_eq!(summary.axis_pts_updated, 3);
+        assert_eq!(summary.blob_not_updated, 0);
+        assert_eq!(summary.blob_updated, 2);
+        assert_eq!(summary.characteristic_not_updated, 0);
+        assert_eq!(summary.characteristic_updated, 6);
+        assert_eq!(summary.measurement_not_updated, 0);
+        assert_eq!(summary.measurement_updated, 5);
+        assert_eq!(summary.instance_not_updated, 0);
+        assert_eq!(summary.instance_updated, 1);
+        assert!(log_msgs.is_empty());
+
+        // test full update
+        let mut log_msgs = Vec::new();
+        let (summary, _) = update_a2l(
+            &mut a2l,
+            &debug_data,
+            &mut log_msgs,
+            UpdateType::Full,
+            UpdateMode::Default,
+            false,
+        );
+        assert_eq!(summary.axis_pts_not_updated, 0);
+        assert_eq!(summary.axis_pts_updated, 3);
+        assert_eq!(summary.blob_not_updated, 0);
+        assert_eq!(summary.blob_updated, 2);
+        assert_eq!(summary.characteristic_not_updated, 0);
+        assert_eq!(summary.characteristic_updated, 6);
+        assert_eq!(summary.measurement_not_updated, 0);
+        assert_eq!(summary.measurement_updated, 5);
+        assert_eq!(summary.instance_not_updated, 0);
+        assert_eq!(summary.instance_updated, 1);
+        assert!(log_msgs.is_empty());
     }
 }

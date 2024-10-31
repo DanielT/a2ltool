@@ -1,255 +1,264 @@
-/* a2ltool 1.6.0 */
 ASAP2_VERSION 1 71
-/begin PROJECT test_project ""
-  /begin MODULE test_module ""
+/begin PROJECT test ""
+  /begin MODULE mod ""
 
-    /begin INSTANCE reg ""
-      RegDef 0x9038
-      SYMBOL_LINK "reg" 0
-    /end INSTANCE
+    /begin COMPU_METHOD uint16_Compu ""
+      RAT_FUNC "%.0" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
 
-    /begin INSTANCE struct_b ""
-      StructB 0x9040
-      SYMBOL_LINK "struct_b" 0
-    /end INSTANCE
+    /begin COMPU_METHOD uint32_Compu ""
+      RAT_FUNC "%.0" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
 
-    /begin INSTANCE TEST_struct ""
-      TestStruct 0x9078
-      SYMBOL_LINK "TEST_struct" 0
-    /end INSTANCE
+    /begin COMPU_METHOD float_Compu ""
+      RAT_FUNC "%.3" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
 
-    /begin INSTANCE TEST_structarr ""
-      TestStruct 0x907C
-      MATRIX_DIM 10
-      SYMBOL_LINK "TEST_structarr" 0
-    /end INSTANCE
+    /begin CHARACTERISTIC Curve_ExternalAxis ""
+      CURVE 0x0 Curve_ExternalAxis_RecordLayout 0 float_Compu -10000000 10000000
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY uint32_Compu 5 0 4294967295
+        AXIS_PTS_REF Axis_0
+      /end AXIS_DESCR
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Curve_ExternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Curve_ExternalAxis" 0
+    /end CHARACTERISTIC
 
-    /begin INSTANCE TEST_structarr_arr ""
-      TestStruct 0x90A4
-      MATRIX_DIM 2 10
-      SYMBOL_LINK "TEST_structarr_arr" 0
-    /end INSTANCE
+    /begin CHARACTERISTIC Curve_InternalAxis ""
+      CURVE 0x0 Curve_InternalAxis_RecordLayout 0 float_Compu -10000000 10000000
+      /begin AXIS_DESCR
+        STD_AXIS NO_INPUT_QUANTITY uint16_Compu 4 0 65535
+      /end AXIS_DESCR
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Curve_InternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Curve_InternalAxis" 0
+    /end CHARACTERISTIC
 
-    /begin INSTANCE TEST_structarr_ptr ""
-      TestStruct 0x9018
-      ADDRESS_TYPE PLONG
-      MATRIX_DIM 10
-      SYMBOL_LINK "TEST_structarr_ptr" 0
-    /end INSTANCE
+    /begin CHARACTERISTIC Map_ExternalAxis ""
+      MAP 0x0 Map_ExternalAxis_RecordLayout 0 float_Compu -10000000 10000000
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY uint32_Compu 3 0 4294967295
+        AXIS_PTS_REF Axis_1
+      /end AXIS_DESCR
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY uint32_Compu 2 0 4294967295
+        AXIS_PTS_REF Axis_2
+      /end AXIS_DESCR
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Map_ExternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Map_ExternalAxis" 0
+    /end CHARACTERISTIC
 
-    /begin INSTANCE TEST_structarr_ptr_arr ""
-      LongPointer_Array_10_TestStruct 0x901C
-      MATRIX_DIM 2
-      SYMBOL_LINK "TEST_structarr_ptr_arr" 0
-    /end INSTANCE
+    /begin CHARACTERISTIC Map_InternalAxis ""
+      MAP 0x0 Map_InternalAxis_RecordLayout 0 uint32_Compu 0 4294967295
+      /begin AXIS_DESCR
+        STD_AXIS NO_INPUT_QUANTITY uint16_Compu 4 0 65535
+      /end AXIS_DESCR
+      /begin AXIS_DESCR
+        STD_AXIS NO_INPUT_QUANTITY uint16_Compu 3 0 65535
+      /end AXIS_DESCR
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Map_InternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Map_InternalAxis" 0
+    /end CHARACTERISTIC
 
-    /begin INSTANCE TEST_structptr ""
-      TestStruct 0x9010
-      ADDRESS_TYPE PLONG
-      SYMBOL_LINK "TEST_structptr" 0
-    /end INSTANCE
+    /begin CHARACTERISTIC Characteristic_ValBlk ""
+      VAL_BLK 0x0 float32_RecordLayout 0 float_Compu -10000000 10000000
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Characteristic_ValBlk" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Characteristic_ValBlk" 0
+      MATRIX_DIM 5
+    /end CHARACTERISTIC
 
-    /begin INSTANCE TEST_structptr_arr ""
-      LongPointer_TestStruct 0x9024
-      MATRIX_DIM 4
-      SYMBOL_LINK "TEST_structptr_arr" 0
-    /end INSTANCE
+    /begin CHARACTERISTIC Characteristic_Value ""
+      VALUE 0x0 uint32_RecordLayout 0 float_Compu 0 10000000
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Characteristic_Value" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Characteristic_Value" 0
+    /end CHARACTERISTIC
 
-    /begin INSTANCE TEST_structptr_arr_ptr ""
-      LongPointer_TestStruct 0x9034
-      ADDRESS_TYPE PLONG
-      MATRIX_DIM 4
-      SYMBOL_LINK "TEST_structptr_arr_ptr" 0
-    /end INSTANCE
+    /begin AXIS_PTS Axis_0 ""
+      0x0 NO_INPUT_QUANTITY Axis_0_RecordLayout 0 uint32_Compu 5 0 4294967295
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Axis_0" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Axis_0" 0
+    /end AXIS_PTS
 
-    /begin INSTANCE TEST_structptr_ptr ""
-      LongPointer_TestStruct 0x9014
-      ADDRESS_TYPE PLONG
-      SYMBOL_LINK "TEST_structptr_ptr" 0
+    /begin AXIS_PTS Axis_1 ""
+      0x0 NO_INPUT_QUANTITY Axis_1_RecordLayout 0 uint32_Compu 3 0 4294967295
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Axis_1" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Axis_1" 0
+    /end AXIS_PTS
+
+    /begin AXIS_PTS Axis_2 ""
+      0x0 NO_INPUT_QUANTITY Axis_2_RecordLayout 0 uint32_Compu 2 0 4294967295
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Axis_2" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Axis_2" 0
+    /end AXIS_PTS
+    
+    /begin BLOB Blob_1 ""
+      0x0 128
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Blob_1" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Blob_1" 0
+    /end BLOB
+    
+    /begin BLOB Blob_2 ""
+      0x0 256
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Blob_2" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Blob_2" 0
+    /end BLOB
+
+    /begin MEASUREMENT Measurement_Matrix ""
+      UBYTE NO_COMPU_METHOD 0 0 0 2
+      MATRIX_DIM 5 4
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Matrix" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Matrix" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT Measurement_Value ""
+      UWORD NO_COMPU_METHOD 0 0 0 2
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Value" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Value" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT Measurement_Bitfield_bits1 ""
+      ULONG NO_COMPU_METHOD 0 0 0 2
+      BIT_MASK 0x1F
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Bitfield.bits_1" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Bitfield.bits_1" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT Measurement_Bitfield_bits2 ""
+      ULONG NO_COMPU_METHOD 0 0 0 2
+      BIT_MASK 0xFFFE0
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Bitfield.bits_2" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Bitfield.bits_2" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT Measurement_Bitfield_bits3 ""
+      ULONG NO_COMPU_METHOD 0 0 0 2
+      BIT_MASK 0xFF00000
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Bitfield.bits_3" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Bitfield.bits_3" 0
+    /end MEASUREMENT
+
+    /begin INSTANCE INSTANCE.Map_InternalAxis "instance for symbol Map_InternalAxis"
+      UpdateTest_Map_InternalAxis 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Map_InternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Map_InternalAxis" 0
     /end INSTANCE
 
     /begin TYPEDEF_MEASUREMENT Measurement_ULong ""
       ULONG NO_COMPU_METHOD 0 0 0 4294967295
     /end TYPEDEF_MEASUREMENT
 
-    /begin TYPEDEF_MEASUREMENT Measurement_Float32 ""
-      FLOAT32_IEEE NO_COMPU_METHOD 0 0 -3.4028234663852886e38 3.4028234663852886e38
+    /begin TYPEDEF_MEASUREMENT Measurement_UWord ""
+      UWORD NO_COMPU_METHOD 0 0 0 65535
     /end TYPEDEF_MEASUREMENT
 
-    /begin TYPEDEF_MEASUREMENT Measurement_UInt64 ""
-      A_UINT64 NO_COMPU_METHOD 0 0 0 1.8446744073709552e19
-    /end TYPEDEF_MEASUREMENT
-
-    /begin TYPEDEF_MEASUREMENT Measurement_ULong_0x1F ""
-      ULONG NO_COMPU_METHOD 0 0 0 32
-      BIT_MASK 0x1F
-    /end TYPEDEF_MEASUREMENT
-
-    /begin TYPEDEF_MEASUREMENT Measurement_ULong_0x3E0 ""
-      ULONG NO_COMPU_METHOD 0 0 0 32
-      BIT_MASK 0x3E0
-    /end TYPEDEF_MEASUREMENT
-
-    /begin TYPEDEF_MEASUREMENT Measurement_ULong_0x7C00 ""
-      ULONG NO_COMPU_METHOD 0 0 0 32
-      BIT_MASK 0x7C00
-    /end TYPEDEF_MEASUREMENT
-
-    /begin TYPEDEF_MEASUREMENT Measurement_ULong_0xF8000 ""
-      ULONG NO_COMPU_METHOD 0 0 0 32
-      BIT_MASK 0xF8000
-    /end TYPEDEF_MEASUREMENT
-
-    /begin TYPEDEF_MEASUREMENT MyEnum ""
-      UWORD MyEnum 0 0 20 11111
-    /end TYPEDEF_MEASUREMENT
-
-    /begin TYPEDEF_STRUCTURE LongPointer_Array_10_TestStruct ""
-      0x28
-      ADDRESS_TYPE PLONG
+    /begin TYPEDEF_STRUCTURE UpdateTest_Map_InternalAxis ""
+      0x40
       /begin STRUCTURE_COMPONENT
-        array_element TestStruct
+        x Measurement_UWord
         0
-        MATRIX_DIM 10
-      /end STRUCTURE_COMPONENT
-      SYMBOL_TYPE_LINK "TestStruct"
-    /end TYPEDEF_STRUCTURE
-
-    /begin TYPEDEF_STRUCTURE LongPointer_TestStruct ""
-      0x4
-      ADDRESS_TYPE PLONG
-      /begin STRUCTURE_COMPONENT
-        value Measurement_ULong
-        0
-        SYMBOL_TYPE_LINK "value"
-      /end STRUCTURE_COMPONENT
-      SYMBOL_TYPE_LINK "TestStruct"
-    /end TYPEDEF_STRUCTURE
-
-    /begin TYPEDEF_STRUCTURE TestStruct ""
-      0x4
-      /begin STRUCTURE_COMPONENT
-        value Measurement_ULong
-        0
-        SYMBOL_TYPE_LINK "value"
-      /end STRUCTURE_COMPONENT
-      SYMBOL_TYPE_LINK "TestStruct"
-    /end TYPEDEF_STRUCTURE
-
-    /begin TYPEDEF_STRUCTURE RegDef ""
-      0x4
-      /begin STRUCTURE_COMPONENT
-        Value Measurement_ULong
-        0
-        SYMBOL_TYPE_LINK "Value"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        Bits_ABC Measurement_ULong_0x1F
-        0
-        SYMBOL_TYPE_LINK "Bits_ABC"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        Bits_DEF Measurement_ULong_0x3E0
-        0
-        SYMBOL_TYPE_LINK "Bits_DEF"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        Bits_GHI Measurement_ULong_0x7C00
-        0
-        SYMBOL_TYPE_LINK "Bits_GHI"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        Bits_JKL Measurement_ULong_0xF8000
-        0
-        SYMBOL_TYPE_LINK "Bits_JKL"
-      /end STRUCTURE_COMPONENT
-      SYMBOL_TYPE_LINK "RegDef"
-    /end TYPEDEF_STRUCTURE
-
-    /begin TYPEDEF_STRUCTURE StructA ""
-      0x18
-      /begin STRUCTURE_COMPONENT
-        enumval MyEnum
-        0
-        SYMBOL_TYPE_LINK "enumval"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        val_i32 Measurement_ULong
-        4
-        SYMBOL_TYPE_LINK "val_i32"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        val_i64 Measurement_UInt64
-        8
-        SYMBOL_TYPE_LINK "val_i64"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        val_f32 Measurement_Float32
-        16
-        SYMBOL_TYPE_LINK "val_f32"
-      /end STRUCTURE_COMPONENT
-      SYMBOL_TYPE_LINK "StructA"
-    /end TYPEDEF_STRUCTURE
-
-    /begin TYPEDEF_STRUCTURE StructB ""
-      0x38
-      /begin STRUCTURE_COMPONENT
-        pPrev StructB
-        0
-        ADDRESS_TYPE PLONG
-        SYMBOL_TYPE_LINK "pPrev"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        pNext StructB
-        4
-        ADDRESS_TYPE PLONG
-        SYMBOL_TYPE_LINK "pNext"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        s1 StructA
-        8
-        SYMBOL_TYPE_LINK "s1"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        s2 StructA
-        32
-        SYMBOL_TYPE_LINK "s2"
-      /end STRUCTURE_COMPONENT
-      /begin STRUCTURE_COMPONENT
-        s3 DeadEnd
-        56
-        SYMBOL_TYPE_LINK "s3"
-      /end STRUCTURE_COMPONENT
-      SYMBOL_TYPE_LINK "StructB"
-    /end TYPEDEF_STRUCTURE
-
-    /begin TYPEDEF_STRUCTURE Unconnected ""
-      0x4
-    /end TYPEDEF_STRUCTURE
-
-    /begin TYPEDEF_STRUCTURE DeadEnd ""
-      0x4
-      /begin STRUCTURE_COMPONENT
-        x DeadEnd2
-        0
+        MATRIX_DIM 4
         SYMBOL_TYPE_LINK "x"
       /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        y Measurement_UWord
+        8
+        MATRIX_DIM 3
+        SYMBOL_TYPE_LINK "y"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        value Measurement_ULong
+        16
+        MATRIX_DIM 3 4
+        SYMBOL_TYPE_LINK "value"
+      /end STRUCTURE_COMPONENT
+      SYMBOL_TYPE_LINK "UpdateTest_Map_InternalAxis"
     /end TYPEDEF_STRUCTURE
 
-    /begin TYPEDEF_STRUCTURE DeadEnd2 ""
-      0x4
-    /end TYPEDEF_STRUCTURE
+    /begin RECORD_LAYOUT Axis_2_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 2
+    /end RECORD_LAYOUT
 
-    /begin COMPU_METHOD MyEnum "Conversion table for enum MyEnum"
-      TAB_VERB "%.4" ""
-      COMPU_TAB_REF MyEnum
-    /end COMPU_METHOD
+    /begin RECORD_LAYOUT Axis_1_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 3
+    /end RECORD_LAYOUT
 
-    /begin COMPU_VTAB MyEnum "Conversion table for enum MyEnum"
-      TAB_VERB 3
-      20 "VALUE_2"
-      100 "VALUE_1"
-      11111 "VALUE_3"
-    /end COMPU_VTAB
+    /begin RECORD_LAYOUT Axis_0_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 5
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Curve_ExternalAxis_RecordLayout
+      FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Curve_InternalAxis_RecordLayout
+      AXIS_PTS_X 1 UWORD INDEX_INCR DIRECT
+      FNC_VALUES 2 FLOAT32_IEEE ROW_DIR DIRECT
+      FIX_NO_AXIS_PTS_X 4
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Map_ExternalAxis_RecordLayout
+      FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Map_InternalAxis_RecordLayout
+      AXIS_PTS_X 1 UWORD INDEX_INCR DIRECT
+      AXIS_PTS_Y 2 UWORD INDEX_INCR DIRECT
+      FNC_VALUES 3 ULONG ROW_DIR DIRECT
+      FIX_NO_AXIS_PTS_X 4
+      FIX_NO_AXIS_PTS_Y 3
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT uint32_RecordLayout
+      FNC_VALUES 1 ULONG ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT float32_RecordLayout
+      FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
   /end MODULE
 /end PROJECT

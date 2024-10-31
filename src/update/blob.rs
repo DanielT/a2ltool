@@ -1,72 +1,99 @@
-use crate::dwarf::{DebugData, TypeInfo};
+use crate::dwarf::DebugData;
+use crate::symbol::SymbolInfo;
 use a2lfile::{A2lObject, Blob, Module};
 use std::collections::HashSet;
 
-use super::ifdata_update::{update_ifdata, zero_if_data};
+use super::ifdata_update::{update_ifdata_address, update_ifdata_type, zero_if_data};
 use super::{
-    cleanup_item_list, get_symbol_info, log_update_errors, make_symbol_link_string, set_symbol_link,
+    cleanup_item_list, get_symbol_info, make_symbol_link_string, set_symbol_link, A2lUpdateInfo,
+    A2lUpdater, UpdateResult,
 };
 
-pub(crate) fn update_module_blobs(
-    module: &mut Module,
-    debug_data: &DebugData,
-    log_msgs: &mut Vec<String>,
-    preserve_unknown: bool,
-) -> (u32, u32) {
+// update all BLOB objects in a module
+pub(crate) fn update_all_module_blobs(
+    data: &mut A2lUpdater,
+    info: &A2lUpdateInfo,
+) -> Vec<UpdateResult> {
     let mut removed_items = HashSet::<String>::new();
     let mut blob_list = Vec::new();
-    let mut blob_updated: u32 = 0;
-    let mut blob_not_updated: u32 = 0;
-    std::mem::swap(&mut module.blob, &mut blob_list);
-    for mut blob in blob_list {
-        match update_blob_address(&mut blob, debug_data) {
-            Ok(typeinfo) => {
-                blob.size = typeinfo.get_size() as u32;
-                module.blob.push(blob);
-                blob_updated += 1;
-            }
-            Err(errmsgs) => {
-                log_update_errors(log_msgs, errmsgs, "BLOB", blob.get_line());
+    let mut results = Vec::new();
 
-                if preserve_unknown {
-                    blob.start_address = 0;
-                    zero_if_data(&mut blob.if_data);
-                    module.blob.push(blob);
+    std::mem::swap(&mut data.module.blob, &mut blob_list);
+    for mut blob in blob_list {
+        let update_result = update_module_blob(&mut blob, info);
+        if matches!(update_result, UpdateResult::SymbolNotFound { .. }) {
+            if info.preserve_unknown {
+                blob.start_address = 0;
+                zero_if_data(&mut blob.if_data);
+                data.module.blob.push(blob);
+            } else {
+                removed_items.insert(blob.name.clone());
+            }
+        } else {
+            data.module.blob.push(blob);
+        }
+        results.push(update_result);
+    }
+    cleanup_removed_blobs(data.module, &removed_items);
+
+    results
+}
+
+// update a single BLOB object
+fn update_module_blob(blob: &mut Blob, info: &A2lUpdateInfo<'_>) -> UpdateResult {
+    match get_symbol_info(
+        &blob.name,
+        &blob.symbol_link,
+        &blob.if_data,
+        info.debug_data,
+    ) {
+        // match update_blob_address(&mut blob, debug_data) {
+        Ok(sym_info) => {
+            update_blob_address(blob, info.debug_data, &sym_info);
+
+            update_ifdata_address(&mut blob.if_data, &sym_info.name, sym_info.address);
+
+            if info.full_update {
+                // update the data type of the BLOB object
+                update_ifdata_type(&mut blob.if_data, sym_info.typeinfo);
+
+                blob.size = sym_info.typeinfo.get_size() as u32;
+                UpdateResult::Updated
+            } else if info.strict_update {
+                // a blob has no data type, but the blob size could be wrong
+                if blob.size != sym_info.typeinfo.get_size() as u32 {
+                    UpdateResult::InvalidDataType {
+                        blocktype: "BLOB",
+                        name: blob.name.clone(),
+                        line: blob.get_line(),
+                    }
                 } else {
-                    // item is removed implicitly, because it is not added back to the list
-                    removed_items.insert(blob.name.clone());
+                    UpdateResult::Updated
                 }
-                blob_not_updated += 1;
+            } else {
+                // no data type update requested, and strict update is also not requested
+                UpdateResult::Updated
             }
         }
+        Err(errmsgs) => UpdateResult::SymbolNotFound {
+            blocktype: "BLOB",
+            name: blob.name.clone(),
+            line: blob.get_line(),
+            errors: errmsgs,
+        },
     }
-    cleanup_removed_blobs(module, &removed_items);
-
-    (blob_updated, blob_not_updated)
 }
 
 // update the address of a BLOB object
-fn update_blob_address<'a>(
+fn update_blob_address<'dbg>(
     blob: &mut Blob,
-    debug_data: &'a DebugData,
-) -> Result<&'a TypeInfo, Vec<String>> {
-    match get_symbol_info(&blob.name, &blob.symbol_link, &blob.if_data, debug_data) {
-        Ok(sym_info) => {
-            // make sure a valid SYMBOL_LINK exists
-            let symbol_link_text = make_symbol_link_string(&sym_info, debug_data);
-            set_symbol_link(&mut blob.symbol_link, symbol_link_text);
-            blob.start_address = sym_info.address as u32;
-            update_ifdata(
-                &mut blob.if_data,
-                &sym_info.name,
-                sym_info.typeinfo,
-                sym_info.address,
-            );
-
-            Ok(sym_info.typeinfo)
-        }
-        Err(errmsgs) => Err(errmsgs),
-    }
+    debug_data: &'dbg DebugData,
+    sym_info: &SymbolInfo<'dbg>,
+) {
+    // make sure a valid SYMBOL_LINK exists
+    let symbol_link_text = make_symbol_link_string(sym_info, debug_data);
+    set_symbol_link(&mut blob.symbol_link, symbol_link_text);
+    blob.start_address = sym_info.address as u32;
 }
 
 pub(crate) fn cleanup_removed_blobs(module: &mut Module, removed_items: &HashSet<String>) {

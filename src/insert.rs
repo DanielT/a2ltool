@@ -81,8 +81,7 @@ pub(crate) fn insert_items(
             || sym_info
                 .typeinfo
                 .get_arraytype()
-                .map(is_simple_type)
-                .unwrap_or(false)
+                .is_some_and(is_simple_type)
         {
             if is_calib {
                 match insert_characteristic_sym(
@@ -196,8 +195,7 @@ fn insert_measurement_sym(
     let typeinfo = sym_info
         .typeinfo
         .get_pointer(&debug_data.types)
-        .map(|(_, t)| t)
-        .unwrap_or(sym_info.typeinfo);
+        .map_or(sym_info.typeinfo, |(_, t)| t);
 
     // handle arrays and unwrap the typeinfo
     update::set_matrix_dim(
