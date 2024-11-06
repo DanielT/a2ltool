@@ -1,0 +1,100 @@
+ASAP2_VERSION 1 71
+/begin PROJECT test ""
+  /begin MODULE mod ""
+
+    /begin COMPU_METHOD uint16_Compu ""
+      RAT_FUNC "%.0" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
+
+    /begin COMPU_METHOD uint32_Compu ""
+      RAT_FUNC "%.0" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
+
+    /begin COMPU_METHOD float_Compu ""
+      RAT_FUNC "%.3" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
+
+    /begin TYPEDEF_MEASUREMENT Measurement_ULong ""
+      ULONG NO_COMPU_METHOD 0 0 0 4294967295
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_MEASUREMENT Measurement_UWord ""
+      UWORD NO_COMPU_METHOD 0 0 0 65535
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_STRUCTURE UpdateTest_Map_InternalAxis ""
+      0x40
+      /begin STRUCTURE_COMPONENT
+        x Measurement_UWord
+        0
+        MATRIX_DIM 4
+        SYMBOL_TYPE_LINK "x"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        y Measurement_UWord
+        8
+        MATRIX_DIM 3
+        SYMBOL_TYPE_LINK "y"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        value Measurement_ULong
+        16
+        MATRIX_DIM 3 4
+        SYMBOL_TYPE_LINK "value"
+      /end STRUCTURE_COMPONENT
+      SYMBOL_TYPE_LINK "UpdateTest_Map_InternalAxis"
+    /end TYPEDEF_STRUCTURE
+
+    /begin RECORD_LAYOUT Axis_2_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 2
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Axis_1_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 3
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Axis_0_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 5
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Curve_ExternalAxis_RecordLayout
+      FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Curve_InternalAxis_RecordLayout
+      AXIS_PTS_X 1 UWORD INDEX_INCR DIRECT
+      FNC_VALUES 2 FLOAT32_IEEE ROW_DIR DIRECT
+      FIX_NO_AXIS_PTS_X 4
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Map_ExternalAxis_RecordLayout
+      FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Map_InternalAxis_RecordLayout
+      AXIS_PTS_X 1 UWORD INDEX_INCR DIRECT
+      AXIS_PTS_Y 2 UWORD INDEX_INCR DIRECT
+      FNC_VALUES 3 ULONG ROW_DIR DIRECT
+      FIX_NO_AXIS_PTS_X 4
+      FIX_NO_AXIS_PTS_Y 3
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT uint32_RecordLayout
+      FNC_VALUES 1 ULONG ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT float32_RecordLayout
+      FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin GROUP empty ""
+    /end GROUP
+
+  /end MODULE
+/end PROJECT

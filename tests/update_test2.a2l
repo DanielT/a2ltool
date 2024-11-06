@@ -199,6 +199,15 @@ ASAP2_VERSION 1 71
       SYMBOL_LINK "Measurement_Bitfield.bits_3" 0
     /end MEASUREMENT
 
+    /begin MEASUREMENT Measurement_Enum_missing_compu ""
+      UBYTE NO_COMPU_METHOD 0 0 0 2
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Enum_Value" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Enum_Value" 0
+    /end MEASUREMENT
+
     /begin MEASUREMENT Measurement_nonexistant ""
       ULONG NO_COMPU_METHOD 0 0 0 2
       ECU_ADDRESS 0x0

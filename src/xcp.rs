@@ -330,5 +330,5 @@ fn print_xcp_on_ip_common(
     if let Some(Ipv6 { address_v6, .. }) = ipv6 {
         println!("    address: {address_v6}");
     }
-    println!("Port: {port}");
+    println!("    port: {port}");
 }

@@ -17,6 +17,11 @@ ASAP2_VERSION 1 71
       COEFFS 0 1 0 0 0 1
     /end COMPU_METHOD
 
+    /begin COMPU_METHOD enumeration "Conversion table for enum enumeration"
+      TAB_VERB "%.4" ""
+      COMPU_TAB_REF enumeration
+    /end COMPU_METHOD
+
     /begin CHARACTERISTIC Curve_ExternalAxis ""
       CURVE 0x0 Curve_ExternalAxis_RecordLayout 0 float_Compu -10000000 10000000
       /begin AXIS_DESCR
@@ -176,6 +181,15 @@ ASAP2_VERSION 1 71
       SYMBOL_LINK "Measurement_Bitfield.bits_3" 0
     /end MEASUREMENT
 
+    /begin MEASUREMENT Measurement_Enum ""
+      UBYTE enumeration 0 0 0 2
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Enum_Value" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Enum_Value" 0
+    /end MEASUREMENT
+
     /begin INSTANCE INSTANCE.Map_InternalAxis "instance for symbol Map_InternalAxis"
       UpdateTest_Map_InternalAxis 0x0
       /begin IF_DATA CANAPE_EXT 0x64
@@ -259,6 +273,16 @@ ASAP2_VERSION 1 71
     /begin RECORD_LAYOUT float32_RecordLayout
       FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
     /end RECORD_LAYOUT
+
+    /begin COMPU_VTAB enumeration "Conversion table for enum enumeration"
+      TAB_VERB 6
+      0 "FIRST_VALUE"
+      1 "SECOND_VALUE"
+      2 "THIRD_VALUE"
+      3 "FOURTH_VALUE"
+      4 "FIFTH_VALUE"
+      5 "SIXTH_VALUE"
+    /end COMPU_VTAB
 
   /end MODULE
 /end PROJECT

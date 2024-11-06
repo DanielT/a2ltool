@@ -93,6 +93,19 @@ struct {
 
 /**********************************************/
 
+enum enumeration {
+    FIRST_VALUE,
+    SECOND_VALUE,
+    THIRD_VALUE,
+    FOURTH_VALUE,
+    FIFTH_VALUE,
+    SIXTH_VALUE,
+};
+
+enum enumeration Enum_Value = THIRD_VALUE;
+
+/**********************************************/
+
 int main(void)
 {
     return 0;

@@ -689,7 +689,13 @@ mod test {
 
     fn test_setup(a2l_name: &str) -> (crate::dwarf::DebugData, a2lfile::A2lFile) {
         let mut log_msgs = Vec::new();
-        let a2l = a2lfile::load(a2l_name, None, &mut log_msgs, true).unwrap();
+        let a2l = a2lfile::load(
+            a2l_name,
+            Some(ifdata::A2MLVECTOR_TEXT.to_string()),
+            &mut log_msgs,
+            true,
+        )
+        .unwrap();
         let debug_data =
             crate::dwarf::DebugData::load(&OsString::from("tests/elffiles/update_test.elf"), false)
                 .unwrap();
@@ -986,9 +992,9 @@ mod test {
         let mut log_msgs = Vec::new();
         let result = update_all_module_measurements(&mut data, &info);
         assert!(result.iter().all(|r| r == &UpdateResult::Updated));
-        assert_eq!(result.len(), 5);
+        assert_eq!(result.len(), 6);
         let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
-        assert_eq!(updated, 5);
+        assert_eq!(updated, 6);
         assert_eq!(not_updated, 0);
         assert!(log_msgs.is_empty());
 
@@ -1006,9 +1012,9 @@ mod test {
         let mut log_msgs = Vec::new();
         let result = update_all_module_measurements(&mut data, &info);
         assert!(result.iter().all(|r| r == &UpdateResult::Updated));
-        assert_eq!(result.len(), 5);
+        assert_eq!(result.len(), 6);
         let (updated, not_updated) = log_update_results(&mut log_msgs, &result);
-        assert_eq!(updated, 5);
+        assert_eq!(updated, 6);
         assert_eq!(not_updated, 0);
         assert!(log_msgs.is_empty());
     }
@@ -1028,13 +1034,14 @@ mod test {
             true,
         );
         let result = update_all_module_measurements(&mut data, &info);
-        assert_eq!(result.len(), 6);
+        assert_eq!(result.len(), 7);
         assert!(matches!(result[0], UpdateResult::InvalidDataType { .. }));
         assert!(matches!(result[1], UpdateResult::InvalidDataType { .. }));
         assert!(matches!(result[2], UpdateResult::InvalidDataType { .. }));
         assert!(matches!(result[3], UpdateResult::Updated));
         assert!(matches!(result[4], UpdateResult::Updated));
-        assert!(matches!(result[5], UpdateResult::SymbolNotFound { .. }));
+        assert!(matches!(result[5], UpdateResult::InvalidDataType { .. }));
+        assert!(matches!(result[6], UpdateResult::SymbolNotFound { .. }));
     }
 
     #[test]
@@ -1059,7 +1066,7 @@ mod test {
         assert_eq!(summary.characteristic_not_updated, 0);
         assert_eq!(summary.characteristic_updated, 6);
         assert_eq!(summary.measurement_not_updated, 0);
-        assert_eq!(summary.measurement_updated, 5);
+        assert_eq!(summary.measurement_updated, 6);
         assert_eq!(summary.instance_not_updated, 0);
         assert_eq!(summary.instance_updated, 1);
         assert!(log_msgs.is_empty());
@@ -1081,7 +1088,7 @@ mod test {
         assert_eq!(summary.characteristic_not_updated, 0);
         assert_eq!(summary.characteristic_updated, 6);
         assert_eq!(summary.measurement_not_updated, 0);
-        assert_eq!(summary.measurement_updated, 5);
+        assert_eq!(summary.measurement_updated, 6);
         assert_eq!(summary.instance_not_updated, 0);
         assert_eq!(summary.instance_updated, 1);
         assert!(log_msgs.is_empty());

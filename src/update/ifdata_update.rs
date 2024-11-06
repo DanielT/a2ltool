@@ -186,8 +186,6 @@ pub(crate) fn zero_if_data(ifdata_vec: &mut Vec<IfData>) {
                     link_map.datatype = 0;
                     link_map.bit_offset = 0;
                     link_map.datatype_valid = 0;
-
-                    decoded_ifdata.store_to_ifdata(ifdata);
                 }
             } else if let Some(asap1b_ccp) = &mut decoded_ifdata.asap1b_ccp {
                 if let Some(dp_blob) = &mut asap1b_ccp.dp_blob {
@@ -195,6 +193,137 @@ pub(crate) fn zero_if_data(ifdata_vec: &mut Vec<IfData>) {
                     dp_blob.base_address = 0;
                 }
             }
+            decoded_ifdata.store_to_ifdata(ifdata);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    static A2L_TEXT_CANAPE_EXT: &str = r#"
+/begin PROJECT Project ""
+  /begin MODULE Module ""
+    /begin MEASUREMENT Meas "" SBYTE NO_COMPU_METHOD 0 0 0 2
+      /begin IF_DATA CANAPE_EXT 100
+        LINK_MAP "text" 0xFF 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+    /end MEASUREMENT
+  /end MODULE
+/end PROJECT"#;
+
+    static A2L_TEXT_ASAP_CCP1B: &str = r#"
+/begin PROJECT Project ""
+  /begin MODULE Module ""
+    /begin MEASUREMENT Meas "" SBYTE NO_COMPU_METHOD 0 0 0 2
+      /begin IF_DATA ASAP1B_CCP 
+        DP_BLOB 0x0 0xFF 3 
+      /end IF_DATA
+    /end MEASUREMENT
+  /end MODULE
+/end PROJECT"#;
+
+    static TYPEINFO_UINT32: TypeInfo = TypeInfo {
+        name: None,
+        unit_idx: 0,
+        datatype: DwarfDataType::Uint32,
+        dbginfo_offset: 0,
+    };
+
+    fn test_setup(input: &str) -> a2lfile::A2lFile {
+        let mut log_msgs = Vec::new();
+        let mut a2l = a2lfile::load_from_string(
+            input,
+            Some(ifdata::A2MLVECTOR_TEXT.to_string()),
+            &mut log_msgs,
+            false,
+        )
+        .unwrap();
+        let module = &mut a2l.project.module[0];
+        let ifdata = &module.measurement[0].if_data[0];
+        assert!(ifdata::A2mlVector::load_from_ifdata(ifdata).is_some());
+        a2l
+    }
+
+    #[test]
+    fn test_update_ifdata_address_canape_ext() {
+        let mut a2l = test_setup(A2L_TEXT_CANAPE_EXT);
+        let module = &mut a2l.project.module[0];
+
+        update_ifdata_address(&mut module.measurement[0].if_data, "symbol", 0x1234);
+        let decoded_ifdata =
+            ifdata::A2mlVector::load_from_ifdata(&module.measurement[0].if_data[0]).unwrap();
+        let canape_ext = decoded_ifdata.canape_ext.unwrap();
+        let link_map = canape_ext.link_map.unwrap();
+        assert_eq!(link_map.address, 0x1234);
+    }
+
+    #[test]
+    fn test_update_ifdata_type_canape_ext() {
+        let mut a2l = test_setup(A2L_TEXT_CANAPE_EXT);
+        let module = &mut a2l.project.module[0];
+
+        update_ifdata_type(&mut module.measurement[0].if_data, &TYPEINFO_UINT32);
+        let decoded_ifdata =
+            ifdata::A2mlVector::load_from_ifdata(&module.measurement[0].if_data[0]).unwrap();
+        let canape_ext = decoded_ifdata.canape_ext.unwrap();
+        let link_map = canape_ext.link_map.unwrap();
+        assert_eq!(link_map.datatype, 0x9f);
+    }
+
+    #[test]
+    fn test_zero_ifdata_canape_ext() {
+        let mut a2l = test_setup(A2L_TEXT_CANAPE_EXT);
+        let module = &mut a2l.project.module[0];
+
+        zero_if_data(&mut module.measurement[0].if_data);
+        let decoded_ifdata =
+            ifdata::A2mlVector::load_from_ifdata(&module.measurement[0].if_data[0]).unwrap();
+        let canape_ext = decoded_ifdata.canape_ext.unwrap();
+        let link_map = canape_ext.link_map.unwrap();
+        assert_eq!(link_map.address, 0);
+        assert_eq!(link_map.datatype, 0);
+        assert_eq!(link_map.bit_offset, 0);
+        assert_eq!(link_map.datatype_valid, 0);
+    }
+
+    #[test]
+    fn test_update_ifdata_address_asap1b_ccp() {
+        let mut a2l = test_setup(A2L_TEXT_ASAP_CCP1B);
+        let module = &mut a2l.project.module[0];
+
+        update_ifdata_address(&mut module.measurement[0].if_data, "symbol", 0x1234);
+        let decoded_ifdata =
+            ifdata::A2mlVector::load_from_ifdata(&module.measurement[0].if_data[0]).unwrap();
+        let asap1b_ccp = decoded_ifdata.asap1b_ccp.unwrap();
+        let dp_blob = asap1b_ccp.dp_blob.unwrap();
+        assert_eq!(dp_blob.base_address, 0x1234);
+    }
+
+    #[test]
+    fn test_update_ifdata_type_asap1b_ccp() {
+        let mut a2l = test_setup(A2L_TEXT_ASAP_CCP1B);
+        let module = &mut a2l.project.module[0];
+
+        update_ifdata_type(&mut module.measurement[0].if_data, &TYPEINFO_UINT32);
+        let decoded_ifdata =
+            ifdata::A2mlVector::load_from_ifdata(&module.measurement[0].if_data[0]).unwrap();
+        let asap1b_ccp = decoded_ifdata.asap1b_ccp.unwrap();
+        let dp_blob = asap1b_ccp.dp_blob.unwrap();
+        assert_eq!(dp_blob.size, 4);
+    }
+
+    #[test]
+    fn test_zero_ifdata_asap1b_ccp() {
+        let mut a2l = test_setup(A2L_TEXT_ASAP_CCP1B);
+        let module = &mut a2l.project.module[0];
+
+        zero_if_data(&mut module.measurement[0].if_data);
+        let decoded_ifdata =
+            ifdata::A2mlVector::load_from_ifdata(&module.measurement[0].if_data[0]).unwrap();
+        let asap1b_ccp = decoded_ifdata.asap1b_ccp.unwrap();
+        let dp_blob = asap1b_ccp.dp_blob.unwrap();
+        assert_eq!(dp_blob.base_address, 0);
     }
 }

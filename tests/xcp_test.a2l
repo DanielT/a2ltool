@@ -1,0 +1,2551 @@
+ASAP2_VERSION 1 71
+/begin PROJECT XcpTest ""
+  /begin MODULE XcpTest ""
+    /begin A2ML
+    struct Protocol_Layer {
+      uint;
+      uint;
+      uint;
+      uint;
+      uint;
+      uint;
+      uint;
+      uint;
+      uchar;
+      uint;
+      enum {
+        "BYTE_ORDER_MSB_LAST"  = 0,
+        "BYTE_ORDER_MSB_FIRST" = 1
+      };
+      enum {
+        "ADDRESS_GRANULARITY_BYTE"    = 1,
+        "ADDRESS_GRANULARITY_WORD"    = 2,
+        "ADDRESS_GRANULARITY_DWORD"   = 4
+      };
+      taggedstruct {
+        ("OPTIONAL_CMD" enum {
+          "GET_COMM_MODE_INFO"               = 0xFB,
+          "GET_ID"                           = 0xFA,
+          "SET_REQUEST"                      = 0xF9,
+          "GET_SEED"                         = 0xF8,
+          "UNLOCK"                           = 0xF7,
+          "SET_MTA"                          = 0xF6,
+          "UPLOAD"                           = 0xF5,
+          "SHORT_UPLOAD"                     = 0xF4,
+          "BUILD_CHECKSUM"                   = 0xF3,
+          "TRANSPORT_LAYER_CMD"              = 0xF2,
+          "USER_CMD"                         = 0xF1,
+          "DOWNLOAD"                         = 0xF0,
+          "DOWNLOAD_NEXT"                    = 0xEF,
+          "DOWNLOAD_MAX"                     = 0xEE,
+          "SHORT_DOWNLOAD"                   = 0xED,
+          "MODIFY_BITS"                      = 0xEC,
+          "SET_CAL_PAGE"                     = 0xEB,
+          "GET_CAL_PAGE"                     = 0xEA,
+          "GET_PAG_PROCESSOR_INFO"           = 0xE9,
+          "GET_SEGMENT_INFO"                 = 0xE8,
+          "GET_PAGE_INFO"                    = 0xE7,
+          "SET_SEGMENT_MODE"                 = 0xE6,
+          "GET_SEGMENT_MODE"                 = 0xE5,
+          "COPY_CAL_PAGE"                    = 0xE4,
+          "CLEAR_DAQ_LIST"                   = 0xE3,
+          "SET_DAQ_PTR"                      = 0xE2,
+          "WRITE_DAQ"                        = 0xE1,
+          "SET_DAQ_LIST_MODE"                = 0xE0,
+          "GET_DAQ_LIST_MODE"                = 0xDF,
+          "START_STOP_DAQ_LIST"              = 0xDE,
+          "START_STOP_SYNCH"                 = 0xDD,
+          "GET_DAQ_CLOCK"                    = 0xDC,
+          "READ_DAQ"                         = 0xDB,
+          "GET_DAQ_PROCESSOR_INFO"           = 0xDA,
+          "GET_DAQ_RESOLUTION_INFO"          = 0xD9,
+          "GET_DAQ_LIST_INFO"                = 0xD8,
+          "GET_DAQ_EVENT_INFO"               = 0xD7,
+          "FREE_DAQ"                         = 0xD6,
+          "ALLOC_DAQ"                        = 0xD5,
+          "ALLOC_ODT"                        = 0xD4,
+          "ALLOC_ODT_ENTRY"                  = 0xD3,
+          "PROGRAM_START"                    = 0xD2,
+          "PROGRAM_CLEAR"                    = 0xD1,
+          "PROGRAM"                          = 0xD0,
+          "PROGRAM_RESET"                    = 0xCF,
+          "GET_PGM_PROCESSOR_INFO"           = 0xCE,
+          "GET_SECTOR_INFO"                  = 0xCD,
+          "PROGRAM_PREPARE"                  = 0xCC,
+          "PROGRAM_FORMAT"                   = 0xCB,
+          "PROGRAM_NEXT"                     = 0xCA,
+          "PROGRAM_MAX"                      = 0xC9,
+          "PROGRAM_VERIFY"                   = 0xC8,
+          "WRITE_DAQ_MULTIPLE"               = 0xC7,
+          "TIME_CORRELATION_PROPERTIES"      = 0xC6,
+          "DTO_CTR_PROPERTIES"               = 0xC5
+        })*;
+        ("OPTIONAL_LEVEL1_CMD" enum {
+          "GET_VERSION"                      = 0x00,
+          "SET_DAQ_PACKED_MODE"              = 0x01,
+          "GET_DAQ_PACKED_MODE"              = 0x02,
+          "SW_DBG_COMMAND_SPACE"             = 0xFC,
+          "POD_COMMAND_SPACE"                = 0xFD
+        })*;
+        "COMMUNICATION_MODE_SUPPORTED" taggedunion {
+          "BLOCK" taggedstruct {
+            "SLAVE";
+            "MASTER" struct {
+              uchar;
+              uchar;
+            };
+          };
+          "INTERLEAVED" uchar;
+        };
+        "SEED_AND_KEY_EXTERNAL_FUNCTION" char[256];
+        "MAX_DTO_STIM" uint;
+        block "ECU_STATES" taggedstruct{
+          (block "STATE" struct{
+            uchar;
+            char[100];
+            taggedstruct {
+              "ECU_SWITCHED_TO_DEFAULT_PAGE";
+            };
+            enum {
+              "NOT_ACTIVE" = 0,
+              "ACTIVE" = 1,
+              "GETTER_ONLY" = 2
+            };
+            enum {
+              "NOT_ACTIVE" = 0,
+              "ACTIVE" = 1
+            };
+            enum {
+              "NOT_ACTIVE" = 0,
+              "ACTIVE" = 1
+            };
+            enum {
+              "NOT_ACTIVE" = 0,
+              "ACTIVE" = 1
+            };
+            taggedstruct {
+              (block "MEMORY_ACCESS" struct{
+                uchar;
+                uchar;
+                enum {
+                  "READ_ACCESS_NOT_ALLOWED" = 0,
+                  "READ_ACCESS_ALLOWED" = 1
+                };
+                enum {
+                  "WRITE_ACCESS_NOT_ALLOWED" = 0,
+                  "WRITE_ACCESS_ALLOWED" = 1
+                };
+              })*;
+            };
+          })*;
+        };
+      };
+    };
+    struct Daq {
+      enum {
+        "STATIC"  = 0,
+        "DYNAMIC" = 1
+      };
+      uint;
+      uint;
+      uchar;
+      enum {
+        "OPTIMISATION_TYPE_DEFAULT"            = 0,
+        "OPTIMISATION_TYPE_ODT_TYPE_16"        = 1,
+        "OPTIMISATION_TYPE_ODT_TYPE_32"        = 2,
+        "OPTIMISATION_TYPE_ODT_TYPE_64"        = 3,
+        "OPTIMISATION_TYPE_ODT_TYPE_ALIGNMENT" = 4,
+        "OPTIMISATION_TYPE_MAX_ENTRY_SIZE"     = 5
+      };
+      enum {
+        "ADDRESS_EXTENSION_FREE" = 0,
+        "ADDRESS_EXTENSION_ODT"  = 1,
+        "ADDRESS_EXTENSION_DAQ"  = 3
+      };
+      enum {
+        "IDENTIFICATION_FIELD_TYPE_ABSOLUTE"              = 0,
+        "IDENTIFICATION_FIELD_TYPE_RELATIVE_BYTE"         = 1,
+        "IDENTIFICATION_FIELD_TYPE_RELATIVE_WORD"         = 2,
+        "IDENTIFICATION_FIELD_TYPE_RELATIVE_WORD_ALIGNED" = 3
+      };
+      enum {
+        "GRANULARITY_ODT_ENTRY_SIZE_DAQ_BYTE"    = 1,
+        "GRANULARITY_ODT_ENTRY_SIZE_DAQ_WORD"    = 2,
+        "GRANULARITY_ODT_ENTRY_SIZE_DAQ_DWORD"   = 4,
+        "GRANULARITY_ODT_ENTRY_SIZE_DAQ_DLONG"   = 8
+      };
+      uchar;
+      enum {
+        "NO_OVERLOAD_INDICATION"    = 0,
+        "OVERLOAD_INDICATION_PID"   = 1,
+        "OVERLOAD_INDICATION_EVENT" = 2
+      };
+      taggedstruct {
+        "DAQ_ALTERNATING_SUPPORTED" uint;
+        "PRESCALER_SUPPORTED";
+        "RESUME_SUPPORTED";
+        "STORE_DAQ_SUPPORTED";
+        "DTO_CTR_FIELD_SUPPORTED";
+        "OPTIMISATION_TYPE_ODT_STRICT";
+        block "STIM" struct {
+          enum {
+            "GRANULARITY_ODT_ENTRY_SIZE_STIM_BYTE"   = 1,
+            "GRANULARITY_ODT_ENTRY_SIZE_STIM_WORD"   = 2,
+            "GRANULARITY_ODT_ENTRY_SIZE_STIM_DWORD"  = 4,
+            "GRANULARITY_ODT_ENTRY_SIZE_STIM_DLONG"  = 8
+          };
+          uchar;
+          taggedstruct {
+            "BIT_STIM_SUPPORTED";
+            "MIN_ST_STIM" uchar;
+          };
+        };
+        block "TIMESTAMP_SUPPORTED" struct {
+          uint;
+          enum {
+            "NO_TIME_STAMP" = 0,
+            "SIZE_BYTE"     = 1,
+            "SIZE_WORD"     = 2,
+            "SIZE_DWORD"    = 4
+          };
+          enum {
+            "UNIT_1NS"   = 0,
+            "UNIT_10NS"  = 1,
+            "UNIT_100NS" = 2,
+            "UNIT_1US"   = 3,
+            "UNIT_10US"  = 4,
+            "UNIT_100US" = 5,
+            "UNIT_1MS"   = 6,
+            "UNIT_10MS"  = 7,
+            "UNIT_100MS" = 8,
+            "UNIT_1S"    = 9,
+            "UNIT_1PS"   = 10,
+            "UNIT_10PS"  = 11,
+            "UNIT_100PS" = 12
+          };
+          taggedstruct {
+            "TIMESTAMP_FIXED";
+          };
+        };
+        "PID_OFF_SUPPORTED";
+        "MAX_DAQ_TOTAL" uint;
+        "MAX_ODT_TOTAL" uint;
+        "MAX_ODT_DAQ_TOTAL" uint;
+        "MAX_ODT_STIM_TOTAL" uint;
+        "MAX_ODT_ENTRIES_TOTAL" uint;
+        "MAX_ODT_ENTRIES_DAQ_TOTAL" uint;
+        "MAX_ODT_ENTRIES_STIM_TOTAL" uint;
+        "CPU_LOAD_MAX_TOTAL" float;
+        "CORE_LOAD_MAX_TOTAL" float;
+        (block "CORE_LOAD_MAX" struct {
+          uint;
+          float;
+        })*;
+        block "DAQ_MEMORY_CONSUMPTION" struct {
+          ulong;
+          uint;
+          uint;
+          uint;
+          uint;
+          uint;
+          taggedstruct {
+            block "BUFFER_RESERVE" struct {
+              uchar;
+              uchar;
+            };
+          };
+        };
+        (block "DAQ_LIST" struct {
+          uint;
+          taggedstruct {
+            "DAQ_LIST_TYPE" enum {
+              "DAQ"      = 1,
+              "STIM"     = 2,
+              "DAQ_STIM" = 3
+            };
+            "MAX_ODT"         uchar;
+            "MAX_ODT_ENTRIES" uchar;
+            "FIRST_PID" uchar;
+            "EVENT_FIXED" uint;
+            "DAQ_PACKED_MODE_SUPPORTED";
+            block "PREDEFINED" taggedstruct {
+              (block "ODT" struct {
+                uchar;
+                taggedstruct {
+                  ("ODT_ENTRY" struct {
+                    uchar;
+                    ulong;
+                    uchar;
+                    uchar;
+                    uchar;
+                  })*;
+                };
+              })*;
+            };
+          };
+        })*;
+        (block "EVENT" struct {
+          char[101];
+          char[9];
+          uint;
+          enum {
+            "DAQ"      = 1,
+            "STIM"     = 2,
+            "DAQ_STIM" = 3
+          };
+          uchar;
+          uchar;
+          uchar;
+          uchar;
+          taggedstruct {
+            "COMPLEMENTARY_BYPASS_EVENT_CHANNEL_NUMBER" uint;
+            "CONSISTENCY" enum {
+              "DAQ"   = 0,
+              "EVENT" = 1,
+              "ODT"   = 2,
+              "NONE"  = 3
+            };
+            "EVENT_COUNTER_PRESENT";
+            "RELATED_EVENT_CHANNEL_NUMBER" uint;
+            "RELATED_EVENT_CHANNEL_NUMBER_FIXED";
+            "DTO_CTR_DAQ_MODE" enum {
+              "INSERT_COUNTER" = 0,
+              "INSERT_STIM_COUNTER_COPY" = 1
+            };
+            "DTO_CTR_DAQ_MODE_FIXED";
+            "DTO_CTR_STIM_MODE" enum {
+              "DO_NOT_CHECK_COUNTER" = 0,
+              "CHECK_COUNTER" = 1
+            };
+            "DTO_CTR_STIM_MODE_FIXED";
+            "STIM_DTO_CTR_COPY_PRESENT";
+            block "DAQ_PACKED_MODE" struct {
+              enum {
+                "ELEMENT_GROUPED" = 1,
+                "EVENT_GROUPED"   = 2
+              };
+              enum {
+                "STS_LAST"      = 0,
+                "STS_FIRST"     = 1
+              };
+              enum {
+                "OPTIONAL"      = 0,
+                "MANDATORY"     = 1
+              };
+              uint;
+              taggedstruct {
+                ("ALT_SAMPLE_COUNT" uint)*;
+              };
+            };
+            block "MIN_CYCLE_TIME" struct {
+              uchar;
+              uchar;
+            };
+            block "BUFFER_RESERVE_EVENT" struct {
+              uchar;
+              uchar;
+            };
+            "CPU_LOAD_MAX" float;
+            block "CPU_LOAD_CONSUMPTION_DAQ" struct {
+              float;
+              float;
+              float;
+              taggedstruct {
+                (block "ODT_ENTRY_SIZE_FACTOR_TABLE" struct{
+                  uint;
+                  float;
+                })*;
+                block "CORE_LOAD_EP" struct {
+                  uint;
+                  float;
+                };
+              };
+            };
+            block "CPU_LOAD_CONSUMPTION_STIM" struct {
+              float;
+              float;
+              float;
+              taggedstruct {
+                (block "ODT_ENTRY_SIZE_FACTOR_TABLE" struct{
+                  uint;
+                  float;
+                })*;
+                block "CORE_LOAD_EP" struct {
+                  uint;
+                  float;
+                };
+              };
+            };
+            block "CPU_LOAD_CONSUMPTION_QUEUE" struct {
+              float;
+              float;
+              taggedstruct {
+                block "CORE_LOAD_EP" struct {
+                  uint;
+                  float;
+                };
+              };
+            };
+            block "CPU_LOAD_CONSUMPTION_QUEUE_STIM" struct {
+              float;
+              float;
+              taggedstruct {
+                block "CORE_LOAD_EP" struct {
+                  uint;
+                  float;
+                };
+              };
+            };
+          };
+        })*;
+      };
+    };
+    taggedunion Daq_Event {
+      "FIXED_EVENT_LIST" taggedstruct {
+        ("EVENT" uint)*;
+      };
+      "VARIABLE" taggedstruct {
+        block "AVAILABLE_EVENT_LIST" taggedstruct {
+          ("EVENT" uint)*;
+        };
+        block "DEFAULT_EVENT_LIST" taggedstruct {
+          ("EVENT" uint)*;
+        };
+        block "CONSISTENCY_EVENT_LIST" taggedstruct {
+          ("EVENT" uint)*;
+        };
+      };
+    };
+    struct Pag {
+      uchar;
+      taggedstruct {
+        "FREEZE_SUPPORTED";
+      };
+    };
+    struct Pgm {
+      enum {
+        "PGM_MODE_ABSOLUTE"                = 1,
+        "PGM_MODE_FUNCTIONAL"              = 2,
+        "PGM_MODE_ABSOLUTE_AND_FUNCTIONAL" = 3
+      };
+      uchar;
+      uchar;
+      taggedstruct {
+        (block "SECTOR" struct {
+          char[101];
+          uchar;
+          ulong;
+          ulong;
+          uchar;
+          uchar;
+          uchar;
+        })*;
+        "COMMUNICATION_MODE_SUPPORTED" taggedunion {
+          "BLOCK" taggedstruct {
+            "SLAVE";
+            "MASTER" struct {
+              uchar;
+              uchar;
+            };
+          };
+          "INTERLEAVED" uchar;
+        };
+      };
+    };
+    struct Segment {
+      uchar;
+      uchar;
+      uchar;
+      uchar;
+      uchar;
+      taggedstruct {
+        block "CHECKSUM" struct {
+          enum {
+            "XCP_ADD_11"       =   1,
+            "XCP_ADD_12"       =   2,
+            "XCP_ADD_14"       =   3,
+            "XCP_ADD_22"       =   4,
+            "XCP_ADD_24"       =   5,
+            "XCP_ADD_44"       =   6,
+            "XCP_CRC_16"       =   7,
+            "XCP_CRC_16_CITT"  =   8,
+            "XCP_CRC_32"       =   9,
+            "XCP_USER_DEFINED" = 255
+          };
+          taggedstruct {
+            "MAX_BLOCK_SIZE" ulong;
+            "EXTERNAL_FUNCTION" char[256];
+            "MTA_BLOCK_SIZE_ALIGN" uint;
+          };
+        };
+        "DEFAULT_PAGE_NUMBER" uchar;
+        (block "PAGE" struct {
+          uchar;
+          enum {
+            "ECU_ACCESS_NOT_ALLOWED"      = 0,
+            "ECU_ACCESS_WITHOUT_XCP_ONLY" = 1,
+            "ECU_ACCESS_WITH_XCP_ONLY"    = 2,
+            "ECU_ACCESS_DONT_CARE"        = 3
+          };
+          enum {
+            "XCP_READ_ACCESS_NOT_ALLOWED"      = 0,
+            "XCP_READ_ACCESS_WITHOUT_ECU_ONLY" = 1,
+            "XCP_READ_ACCESS_WITH_ECU_ONLY"    = 2,
+            "XCP_READ_ACCESS_DONT_CARE"        = 3
+          };
+          enum {
+            "XCP_WRITE_ACCESS_NOT_ALLOWED"      = 0,
+            "XCP_WRITE_ACCESS_WITHOUT_ECU_ONLY" = 1,
+            "XCP_WRITE_ACCESS_WITH_ECU_ONLY"    = 2,
+            "XCP_WRITE_ACCESS_DONT_CARE"        = 3
+          };
+          taggedstruct {
+            "INIT_SEGMENT" uchar;
+          };
+        })*;
+        (block "ADDRESS_MAPPING" struct {
+          ulong;
+          ulong;
+          ulong;
+        })*;
+        "PGM_VERIFY" ulong;
+      };
+    };
+    taggedstruct Time_Correlation {
+      "DAQ_TIMESTAMPS_RELATE_TO" enum {
+        "XCP_SLAVE_CLOCK"           = 0,
+        "ECU_CLOCK"                 = 1
+      };
+      (block "CLOCK" struct {
+        char;
+        char;
+        char;
+        char;
+        char;
+        char;
+        char;
+        char;
+        enum {
+          "XCP_SLAVE_CLOCK"             = 0,
+          "ECU_CLOCK"                   = 1,
+          "XCP_SLAVE_GRANDMASTER_CLOCK" = 2,
+          "ECU_GRANDMASTER_CLOCK"       = 3
+        };
+        enum {
+          "RANDOMLY_READABLE" = 0,
+          "LIMITED_READABLE"  = 1,
+          "NOT_READABLE"      = 2
+        };
+        enum {
+          "SYN_UNSUPPORTED"      = 0,
+          "SYNCHRONIZATION_ONLY" = 1,
+          "SYNTONIZATION_ONLY"   = 2,
+          "SYN_ALL"              = 3
+        };
+        uchar;
+        taggedstruct {
+          block "TIMESTAMP_CHARACTERIZATION" struct {
+            uint;
+            enum {
+              "UNIT_1NS"   = 0,
+              "UNIT_10NS"  = 1,
+              "UNIT_100NS" = 2,
+              "UNIT_1US"   = 3,
+              "UNIT_10US"  = 4,
+              "UNIT_100US" = 5,
+              "UNIT_1MS"   = 6,
+              "UNIT_10MS"  = 7,
+              "UNIT_100MS" = 8,
+              "UNIT_1S"    = 9,
+              "UNIT_1PS"   = 10,
+              "UNIT_10PS"  = 11,
+              "UNIT_100PS" = 12
+            };
+            enum {
+              "SIZE_FOUR_BYTE"  = 4,
+              "SIZE_EIGHT_BYTE" = 8
+            };
+          };
+        };
+        uint64;
+        enum {
+          "ATOMIC_TIME"                = 0,
+          "UNIVERSAL_COORDINATED_TIME" = 1,
+          "ARBITRARY"                  = 2
+        };
+      })*;
+    };
+    taggedstruct Common_Parameters {
+      block "PROTOCOL_LAYER" struct Protocol_Layer;
+      block "TIME_CORRELATION" taggedstruct Time_Correlation;
+      block "SEGMENT" struct Segment;
+      block "DAQ" struct Daq;
+      block "PAG" struct Pag;
+      block "PGM" struct Pgm;
+      block "DAQ_EVENT" taggedunion Daq_Event;
+    };
+    struct CAN_Parameters {
+      uint;
+      taggedstruct {
+        "CAN_ID_BROADCAST" ulong;
+        "CAN_ID_MASTER" ulong;
+        "CAN_ID_MASTER_INCREMENTAL";
+        "CAN_ID_SLAVE" ulong;
+        "CAN_ID_GET_DAQ_CLOCK_MULTICAST" ulong;
+        "BAUDRATE" ulong;
+        "SAMPLE_POINT" uchar;
+        "SAMPLE_RATE" enum {
+          "SINGLE" = 1,
+          "TRIPLE" = 3
+        };
+        "BTL_CYCLES" uchar;
+        "SJW" uchar;
+        "SYNC_EDGE" enum {
+          "SINGLE" = 1,
+          "DUAL" = 2
+        };
+        "MAX_DLC_REQUIRED";
+        (block "DAQ_LIST_CAN_ID" struct {
+          uint;
+          taggedstruct {
+            "VARIABLE";
+            "FIXED" ulong;
+          };
+        })*;
+        (block "EVENT_CAN_ID_LIST" struct {
+          uint;
+          taggedstruct {
+            ("FIXED" ulong)*;
+          };
+        })*;
+        "MAX_BUS_LOAD"  ulong;
+        "MEASUREMENT_SPLIT_ALLOWED";
+        block "CAN_FD" struct {
+          taggedstruct {
+            "MAX_DLC" uint;
+            "CAN_FD_DATA_TRANSFER_BAUDRATE" ulong;
+            "SAMPLE_POINT" uchar;
+            "BTL_CYCLES" uchar;
+            "SJW" uchar;
+            "SYNC_EDGE" enum {
+              "SINGLE" = 1,
+              "DUAL"   = 2
+            };
+            "MAX_DLC_REQUIRED";
+            "SECONDARY_SAMPLE_POINT" uchar;
+            "TRANSCEIVER_DELAY_COMPENSATION" enum {
+              "OFF" = 0,
+              "ON" = 1
+            };
+          };
+        };
+      };
+      taggedstruct {
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "GET_SLAVE_ID"                     = 0xFF,
+          "GET_DAQ_ID"                       = 0xFE,
+          "SET_DAQ_ID"                       = 0xFD,
+          "GET_DAQ_CLOCK_MULTICAST"          = 0xFA
+        })*;
+      };
+    };
+    struct SxI_Parameters {
+      uint;
+      ulong;
+      taggedstruct {
+        "ASYNCH_FULL_DUPLEX_MODE" struct {
+          enum {
+            "PARITY_NONE" = 0,
+            "PARITY_ODD" = 1,
+            "PARITY_EVEN" = 2
+          };
+          enum {
+            "ONE_STOP_BIT" = 1,
+            "TWO_STOP_BITS" = 2
+          };
+          taggedstruct {
+            block "FRAMING" struct {
+              uchar;
+              uchar;
+            };
+          };
+        };
+        "SYNCH_FULL_DUPLEX_MODE_BYTE";
+        "SYNCH_FULL_DUPLEX_MODE_WORD";
+        "SYNCH_FULL_DUPLEX_MODE_DWORD";
+        "SYNCH_MASTER_SLAVE_MODE_BYTE";
+        "SYNCH_MASTER_SLAVE_MODE_WORD";
+        "SYNCH_MASTER_SLAVE_MODE_DWORD";
+      };
+      enum {
+        "HEADER_LEN_BYTE" = 0,
+        "HEADER_LEN_CTR_BYTE" = 1,
+        "HEADER_LEN_FILL_BYTE" = 2,
+        "HEADER_LEN_WORD" = 3,
+        "HEADER_LEN_CTR_WORD" = 4,
+        "HEADER_LEN_FILL_WORD" = 5
+      };
+      enum {
+        "NO_CHECKSUM" = 0,
+        "CHECKSUM_BYTE" = 1,
+        "CHECKSUM_WORD" = 2
+      };
+    };
+    struct TCP_IP_Parameters {
+      uint;
+      uint;
+      taggedunion {
+        "HOST_NAME" char[256];
+        "ADDRESS" char[15];
+        "IPV6" char[39];
+      };
+      taggedstruct{
+        "MAX_BUS_LOAD"  ulong;
+        "MAX_BIT_RATE"  ulong;
+      };
+      taggedstruct{
+        "PACKET_ALIGNMENT" enum {
+          "PACKET_ALIGNMENT_8"  = 0,
+          "PACKET_ALIGNMENT_16" = 1,
+          "PACKET_ALIGNMENT_32" = 2
+        };
+      };
+      taggedstruct{
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "GET_SLAVE_ID"             = 0xFF,
+          "GET_SLAVE_ID_EXTENDED"    = 0xFD,
+          "SET_SLAVE_IP_ADDRESS"     = 0xFC,
+          "GET_DAQ_CLOCK_MULTICAST"  = 0xFA
+        })*;
+      };
+    };
+    struct UDP_IP_Parameters {
+      uint;
+      uint;
+      taggedunion {
+        "HOST_NAME" char[256];
+        "ADDRESS" char[15];
+        "IPV6" char[39];
+      };
+      taggedstruct{
+        "MAX_BUS_LOAD"  ulong;
+        "MAX_BIT_RATE"  ulong;
+      };
+      taggedstruct{
+        "PACKET_ALIGNMENT" enum {
+          "PACKET_ALIGNMENT_8"  = 0,
+          "PACKET_ALIGNMENT_16" = 1,
+          "PACKET_ALIGNMENT_32" = 2
+        };
+      };
+      taggedstruct{
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "GET_SLAVE_ID"             = 0xFF,
+          "GET_SLAVE_ID_EXTENDED"    = 0xFD,
+          "SET_SLAVE_IP_ADDRESS"     = 0xFC,
+          "GET_DAQ_CLOCK_MULTICAST"  = 0xFA
+        })*;
+      };
+    };
+    struct ep_parameters {
+      uchar;
+      enum {
+        "BULK_TRANSFER"      = 2,
+        "INTERRUPT_TRANSFER" = 3
+      };
+      uint;
+      uchar;
+      enum {
+        "MESSAGE_PACKING_SINGLE"    = 0,
+        "MESSAGE_PACKING_MULTIPLE"  = 1,
+        "MESSAGE_PACKING_STREAMING" = 2
+      };
+      enum {
+        "ALIGNMENT_8_BIT" = 0,
+        "ALIGNMENT_16_BIT"= 1,
+        "ALIGNMENT_32_BIT"= 2,
+        "ALIGNMENT_64_BIT"= 3
+      };
+      taggedstruct {
+        "RECOMMENDED_HOST_BUFSIZE" uint;
+      };
+    };
+    struct USB_Parameters {
+      uint;
+      uint;
+      uint;
+      uchar;
+      enum {
+        "HEADER_LEN_BYTE"      = 0,
+        "HEADER_LEN_CTR_BYTE"  = 1,
+        "HEADER_LEN_FILL_BYTE"  = 2,
+        "HEADER_LEN_WORD"      = 3,
+        "HEADER_LEN_CTR_WORD"  = 4,
+        "HEADER_LEN_FILL_WORD" = 5
+      };
+      taggedunion {
+        block "OUT_EP_CMD_STIM" struct ep_parameters;
+      };
+      taggedunion {
+        block "IN_EP_RESERR_DAQ_EVSERV" struct ep_parameters;
+      };
+      taggedstruct {
+        "ALTERNATE_SETTING_NO" uchar;
+        "INTERFACE_STRING_DESCRIPTOR" char [101];
+        (block "OUT_EP_ONLY_STIM" struct ep_parameters)*;
+        (block "IN_EP_ONLY_DAQ" struct ep_parameters)*;
+        block "IN_EP_ONLY_EVSERV" struct ep_parameters;
+        (block "DAQ_LIST_USB_ENDPOINT" struct {
+          uint;
+          taggedstruct {
+            "FIXED_IN" uchar;
+            "FIXED_OUT" uchar;
+          };
+        })*;
+      };
+      taggedstruct {
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "GET_DAQ_EP"         = 0xFF,
+          "SET_DAQ_EP"         = 0xFE
+        })*;
+      };
+    };
+    enum packet_assignment_type {
+      "NOT_ALLOWED",
+      "FIXED",
+      "VARIABLE_INITIALISED",
+      "VARIABLE"
+    };
+    struct buffer {
+      uchar;
+      taggedstruct {
+        "MAX_FLX_LEN_BUF" taggedunion {
+          "FIXED" uchar;
+          "VARIABLE" uchar;
+        };
+        block "LPDU_ID" taggedstruct {
+          "FLX_SLOT_ID" taggedunion {
+            "FIXED" uint;
+            "VARIABLE" taggedstruct{
+              "INITIAL_VALUE" uint;
+            };
+          };
+          "OFFSET" taggedunion {
+            "FIXED" uchar;
+            "VARIABLE" taggedstruct{
+              "INITIAL_VALUE" uchar;
+            };
+          };
+          "CYCLE_REPETITION" taggedunion {
+            "FIXED" uchar;
+            "VARIABLE" taggedstruct{
+              "INITIAL_VALUE" uchar;
+            };
+          };
+          "CHANNEL" taggedunion {
+            "FIXED" enum {
+              "A" = 0,
+              "B" = 1
+            };
+            "VARIABLE" taggedstruct{
+              "INITIAL_VALUE" enum {
+                "A" = 0,
+                "B" = 1
+              };
+            };
+          };
+        };
+        block "XCP_PACKET" taggedstruct {
+          "CMD" enum packet_assignment_type;
+          "RES_ERR" enum packet_assignment_type;
+          "EV_SERV" enum packet_assignment_type;
+          "DAQ" enum packet_assignment_type;
+          "STIM" enum packet_assignment_type;
+          "MULTICAST" enum packet_assignment_type;
+        };
+      };
+    };
+    struct FLX_Parameters {
+      uint;
+      uint;
+      char[256];
+      char[256];
+      uchar;
+      enum {
+        "HEADER_NAX"               = 0,
+        "HEADER_NAX_FILL"          = 1,
+        "HEADER_NAX_CTR"           = 2,
+        "HEADER_NAX_FILL3"         = 3,
+        "HEADER_NAX_CTR_FILL2"     = 4,
+        "HEADER_NAX_LEN"           = 5,
+        "HEADER_NAX_CTR_LEN"       = 6,
+        "HEADER_NAX_FILL2_LEN"     = 7,
+        "HEADER_NAX_CTR_FILL_LEN"  = 8
+      };
+      enum {
+        "PACKET_ALIGNMENT_8"  = 0,
+        "PACKET_ALIGNMENT_16" = 1,
+        "PACKET_ALIGNMENT_32" = 2
+      };
+      taggedunion {
+        block "INITIAL_CMD_BUFFER" struct buffer;
+      };
+      taggedunion {
+        block "INITIAL_RES_ERR_BUFFER" struct buffer;
+      };
+      taggedstruct {
+        (block "POOL_BUFFER" struct buffer)*;
+      };
+      taggedstruct {
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "FLX_ASSIGN"               = 0xFF,
+          "FLX_ACTIVATE"             = 0xFE,
+          "FLX_DEACTIVATE"           = 0xFD,
+          "GET_DAQ_FLX_BUF"          = 0xFC,
+          "SET_DAQ_FLX_BUF"          = 0xFB,
+          "GET_DAQ_CLOCK_MULTICAST"  = 0xFA
+        })*;
+      };
+    };
+    block "IF_DATA" taggedunion if_data {
+    "XCP" struct {
+      taggedstruct Common_Parameters;
+      taggedstruct {
+        block "XCP_ON_CAN" struct {
+          struct CAN_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_SxI" struct {
+          struct SxI_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_TCP_IP" struct {
+          struct TCP_IP_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_UDP_IP" struct {
+          struct UDP_IP_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_USB" struct {
+          struct USB_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_FLX" struct {
+          struct FLX_Parameters;
+          taggedstruct Common_Parameters;
+        };
+      };
+    };
+    "XCPplus" struct {
+      uint;
+      taggedstruct Common_Parameters;
+      taggedstruct {
+        (block "XCP_ON_CAN" struct {
+          struct CAN_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_SxI" struct {
+          struct SxI_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_TCP_IP" struct {
+          struct TCP_IP_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_UDP_IP" struct {
+          struct UDP_IP_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_USB" struct {
+          struct USB_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_FLX" struct {
+          struct FLX_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+       };
+      };
+    };
+      block "IF_DATA" taggedunion {
+        "CANAPE_ADDRESS_UPDATE" taggedstruct {
+            ("EPK_ADDRESS" struct {
+                char[1024];
+                long;
+            })*;
+            "ECU_CALIBRATION_OFFSET" struct {
+                char[1024];
+                long;
+            };
+            (block "CALIBRATION_METHOD" taggedunion {
+                "AUTOSAR_SINGLE_POINTERED" struct {
+                    char[1024];
+                    long;
+                    taggedstruct {
+                        "ORIGINAL_POINTER_TABLE" struct {
+                            char[1024];
+                            long;
+                        };
+                    };
+                 };
+                 "InCircuit2" struct {
+                    char[1024];
+                    long;
+                    taggedstruct {
+                        "ORIGINAL_POINTER_TABLE" struct {
+                            char[1024];
+                            long;
+                        };
+                        "FLASH_SECTION" struct {
+                            ulong;
+                            ulong;
+                        }
+                    };
+                };
+            })*;
+            block "MAP_SYMBOL" taggedstruct {
+                "FIRST" struct {
+                   char[1024];
+                   long;
+                };
+                "LAST" struct {
+                   char[1024];
+                   long;
+                };
+                ("ADDRESS_MAPPING_XCP" struct {
+                    char[1024];
+                    char[1024];
+                })*;
+            };
+            (block "MEMORY_SEGMENT" struct {
+                char[1024];
+                taggedstruct {
+                    "FIRST" struct {
+                       char[1024];
+                       long;
+                    };
+                    "LAST" struct {
+                       char[1024];
+                       long;
+                    };
+                    ("ADDRESS_MAPPING_XCP" struct {
+                        char[1024];
+                        char[1024];
+                    })*;
+                };
+            })*;
+        };
+      };
+    /end A2ML
+
+    /begin IF_DATA XCP
+      /begin PROTOCOL_LAYER
+        0x104
+        2000
+        10000
+        2000
+        2000
+        2000
+        2000
+        0
+        12
+        12
+        BYTE_ORDER_MSB_LAST
+        ADDRESS_GRANULARITY_BYTE
+        OPTIONAL_CMD GET_COMM_MODE_INFO
+      /end PROTOCOL_LAYER
+      /begin DAQ
+        DYNAMIC
+        5
+        5
+        0
+        OPTIMISATION_TYPE_DEFAULT
+        ADDRESS_EXTENSION_FREE
+        IDENTIFICATION_FIELD_TYPE_ABSOLUTE
+        GRANULARITY_ODT_ENTRY_SIZE_DAQ_BYTE
+        7
+        OVERLOAD_INDICATION_PID
+        PRESCALER_SUPPORTED
+        /begin EVENT
+          "Task_a"
+          "Task_a"
+          0
+          DAQ
+          1
+          1
+          6
+          0
+        /end EVENT
+        /begin EVENT
+          "Task_b"
+          "Task_b"
+          3
+          DAQ
+          1
+          15
+          7
+          0
+        /end EVENT
+      /end DAQ
+      /begin XCP_ON_CAN
+        0x0102
+        CAN_ID_MASTER 0x12345678
+        CAN_ID_SLAVE 0x12345679
+        BAUDRATE 500000
+        SAMPLE_POINT 75
+        SAMPLE_RATE SINGLE
+        BTL_CYCLES 8
+        SJW 1
+        /begin CAN_FD
+          MAX_DLC 64
+          CAN_FD_DATA_TRANSFER_BAUDRATE 2000000
+          SAMPLE_POINT 75
+          BTL_CYCLES 10
+          SJW 2
+          SECONDARY_SAMPLE_POINT 0
+          TRANSCEIVER_DELAY_COMPENSATION OFF
+        /end CAN_FD
+        /begin PROTOCOL_LAYER
+          0x0101
+          0x07D0
+          0x2710
+          0x07D0
+          0x07D0
+          0x07D0
+          0x07D0
+          0x00
+          0x40
+          0x40
+          BYTE_ORDER_MSB_LAST
+          ADDRESS_GRANULARITY_BYTE
+          OPTIONAL_CMD GET_COMM_MODE_INFO
+          COMMUNICATION_MODE_SUPPORTED BLOCK
+          SLAVE
+        /end PROTOCOL_LAYER
+      /end XCP_ON_CAN
+      /begin XCP_ON_FLX
+        0x101
+        1000
+        ""
+        ""
+        0
+        HEADER_NAX_CTR
+        PACKET_ALIGNMENT_8
+        /begin INITIAL_CMD_BUFFER
+          0
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 66
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD FIXED
+            RES_ERR NOT_ALLOWED
+            EV_SERV NOT_ALLOWED
+            DAQ NOT_ALLOWED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end INITIAL_CMD_BUFFER
+        /begin INITIAL_RES_ERR_BUFFER
+          1
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 67
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD NOT_ALLOWED
+            RES_ERR FIXED
+            EV_SERV NOT_ALLOWED
+            DAQ NOT_ALLOWED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end INITIAL_RES_ERR_BUFFER
+        /begin POOL_BUFFER
+          2
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 68
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD NOT_ALLOWED
+            RES_ERR NOT_ALLOWED
+            EV_SERV NOT_ALLOWED
+            DAQ FIXED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end POOL_BUFFER
+        /begin POOL_BUFFER
+          3
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 69
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD NOT_ALLOWED
+            RES_ERR NOT_ALLOWED
+            EV_SERV NOT_ALLOWED
+            DAQ FIXED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end POOL_BUFFER
+        /begin POOL_BUFFER
+          4
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 70
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD NOT_ALLOWED
+            RES_ERR NOT_ALLOWED
+            EV_SERV NOT_ALLOWED
+            DAQ FIXED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end POOL_BUFFER
+      /end XCP_ON_FLX
+      /begin XCP_ON_UDP_IP
+        1
+        2000
+        ADDRESS "192.168.0.1"
+      /end XCP_ON_UDP_IP
+      /begin XCP_ON_TCP_IP
+        1
+        2000
+        ADDRESS "192.168.0.1"
+      /end XCP_ON_TCP_IP
+    /end IF_DATA
+  /end MODULE
+
+  /begin MODULE XcpPlusTest ""
+    /begin A2ML
+    struct Protocol_Layer {
+      uint;
+      uint;
+      uint;
+      uint;
+      uint;
+      uint;
+      uint;
+      uint;
+      uchar;
+      uint;
+      enum {
+        "BYTE_ORDER_MSB_LAST"  = 0,
+        "BYTE_ORDER_MSB_FIRST" = 1
+      };
+      enum {
+        "ADDRESS_GRANULARITY_BYTE"    = 1,
+        "ADDRESS_GRANULARITY_WORD"    = 2,
+        "ADDRESS_GRANULARITY_DWORD"   = 4
+      };
+      taggedstruct {
+        ("OPTIONAL_CMD" enum {
+          "GET_COMM_MODE_INFO"               = 0xFB,
+          "GET_ID"                           = 0xFA,
+          "SET_REQUEST"                      = 0xF9,
+          "GET_SEED"                         = 0xF8,
+          "UNLOCK"                           = 0xF7,
+          "SET_MTA"                          = 0xF6,
+          "UPLOAD"                           = 0xF5,
+          "SHORT_UPLOAD"                     = 0xF4,
+          "BUILD_CHECKSUM"                   = 0xF3,
+          "TRANSPORT_LAYER_CMD"              = 0xF2,
+          "USER_CMD"                         = 0xF1,
+          "DOWNLOAD"                         = 0xF0,
+          "DOWNLOAD_NEXT"                    = 0xEF,
+          "DOWNLOAD_MAX"                     = 0xEE,
+          "SHORT_DOWNLOAD"                   = 0xED,
+          "MODIFY_BITS"                      = 0xEC,
+          "SET_CAL_PAGE"                     = 0xEB,
+          "GET_CAL_PAGE"                     = 0xEA,
+          "GET_PAG_PROCESSOR_INFO"           = 0xE9,
+          "GET_SEGMENT_INFO"                 = 0xE8,
+          "GET_PAGE_INFO"                    = 0xE7,
+          "SET_SEGMENT_MODE"                 = 0xE6,
+          "GET_SEGMENT_MODE"                 = 0xE5,
+          "COPY_CAL_PAGE"                    = 0xE4,
+          "CLEAR_DAQ_LIST"                   = 0xE3,
+          "SET_DAQ_PTR"                      = 0xE2,
+          "WRITE_DAQ"                        = 0xE1,
+          "SET_DAQ_LIST_MODE"                = 0xE0,
+          "GET_DAQ_LIST_MODE"                = 0xDF,
+          "START_STOP_DAQ_LIST"              = 0xDE,
+          "START_STOP_SYNCH"                 = 0xDD,
+          "GET_DAQ_CLOCK"                    = 0xDC,
+          "READ_DAQ"                         = 0xDB,
+          "GET_DAQ_PROCESSOR_INFO"           = 0xDA,
+          "GET_DAQ_RESOLUTION_INFO"          = 0xD9,
+          "GET_DAQ_LIST_INFO"                = 0xD8,
+          "GET_DAQ_EVENT_INFO"               = 0xD7,
+          "FREE_DAQ"                         = 0xD6,
+          "ALLOC_DAQ"                        = 0xD5,
+          "ALLOC_ODT"                        = 0xD4,
+          "ALLOC_ODT_ENTRY"                  = 0xD3,
+          "PROGRAM_START"                    = 0xD2,
+          "PROGRAM_CLEAR"                    = 0xD1,
+          "PROGRAM"                          = 0xD0,
+          "PROGRAM_RESET"                    = 0xCF,
+          "GET_PGM_PROCESSOR_INFO"           = 0xCE,
+          "GET_SECTOR_INFO"                  = 0xCD,
+          "PROGRAM_PREPARE"                  = 0xCC,
+          "PROGRAM_FORMAT"                   = 0xCB,
+          "PROGRAM_NEXT"                     = 0xCA,
+          "PROGRAM_MAX"                      = 0xC9,
+          "PROGRAM_VERIFY"                   = 0xC8,
+          "WRITE_DAQ_MULTIPLE"               = 0xC7,
+          "TIME_CORRELATION_PROPERTIES"      = 0xC6,
+          "DTO_CTR_PROPERTIES"               = 0xC5
+        })*;
+        ("OPTIONAL_LEVEL1_CMD" enum {
+          "GET_VERSION"                      = 0x00,
+          "SET_DAQ_PACKED_MODE"              = 0x01,
+          "GET_DAQ_PACKED_MODE"              = 0x02,
+          "SW_DBG_COMMAND_SPACE"             = 0xFC,
+          "POD_COMMAND_SPACE"                = 0xFD
+        })*;
+        "COMMUNICATION_MODE_SUPPORTED" taggedunion {
+          "BLOCK" taggedstruct {
+            "SLAVE";
+            "MASTER" struct {
+              uchar;
+              uchar;
+            };
+          };
+          "INTERLEAVED" uchar;
+        };
+        "SEED_AND_KEY_EXTERNAL_FUNCTION" char[256];
+        "MAX_DTO_STIM" uint;
+        block "ECU_STATES" taggedstruct{
+          (block "STATE" struct{
+            uchar;
+            char[100];
+            taggedstruct {
+              "ECU_SWITCHED_TO_DEFAULT_PAGE";
+            };
+            enum {
+              "NOT_ACTIVE" = 0,
+              "ACTIVE" = 1,
+              "GETTER_ONLY" = 2
+            };
+            enum {
+              "NOT_ACTIVE" = 0,
+              "ACTIVE" = 1
+            };
+            enum {
+              "NOT_ACTIVE" = 0,
+              "ACTIVE" = 1
+            };
+            enum {
+              "NOT_ACTIVE" = 0,
+              "ACTIVE" = 1
+            };
+            taggedstruct {
+              (block "MEMORY_ACCESS" struct{
+                uchar;
+                uchar;
+                enum {
+                  "READ_ACCESS_NOT_ALLOWED" = 0,
+                  "READ_ACCESS_ALLOWED" = 1
+                };
+                enum {
+                  "WRITE_ACCESS_NOT_ALLOWED" = 0,
+                  "WRITE_ACCESS_ALLOWED" = 1
+                };
+              })*;
+            };
+          })*;
+        };
+      };
+    };
+    struct Daq {
+      enum {
+        "STATIC"  = 0,
+        "DYNAMIC" = 1
+      };
+      uint;
+      uint;
+      uchar;
+      enum {
+        "OPTIMISATION_TYPE_DEFAULT"            = 0,
+        "OPTIMISATION_TYPE_ODT_TYPE_16"        = 1,
+        "OPTIMISATION_TYPE_ODT_TYPE_32"        = 2,
+        "OPTIMISATION_TYPE_ODT_TYPE_64"        = 3,
+        "OPTIMISATION_TYPE_ODT_TYPE_ALIGNMENT" = 4,
+        "OPTIMISATION_TYPE_MAX_ENTRY_SIZE"     = 5
+      };
+      enum {
+        "ADDRESS_EXTENSION_FREE" = 0,
+        "ADDRESS_EXTENSION_ODT"  = 1,
+        "ADDRESS_EXTENSION_DAQ"  = 3
+      };
+      enum {
+        "IDENTIFICATION_FIELD_TYPE_ABSOLUTE"              = 0,
+        "IDENTIFICATION_FIELD_TYPE_RELATIVE_BYTE"         = 1,
+        "IDENTIFICATION_FIELD_TYPE_RELATIVE_WORD"         = 2,
+        "IDENTIFICATION_FIELD_TYPE_RELATIVE_WORD_ALIGNED" = 3
+      };
+      enum {
+        "GRANULARITY_ODT_ENTRY_SIZE_DAQ_BYTE"    = 1,
+        "GRANULARITY_ODT_ENTRY_SIZE_DAQ_WORD"    = 2,
+        "GRANULARITY_ODT_ENTRY_SIZE_DAQ_DWORD"   = 4,
+        "GRANULARITY_ODT_ENTRY_SIZE_DAQ_DLONG"   = 8
+      };
+      uchar;
+      enum {
+        "NO_OVERLOAD_INDICATION"    = 0,
+        "OVERLOAD_INDICATION_PID"   = 1,
+        "OVERLOAD_INDICATION_EVENT" = 2
+      };
+      taggedstruct {
+        "DAQ_ALTERNATING_SUPPORTED" uint;
+        "PRESCALER_SUPPORTED";
+        "RESUME_SUPPORTED";
+        "STORE_DAQ_SUPPORTED";
+        "DTO_CTR_FIELD_SUPPORTED";
+        "OPTIMISATION_TYPE_ODT_STRICT";
+        block "STIM" struct {
+          enum {
+            "GRANULARITY_ODT_ENTRY_SIZE_STIM_BYTE"   = 1,
+            "GRANULARITY_ODT_ENTRY_SIZE_STIM_WORD"   = 2,
+            "GRANULARITY_ODT_ENTRY_SIZE_STIM_DWORD"  = 4,
+            "GRANULARITY_ODT_ENTRY_SIZE_STIM_DLONG"  = 8
+          };
+          uchar;
+          taggedstruct {
+            "BIT_STIM_SUPPORTED";
+            "MIN_ST_STIM" uchar;
+          };
+        };
+        block "TIMESTAMP_SUPPORTED" struct {
+          uint;
+          enum {
+            "NO_TIME_STAMP" = 0,
+            "SIZE_BYTE"     = 1,
+            "SIZE_WORD"     = 2,
+            "SIZE_DWORD"    = 4
+          };
+          enum {
+            "UNIT_1NS"   = 0,
+            "UNIT_10NS"  = 1,
+            "UNIT_100NS" = 2,
+            "UNIT_1US"   = 3,
+            "UNIT_10US"  = 4,
+            "UNIT_100US" = 5,
+            "UNIT_1MS"   = 6,
+            "UNIT_10MS"  = 7,
+            "UNIT_100MS" = 8,
+            "UNIT_1S"    = 9,
+            "UNIT_1PS"   = 10,
+            "UNIT_10PS"  = 11,
+            "UNIT_100PS" = 12
+          };
+          taggedstruct {
+            "TIMESTAMP_FIXED";
+          };
+        };
+        "PID_OFF_SUPPORTED";
+        "MAX_DAQ_TOTAL" uint;
+        "MAX_ODT_TOTAL" uint;
+        "MAX_ODT_DAQ_TOTAL" uint;
+        "MAX_ODT_STIM_TOTAL" uint;
+        "MAX_ODT_ENTRIES_TOTAL" uint;
+        "MAX_ODT_ENTRIES_DAQ_TOTAL" uint;
+        "MAX_ODT_ENTRIES_STIM_TOTAL" uint;
+        "CPU_LOAD_MAX_TOTAL" float;
+        "CORE_LOAD_MAX_TOTAL" float;
+        (block "CORE_LOAD_MAX" struct {
+          uint;
+          float;
+        })*;
+        block "DAQ_MEMORY_CONSUMPTION" struct {
+          ulong;
+          uint;
+          uint;
+          uint;
+          uint;
+          uint;
+          taggedstruct {
+            block "BUFFER_RESERVE" struct {
+              uchar;
+              uchar;
+            };
+          };
+        };
+        (block "DAQ_LIST" struct {
+          uint;
+          taggedstruct {
+            "DAQ_LIST_TYPE" enum {
+              "DAQ"      = 1,
+              "STIM"     = 2,
+              "DAQ_STIM" = 3
+            };
+            "MAX_ODT"         uchar;
+            "MAX_ODT_ENTRIES" uchar;
+            "FIRST_PID" uchar;
+            "EVENT_FIXED" uint;
+            "DAQ_PACKED_MODE_SUPPORTED";
+            block "PREDEFINED" taggedstruct {
+              (block "ODT" struct {
+                uchar;
+                taggedstruct {
+                  ("ODT_ENTRY" struct {
+                    uchar;
+                    ulong;
+                    uchar;
+                    uchar;
+                    uchar;
+                  })*;
+                };
+              })*;
+            };
+          };
+        })*;
+        (block "EVENT" struct {
+          char[101];
+          char[9];
+          uint;
+          enum {
+            "DAQ"      = 1,
+            "STIM"     = 2,
+            "DAQ_STIM" = 3
+          };
+          uchar;
+          uchar;
+          uchar;
+          uchar;
+          taggedstruct {
+            "COMPLEMENTARY_BYPASS_EVENT_CHANNEL_NUMBER" uint;
+            "CONSISTENCY" enum {
+              "DAQ"   = 0,
+              "EVENT" = 1,
+              "ODT"   = 2,
+              "NONE"  = 3
+            };
+            "EVENT_COUNTER_PRESENT";
+            "RELATED_EVENT_CHANNEL_NUMBER" uint;
+            "RELATED_EVENT_CHANNEL_NUMBER_FIXED";
+            "DTO_CTR_DAQ_MODE" enum {
+              "INSERT_COUNTER" = 0,
+              "INSERT_STIM_COUNTER_COPY" = 1
+            };
+            "DTO_CTR_DAQ_MODE_FIXED";
+            "DTO_CTR_STIM_MODE" enum {
+              "DO_NOT_CHECK_COUNTER" = 0,
+              "CHECK_COUNTER" = 1
+            };
+            "DTO_CTR_STIM_MODE_FIXED";
+            "STIM_DTO_CTR_COPY_PRESENT";
+            block "DAQ_PACKED_MODE" struct {
+              enum {
+                "ELEMENT_GROUPED" = 1,
+                "EVENT_GROUPED"   = 2
+              };
+              enum {
+                "STS_LAST"      = 0,
+                "STS_FIRST"     = 1
+              };
+              enum {
+                "OPTIONAL"      = 0,
+                "MANDATORY"     = 1
+              };
+              uint;
+              taggedstruct {
+                ("ALT_SAMPLE_COUNT" uint)*;
+              };
+            };
+            block "MIN_CYCLE_TIME" struct {
+              uchar;
+              uchar;
+            };
+            block "BUFFER_RESERVE_EVENT" struct {
+              uchar;
+              uchar;
+            };
+            "CPU_LOAD_MAX" float;
+            block "CPU_LOAD_CONSUMPTION_DAQ" struct {
+              float;
+              float;
+              float;
+              taggedstruct {
+                (block "ODT_ENTRY_SIZE_FACTOR_TABLE" struct{
+                  uint;
+                  float;
+                })*;
+                block "CORE_LOAD_EP" struct {
+                  uint;
+                  float;
+                };
+              };
+            };
+            block "CPU_LOAD_CONSUMPTION_STIM" struct {
+              float;
+              float;
+              float;
+              taggedstruct {
+                (block "ODT_ENTRY_SIZE_FACTOR_TABLE" struct{
+                  uint;
+                  float;
+                })*;
+                block "CORE_LOAD_EP" struct {
+                  uint;
+                  float;
+                };
+              };
+            };
+            block "CPU_LOAD_CONSUMPTION_QUEUE" struct {
+              float;
+              float;
+              taggedstruct {
+                block "CORE_LOAD_EP" struct {
+                  uint;
+                  float;
+                };
+              };
+            };
+            block "CPU_LOAD_CONSUMPTION_QUEUE_STIM" struct {
+              float;
+              float;
+              taggedstruct {
+                block "CORE_LOAD_EP" struct {
+                  uint;
+                  float;
+                };
+              };
+            };
+          };
+        })*;
+      };
+    };
+    taggedunion Daq_Event {
+      "FIXED_EVENT_LIST" taggedstruct {
+        ("EVENT" uint)*;
+      };
+      "VARIABLE" taggedstruct {
+        block "AVAILABLE_EVENT_LIST" taggedstruct {
+          ("EVENT" uint)*;
+        };
+        block "DEFAULT_EVENT_LIST" taggedstruct {
+          ("EVENT" uint)*;
+        };
+        block "CONSISTENCY_EVENT_LIST" taggedstruct {
+          ("EVENT" uint)*;
+        };
+      };
+    };
+    struct Pag {
+      uchar;
+      taggedstruct {
+        "FREEZE_SUPPORTED";
+      };
+    };
+    struct Pgm {
+      enum {
+        "PGM_MODE_ABSOLUTE"                = 1,
+        "PGM_MODE_FUNCTIONAL"              = 2,
+        "PGM_MODE_ABSOLUTE_AND_FUNCTIONAL" = 3
+      };
+      uchar;
+      uchar;
+      taggedstruct {
+        (block "SECTOR" struct {
+          char[101];
+          uchar;
+          ulong;
+          ulong;
+          uchar;
+          uchar;
+          uchar;
+        })*;
+        "COMMUNICATION_MODE_SUPPORTED" taggedunion {
+          "BLOCK" taggedstruct {
+            "SLAVE";
+            "MASTER" struct {
+              uchar;
+              uchar;
+            };
+          };
+          "INTERLEAVED" uchar;
+        };
+      };
+    };
+    struct Segment {
+      uchar;
+      uchar;
+      uchar;
+      uchar;
+      uchar;
+      taggedstruct {
+        block "CHECKSUM" struct {
+          enum {
+            "XCP_ADD_11"       =   1,
+            "XCP_ADD_12"       =   2,
+            "XCP_ADD_14"       =   3,
+            "XCP_ADD_22"       =   4,
+            "XCP_ADD_24"       =   5,
+            "XCP_ADD_44"       =   6,
+            "XCP_CRC_16"       =   7,
+            "XCP_CRC_16_CITT"  =   8,
+            "XCP_CRC_32"       =   9,
+            "XCP_USER_DEFINED" = 255
+          };
+          taggedstruct {
+            "MAX_BLOCK_SIZE" ulong;
+            "EXTERNAL_FUNCTION" char[256];
+            "MTA_BLOCK_SIZE_ALIGN" uint;
+          };
+        };
+        "DEFAULT_PAGE_NUMBER" uchar;
+        (block "PAGE" struct {
+          uchar;
+          enum {
+            "ECU_ACCESS_NOT_ALLOWED"      = 0,
+            "ECU_ACCESS_WITHOUT_XCP_ONLY" = 1,
+            "ECU_ACCESS_WITH_XCP_ONLY"    = 2,
+            "ECU_ACCESS_DONT_CARE"        = 3
+          };
+          enum {
+            "XCP_READ_ACCESS_NOT_ALLOWED"      = 0,
+            "XCP_READ_ACCESS_WITHOUT_ECU_ONLY" = 1,
+            "XCP_READ_ACCESS_WITH_ECU_ONLY"    = 2,
+            "XCP_READ_ACCESS_DONT_CARE"        = 3
+          };
+          enum {
+            "XCP_WRITE_ACCESS_NOT_ALLOWED"      = 0,
+            "XCP_WRITE_ACCESS_WITHOUT_ECU_ONLY" = 1,
+            "XCP_WRITE_ACCESS_WITH_ECU_ONLY"    = 2,
+            "XCP_WRITE_ACCESS_DONT_CARE"        = 3
+          };
+          taggedstruct {
+            "INIT_SEGMENT" uchar;
+          };
+        })*;
+        (block "ADDRESS_MAPPING" struct {
+          ulong;
+          ulong;
+          ulong;
+        })*;
+        "PGM_VERIFY" ulong;
+      };
+    };
+    taggedstruct Time_Correlation {
+      "DAQ_TIMESTAMPS_RELATE_TO" enum {
+        "XCP_SLAVE_CLOCK"           = 0,
+        "ECU_CLOCK"                 = 1
+      };
+      (block "CLOCK" struct {
+        char;
+        char;
+        char;
+        char;
+        char;
+        char;
+        char;
+        char;
+        enum {
+          "XCP_SLAVE_CLOCK"             = 0,
+          "ECU_CLOCK"                   = 1,
+          "XCP_SLAVE_GRANDMASTER_CLOCK" = 2,
+          "ECU_GRANDMASTER_CLOCK"       = 3
+        };
+        enum {
+          "RANDOMLY_READABLE" = 0,
+          "LIMITED_READABLE"  = 1,
+          "NOT_READABLE"      = 2
+        };
+        enum {
+          "SYN_UNSUPPORTED"      = 0,
+          "SYNCHRONIZATION_ONLY" = 1,
+          "SYNTONIZATION_ONLY"   = 2,
+          "SYN_ALL"              = 3
+        };
+        uchar;
+        taggedstruct {
+          block "TIMESTAMP_CHARACTERIZATION" struct {
+            uint;
+            enum {
+              "UNIT_1NS"   = 0,
+              "UNIT_10NS"  = 1,
+              "UNIT_100NS" = 2,
+              "UNIT_1US"   = 3,
+              "UNIT_10US"  = 4,
+              "UNIT_100US" = 5,
+              "UNIT_1MS"   = 6,
+              "UNIT_10MS"  = 7,
+              "UNIT_100MS" = 8,
+              "UNIT_1S"    = 9,
+              "UNIT_1PS"   = 10,
+              "UNIT_10PS"  = 11,
+              "UNIT_100PS" = 12
+            };
+            enum {
+              "SIZE_FOUR_BYTE"  = 4,
+              "SIZE_EIGHT_BYTE" = 8
+            };
+          };
+        };
+        uint64;
+        enum {
+          "ATOMIC_TIME"                = 0,
+          "UNIVERSAL_COORDINATED_TIME" = 1,
+          "ARBITRARY"                  = 2
+        };
+      })*;
+    };
+    taggedstruct Common_Parameters {
+      block "PROTOCOL_LAYER" struct Protocol_Layer;
+      block "TIME_CORRELATION" taggedstruct Time_Correlation;
+      block "SEGMENT" struct Segment;
+      block "DAQ" struct Daq;
+      block "PAG" struct Pag;
+      block "PGM" struct Pgm;
+      block "DAQ_EVENT" taggedunion Daq_Event;
+    };
+    struct CAN_Parameters {
+      uint;
+      taggedstruct {
+        "CAN_ID_BROADCAST" ulong;
+        "CAN_ID_MASTER" ulong;
+        "CAN_ID_MASTER_INCREMENTAL";
+        "CAN_ID_SLAVE" ulong;
+        "CAN_ID_GET_DAQ_CLOCK_MULTICAST" ulong;
+        "BAUDRATE" ulong;
+        "SAMPLE_POINT" uchar;
+        "SAMPLE_RATE" enum {
+          "SINGLE" = 1,
+          "TRIPLE" = 3
+        };
+        "BTL_CYCLES" uchar;
+        "SJW" uchar;
+        "SYNC_EDGE" enum {
+          "SINGLE" = 1,
+          "DUAL" = 2
+        };
+        "MAX_DLC_REQUIRED";
+        (block "DAQ_LIST_CAN_ID" struct {
+          uint;
+          taggedstruct {
+            "VARIABLE";
+            "FIXED" ulong;
+          };
+        })*;
+        (block "EVENT_CAN_ID_LIST" struct {
+          uint;
+          taggedstruct {
+            ("FIXED" ulong)*;
+          };
+        })*;
+        "MAX_BUS_LOAD"  ulong;
+        "MEASUREMENT_SPLIT_ALLOWED";
+        block "CAN_FD" struct {
+          taggedstruct {
+            "MAX_DLC" uint;
+            "CAN_FD_DATA_TRANSFER_BAUDRATE" ulong;
+            "SAMPLE_POINT" uchar;
+            "BTL_CYCLES" uchar;
+            "SJW" uchar;
+            "SYNC_EDGE" enum {
+              "SINGLE" = 1,
+              "DUAL"   = 2
+            };
+            "MAX_DLC_REQUIRED";
+            "SECONDARY_SAMPLE_POINT" uchar;
+            "TRANSCEIVER_DELAY_COMPENSATION" enum {
+              "OFF" = 0,
+              "ON" = 1
+            };
+          };
+        };
+      };
+      taggedstruct {
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "GET_SLAVE_ID"                     = 0xFF,
+          "GET_DAQ_ID"                       = 0xFE,
+          "SET_DAQ_ID"                       = 0xFD,
+          "GET_DAQ_CLOCK_MULTICAST"          = 0xFA
+        })*;
+      };
+    };
+    struct SxI_Parameters {
+      uint;
+      ulong;
+      taggedstruct {
+        "ASYNCH_FULL_DUPLEX_MODE" struct {
+          enum {
+            "PARITY_NONE" = 0,
+            "PARITY_ODD" = 1,
+            "PARITY_EVEN" = 2
+          };
+          enum {
+            "ONE_STOP_BIT" = 1,
+            "TWO_STOP_BITS" = 2
+          };
+          taggedstruct {
+            block "FRAMING" struct {
+              uchar;
+              uchar;
+            };
+          };
+        };
+        "SYNCH_FULL_DUPLEX_MODE_BYTE";
+        "SYNCH_FULL_DUPLEX_MODE_WORD";
+        "SYNCH_FULL_DUPLEX_MODE_DWORD";
+        "SYNCH_MASTER_SLAVE_MODE_BYTE";
+        "SYNCH_MASTER_SLAVE_MODE_WORD";
+        "SYNCH_MASTER_SLAVE_MODE_DWORD";
+      };
+      enum {
+        "HEADER_LEN_BYTE" = 0,
+        "HEADER_LEN_CTR_BYTE" = 1,
+        "HEADER_LEN_FILL_BYTE" = 2,
+        "HEADER_LEN_WORD" = 3,
+        "HEADER_LEN_CTR_WORD" = 4,
+        "HEADER_LEN_FILL_WORD" = 5
+      };
+      enum {
+        "NO_CHECKSUM" = 0,
+        "CHECKSUM_BYTE" = 1,
+        "CHECKSUM_WORD" = 2
+      };
+    };
+    struct TCP_IP_Parameters {
+      uint;
+      uint;
+      taggedunion {
+        "HOST_NAME" char[256];
+        "ADDRESS" char[15];
+        "IPV6" char[39];
+      };
+      taggedstruct{
+        "MAX_BUS_LOAD"  ulong;
+        "MAX_BIT_RATE"  ulong;
+      };
+      taggedstruct{
+        "PACKET_ALIGNMENT" enum {
+          "PACKET_ALIGNMENT_8"  = 0,
+          "PACKET_ALIGNMENT_16" = 1,
+          "PACKET_ALIGNMENT_32" = 2
+        };
+      };
+      taggedstruct{
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "GET_SLAVE_ID"             = 0xFF,
+          "GET_SLAVE_ID_EXTENDED"    = 0xFD,
+          "SET_SLAVE_IP_ADDRESS"     = 0xFC,
+          "GET_DAQ_CLOCK_MULTICAST"  = 0xFA
+        })*;
+      };
+    };
+    struct UDP_IP_Parameters {
+      uint;
+      uint;
+      taggedunion {
+        "HOST_NAME" char[256];
+        "ADDRESS" char[15];
+        "IPV6" char[39];
+      };
+      taggedstruct{
+        "MAX_BUS_LOAD"  ulong;
+        "MAX_BIT_RATE"  ulong;
+      };
+      taggedstruct{
+        "PACKET_ALIGNMENT" enum {
+          "PACKET_ALIGNMENT_8"  = 0,
+          "PACKET_ALIGNMENT_16" = 1,
+          "PACKET_ALIGNMENT_32" = 2
+        };
+      };
+      taggedstruct{
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "GET_SLAVE_ID"             = 0xFF,
+          "GET_SLAVE_ID_EXTENDED"    = 0xFD,
+          "SET_SLAVE_IP_ADDRESS"     = 0xFC,
+          "GET_DAQ_CLOCK_MULTICAST"  = 0xFA
+        })*;
+      };
+    };
+    struct ep_parameters {
+      uchar;
+      enum {
+        "BULK_TRANSFER"      = 2,
+        "INTERRUPT_TRANSFER" = 3
+      };
+      uint;
+      uchar;
+      enum {
+        "MESSAGE_PACKING_SINGLE"    = 0,
+        "MESSAGE_PACKING_MULTIPLE"  = 1,
+        "MESSAGE_PACKING_STREAMING" = 2
+      };
+      enum {
+        "ALIGNMENT_8_BIT" = 0,
+        "ALIGNMENT_16_BIT"= 1,
+        "ALIGNMENT_32_BIT"= 2,
+        "ALIGNMENT_64_BIT"= 3
+      };
+      taggedstruct {
+        "RECOMMENDED_HOST_BUFSIZE" uint;
+      };
+    };
+    struct USB_Parameters {
+      uint;
+      uint;
+      uint;
+      uchar;
+      enum {
+        "HEADER_LEN_BYTE"      = 0,
+        "HEADER_LEN_CTR_BYTE"  = 1,
+        "HEADER_LEN_FILL_BYTE"  = 2,
+        "HEADER_LEN_WORD"      = 3,
+        "HEADER_LEN_CTR_WORD"  = 4,
+        "HEADER_LEN_FILL_WORD" = 5
+      };
+      taggedunion {
+        block "OUT_EP_CMD_STIM" struct ep_parameters;
+      };
+      taggedunion {
+        block "IN_EP_RESERR_DAQ_EVSERV" struct ep_parameters;
+      };
+      taggedstruct {
+        "ALTERNATE_SETTING_NO" uchar;
+        "INTERFACE_STRING_DESCRIPTOR" char [101];
+        (block "OUT_EP_ONLY_STIM" struct ep_parameters)*;
+        (block "IN_EP_ONLY_DAQ" struct ep_parameters)*;
+        block "IN_EP_ONLY_EVSERV" struct ep_parameters;
+        (block "DAQ_LIST_USB_ENDPOINT" struct {
+          uint;
+          taggedstruct {
+            "FIXED_IN" uchar;
+            "FIXED_OUT" uchar;
+          };
+        })*;
+      };
+      taggedstruct {
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "GET_DAQ_EP"         = 0xFF,
+          "SET_DAQ_EP"         = 0xFE
+        })*;
+      };
+    };
+    enum packet_assignment_type {
+      "NOT_ALLOWED",
+      "FIXED",
+      "VARIABLE_INITIALISED",
+      "VARIABLE"
+    };
+    struct buffer {
+      uchar;
+      taggedstruct {
+        "MAX_FLX_LEN_BUF" taggedunion {
+          "FIXED" uchar;
+          "VARIABLE" uchar;
+        };
+        block "LPDU_ID" taggedstruct {
+          "FLX_SLOT_ID" taggedunion {
+            "FIXED" uint;
+            "VARIABLE" taggedstruct{
+              "INITIAL_VALUE" uint;
+            };
+          };
+          "OFFSET" taggedunion {
+            "FIXED" uchar;
+            "VARIABLE" taggedstruct{
+              "INITIAL_VALUE" uchar;
+            };
+          };
+          "CYCLE_REPETITION" taggedunion {
+            "FIXED" uchar;
+            "VARIABLE" taggedstruct{
+              "INITIAL_VALUE" uchar;
+            };
+          };
+          "CHANNEL" taggedunion {
+            "FIXED" enum {
+              "A" = 0,
+              "B" = 1
+            };
+            "VARIABLE" taggedstruct{
+              "INITIAL_VALUE" enum {
+                "A" = 0,
+                "B" = 1
+              };
+            };
+          };
+        };
+        block "XCP_PACKET" taggedstruct {
+          "CMD" enum packet_assignment_type;
+          "RES_ERR" enum packet_assignment_type;
+          "EV_SERV" enum packet_assignment_type;
+          "DAQ" enum packet_assignment_type;
+          "STIM" enum packet_assignment_type;
+          "MULTICAST" enum packet_assignment_type;
+        };
+      };
+    };
+    struct FLX_Parameters {
+      uint;
+      uint;
+      char[256];
+      char[256];
+      uchar;
+      enum {
+        "HEADER_NAX"               = 0,
+        "HEADER_NAX_FILL"          = 1,
+        "HEADER_NAX_CTR"           = 2,
+        "HEADER_NAX_FILL3"         = 3,
+        "HEADER_NAX_CTR_FILL2"     = 4,
+        "HEADER_NAX_LEN"           = 5,
+        "HEADER_NAX_CTR_LEN"       = 6,
+        "HEADER_NAX_FILL2_LEN"     = 7,
+        "HEADER_NAX_CTR_FILL_LEN"  = 8
+      };
+      enum {
+        "PACKET_ALIGNMENT_8"  = 0,
+        "PACKET_ALIGNMENT_16" = 1,
+        "PACKET_ALIGNMENT_32" = 2
+      };
+      taggedunion {
+        block "INITIAL_CMD_BUFFER" struct buffer;
+      };
+      taggedunion {
+        block "INITIAL_RES_ERR_BUFFER" struct buffer;
+      };
+      taggedstruct {
+        (block "POOL_BUFFER" struct buffer)*;
+      };
+      taggedstruct {
+        ("OPTIONAL_TL_SUBCMD" enum {
+          "FLX_ASSIGN"               = 0xFF,
+          "FLX_ACTIVATE"             = 0xFE,
+          "FLX_DEACTIVATE"           = 0xFD,
+          "GET_DAQ_FLX_BUF"          = 0xFC,
+          "SET_DAQ_FLX_BUF"          = 0xFB,
+          "GET_DAQ_CLOCK_MULTICAST"  = 0xFA
+        })*;
+      };
+    };
+    block "IF_DATA" taggedunion if_data {
+    "XCP" struct {
+      taggedstruct Common_Parameters;
+      taggedstruct {
+        block "XCP_ON_CAN" struct {
+          struct CAN_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_SxI" struct {
+          struct SxI_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_TCP_IP" struct {
+          struct TCP_IP_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_UDP_IP" struct {
+          struct UDP_IP_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_USB" struct {
+          struct USB_Parameters;
+          taggedstruct Common_Parameters;
+        };
+        block "XCP_ON_FLX" struct {
+          struct FLX_Parameters;
+          taggedstruct Common_Parameters;
+        };
+      };
+    };
+    "XCPplus" struct {
+      uint;
+      taggedstruct Common_Parameters;
+      taggedstruct {
+        (block "XCP_ON_CAN" struct {
+          struct CAN_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_SxI" struct {
+          struct SxI_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_TCP_IP" struct {
+          struct TCP_IP_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_UDP_IP" struct {
+          struct UDP_IP_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_USB" struct {
+          struct USB_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+        (block "XCP_ON_FLX" struct {
+          struct FLX_Parameters;
+          taggedstruct Common_Parameters;
+          taggedstruct {
+            "TRANSPORT_LAYER_INSTANCE" char[101];
+          };
+        })*;
+       };
+      };
+    };
+      block "IF_DATA" taggedunion {
+        "CANAPE_ADDRESS_UPDATE" taggedstruct {
+            ("EPK_ADDRESS" struct {
+                char[1024];
+                long;
+            })*;
+            "ECU_CALIBRATION_OFFSET" struct {
+                char[1024];
+                long;
+            };
+            (block "CALIBRATION_METHOD" taggedunion {
+                "AUTOSAR_SINGLE_POINTERED" struct {
+                    char[1024];
+                    long;
+                    taggedstruct {
+                        "ORIGINAL_POINTER_TABLE" struct {
+                            char[1024];
+                            long;
+                        };
+                    };
+                 };
+                 "InCircuit2" struct {
+                    char[1024];
+                    long;
+                    taggedstruct {
+                        "ORIGINAL_POINTER_TABLE" struct {
+                            char[1024];
+                            long;
+                        };
+                        "FLASH_SECTION" struct {
+                            ulong;
+                            ulong;
+                        }
+                    };
+                };
+            })*;
+            block "MAP_SYMBOL" taggedstruct {
+                "FIRST" struct {
+                   char[1024];
+                   long;
+                };
+                "LAST" struct {
+                   char[1024];
+                   long;
+                };
+                ("ADDRESS_MAPPING_XCP" struct {
+                    char[1024];
+                    char[1024];
+                })*;
+            };
+            (block "MEMORY_SEGMENT" struct {
+                char[1024];
+                taggedstruct {
+                    "FIRST" struct {
+                       char[1024];
+                       long;
+                    };
+                    "LAST" struct {
+                       char[1024];
+                       long;
+                    };
+                    ("ADDRESS_MAPPING_XCP" struct {
+                        char[1024];
+                        char[1024];
+                    })*;
+                };
+            })*;
+        };
+      };
+    /end A2ML
+
+    /begin IF_DATA XCPplus
+      1
+      /begin PROTOCOL_LAYER
+        0x104
+        2000
+        10000
+        2000
+        2000
+        2000
+        2000
+        0
+        12
+        12
+        BYTE_ORDER_MSB_LAST
+        ADDRESS_GRANULARITY_BYTE
+        OPTIONAL_CMD GET_COMM_MODE_INFO
+      /end PROTOCOL_LAYER
+      /begin DAQ
+        DYNAMIC
+        5
+        5
+        0
+        OPTIMISATION_TYPE_DEFAULT
+        ADDRESS_EXTENSION_FREE
+        IDENTIFICATION_FIELD_TYPE_ABSOLUTE
+        GRANULARITY_ODT_ENTRY_SIZE_DAQ_BYTE
+        7
+        OVERLOAD_INDICATION_PID
+        PRESCALER_SUPPORTED
+        /begin EVENT
+          "Task_a"
+          "Task_a"
+          0
+          DAQ
+          1
+          1
+          6
+          0
+        /end EVENT
+        /begin EVENT
+          "Task_b"
+          "Task_b"
+          3
+          DAQ
+          1
+          15
+          7
+          0
+        /end EVENT
+      /end DAQ
+      /begin XCP_ON_CAN
+        0x0102
+        CAN_ID_MASTER 0x12345678
+        CAN_ID_SLAVE 0x12345679
+        BAUDRATE 500000
+        SAMPLE_POINT 75
+        SAMPLE_RATE SINGLE
+        BTL_CYCLES 8
+        SJW 1
+        /begin CAN_FD
+          MAX_DLC 64
+          CAN_FD_DATA_TRANSFER_BAUDRATE 2000000
+          SAMPLE_POINT 75
+          BTL_CYCLES 10
+          SJW 2
+          SECONDARY_SAMPLE_POINT 0
+          TRANSCEIVER_DELAY_COMPENSATION OFF
+        /end CAN_FD
+        /begin PROTOCOL_LAYER
+          0x0101
+          0x07D0
+          0x2710
+          0x07D0
+          0x07D0
+          0x07D0
+          0x07D0
+          0x00
+          0x40
+          0x40
+          BYTE_ORDER_MSB_LAST
+          ADDRESS_GRANULARITY_BYTE
+          OPTIONAL_CMD GET_COMM_MODE_INFO
+          COMMUNICATION_MODE_SUPPORTED BLOCK
+          SLAVE
+        /end PROTOCOL_LAYER
+      /end XCP_ON_CAN
+      /begin XCP_ON_FLX
+        0x101
+        1000
+        ""
+        ""
+        0
+        HEADER_NAX_CTR
+        PACKET_ALIGNMENT_8
+        /begin INITIAL_CMD_BUFFER
+          0
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 66
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD FIXED
+            RES_ERR NOT_ALLOWED
+            EV_SERV NOT_ALLOWED
+            DAQ NOT_ALLOWED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end INITIAL_CMD_BUFFER
+        /begin INITIAL_RES_ERR_BUFFER
+          1
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 67
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD NOT_ALLOWED
+            RES_ERR FIXED
+            EV_SERV NOT_ALLOWED
+            DAQ NOT_ALLOWED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end INITIAL_RES_ERR_BUFFER
+        /begin POOL_BUFFER
+          2
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 68
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD NOT_ALLOWED
+            RES_ERR NOT_ALLOWED
+            EV_SERV NOT_ALLOWED
+            DAQ FIXED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end POOL_BUFFER
+        /begin POOL_BUFFER
+          3
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 69
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD NOT_ALLOWED
+            RES_ERR NOT_ALLOWED
+            EV_SERV NOT_ALLOWED
+            DAQ FIXED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end POOL_BUFFER
+        /begin POOL_BUFFER
+          4
+          MAX_FLX_LEN_BUF
+            FIXED 100
+          /begin LPDU_ID
+            FLX_SLOT_ID
+              FIXED 70
+            OFFSET
+              FIXED 0
+            CYCLE_REPETITION
+              FIXED 1
+            CHANNEL
+              FIXED A
+          /end LPDU_ID
+          /begin XCP_PACKET
+            CMD NOT_ALLOWED
+            RES_ERR NOT_ALLOWED
+            EV_SERV NOT_ALLOWED
+            DAQ FIXED
+            STIM NOT_ALLOWED
+          /end XCP_PACKET
+        /end POOL_BUFFER
+      /end XCP_ON_FLX
+      /begin XCP_ON_UDP_IP
+        1
+        2000
+        ADDRESS "192.168.0.1"
+      /end XCP_ON_UDP_IP
+      /begin XCP_ON_TCP_IP
+        1
+        2000
+        ADDRESS "192.168.0.1"
+      /end XCP_ON_TCP_IP
+    /end IF_DATA
+  /end MODULE
+/end PROJECT

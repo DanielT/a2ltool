@@ -1,0 +1,8 @@
+ASAP2_VERSION 1 71
+/begin PROJECT merge_includes_project ""
+  /begin MODULE module ""
+    
+    /include "included.a2l"
+ 
+  /end MODULE
+/end PROJECT

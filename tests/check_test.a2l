@@ -1,0 +1,18 @@
+ASAP2_VERSION 1 71
+/begin PROJECT test ""
+  /begin MODULE mod ""
+
+    /begin CHARACTERISTIC Curve_ExternalAxis ""
+      CURVE 0x0 Curve_ExternalAxis_RecordLayout 0 float_Compu -10000000 10000000
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY uint32_Compu 5 0 4294967295
+        AXIS_PTS_REF Axis_0
+      /end AXIS_DESCR
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Curve_ExternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Curve_ExternalAxis" 0
+    /end CHARACTERISTIC
+
+  /end MODULE
+/end PROJECT

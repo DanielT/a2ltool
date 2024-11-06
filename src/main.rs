@@ -62,7 +62,8 @@ macro_rules! ext_println {
 }
 
 fn main() {
-    match core() {
+    let args = std::env::args_os();
+    match core(args) {
         Ok(()) => {}
         Err(err) => {
             println!("{err}");
@@ -83,8 +84,8 @@ fn main() {
 //  8) clean up ifdata
 //  9) sort the file
 // 10) output
-fn core() -> Result<(), String> {
-    let arg_matches = get_args();
+fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
+    let arg_matches = parse_args(args);
 
     let strict = *arg_matches
         .get_one::<bool>("STRICT")
@@ -586,8 +587,7 @@ fn load_or_create_a2l(
 
 // set up the entire command line handling.
 // fortunately clap makes this painless
-fn get_args() -> ArgMatches {
-    let args = std::env::args_os();
+fn parse_args(args: impl Iterator<Item = OsString>) -> ArgMatches {
     let args = argfile::expand_args_from(args, argfile::parse_response, argfile::PREFIX)
         .unwrap_or_else(|err| {
             println!("invalid response file: {err}: {}", err.kind());
@@ -1071,5 +1071,505 @@ impl clap::builder::TypedValueParser for UpdateTypeParser {
                 Err(err)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_option_create_output() {
+        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let outfile = tempdir.join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("--create"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        let result = core(args.into_iter());
+        // Passing the option --create should neither panic nor return an error
+        // Passing the option --output should neither panic nor return an error
+        // After the run, the output file should exist
+        assert!(result.is_ok());
+        assert!(outfile.exists());
+        assert!(outfile.is_file());
+    }
+
+    #[test]
+    fn test_option_input() {
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/update_test1.a2l"),
+        ];
+        let result = core(args.into_iter());
+        // Passing the option --input should neither panic nor return an error
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_option_check() {
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/check_test.a2l"),
+            OsString::from("--check"),
+        ];
+        let result = core(args.into_iter());
+        // Passing the option --check should neither panic nor return an error
+        // check_test.a2l has problems, but without --strict they are only warnings
+        assert!(result.is_ok());
+
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/check_test.a2l"),
+            OsString::from("--check"),
+            OsString::from("--strict"),
+        ];
+        let result = core(args.into_iter());
+        // Passing the option --check should neither panic nor return an error
+        // check_test.a2l has problems, and with --strict they are errors
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_option_elffile() {
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("--create"),
+            OsString::from("--elffile"),
+            OsString::from("tests/elffiles/update_test.elf"),
+        ];
+        // Passing the option --elffile should neither panic nor return an error
+        core(args.into_iter()).unwrap();
+    }
+
+    #[test]
+    fn test_option_cleanup() {
+        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let outfile = tempdir.join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/cleanup_test.a2l"),
+            OsString::from("--cleanup"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        // Passing the option --cleanup should neither panic nor return an error
+        // cleanup_test.a2l has unused items, but --cleanup should remove them
+        core(args.into_iter()).unwrap();
+
+        let a2l_input =
+            a2lfile::load("tests/cleanup_test.a2l", None, &mut Vec::new(), false).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        assert_ne!(a2l_input, a2l_output);
+        // all items in cleanup_test.a2l are used
+        assert!(a2l_output.project.module[0].record_layout.is_empty());
+        assert!(a2l_output.project.module[0].compu_method.is_empty());
+        assert!(a2l_output.project.module[0].group.is_empty());
+    }
+
+    #[test]
+    fn test_option_update() {
+        let tempdir = tempfile::tempdir().unwrap().into_path();
+
+        // 1. full update
+        let outfile = tempdir.join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/update_test1.a2l"),
+            OsString::from("--elffile"),
+            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("--update"),
+            OsString::from("FULL"),
+            OsString::from("-v"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        // Passing the option --update should neither panic nor return an error
+        // update_test.elf has symbols that can be updated in the a2l file
+        core(args.into_iter()).unwrap();
+
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        // the output file should have updated addresses
+        let module = &a2l_output.project.module[0];
+        assert_ne!(module.characteristic[0].address, 0);
+        assert_ne!(
+            module.measurement[0].ecu_address.as_ref().unwrap().address,
+            0
+        );
+
+        // 2. address update only in strict mode on valid input
+        let outfile = tempdir.join("output2.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/update_test1.a2l"),
+            OsString::from("--elffile"),
+            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("--update"),
+            OsString::from("ADDRESSES"),
+            OsString::from("--update-mode"),
+            OsString::from("STRICT"),
+            OsString::from("-v"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        assert!(a2l_output.project.module[0].characteristic[0].address != 0);
+
+        // 3. address update only in strict mode on invalid input
+        let outfile = tempdir.join("output3.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/update_test2.a2l"),
+            OsString::from("--elffile"),
+            OsString::from("tests/elffiles/update_test_invalid.elf"),
+            OsString::from("--update"),
+            OsString::from("ADDRESSES"),
+            OsString::from("--update-mode"),
+            OsString::from("STRICT"),
+            OsString::from("-v"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        let result = core(args.into_iter());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_option_insert() {
+        // characteristics and measurements can be inserted in several different ways:
+        // - by name with --characteristic and --measurement
+        // - by address range with --characteristic-range and --measurement-range
+        // - by regex with --characteristic-regex and --measurement-regex
+        // - by section with --characteristic-section and --measurement-section
+        // The option --target-group can be used to put the inserted items into a group, and is tested here too
+
+        // 1. insert by name
+        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let outfile = tempdir.join("output1.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("--create"),
+            OsString::from("--elffile"),
+            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("--characteristic"),
+            OsString::from("Characteristic_Value"),
+            OsString::from("--measurement"),
+            OsString::from("Measurement_Value"),
+            OsString::from("--target-group"),
+            OsString::from("TestGroup"),
+            OsString::from("-v"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        assert_eq!(a2l_output.project.module[0].measurement.len(), 1);
+        assert_eq!(a2l_output.project.module[0].characteristic.len(), 1);
+        assert_eq!(a2l_output.project.module[0].group.len(), 1);
+        assert_eq!(a2l_output.project.module[0].group[0].name, "TestGroup");
+        // get the addresses of the inserted items for the second test
+        let measurement_addr = a2l_output.project.module[0].measurement[0]
+            .ecu_address
+            .as_ref()
+            .unwrap()
+            .address;
+        let characteristic_addr = a2l_output.project.module[0].characteristic[0].address;
+
+        // 2. insert by address range
+        let outfile = tempdir.join("output2.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("--create"),
+            OsString::from("--elffile"),
+            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("--characteristic-range"),
+            OsString::from(format!("0x{:x}", characteristic_addr)),
+            OsString::from(format!("0x{:x}", characteristic_addr + 4)),
+            OsString::from("--measurement-range"),
+            OsString::from(format!("0x{:x}", measurement_addr)),
+            OsString::from(format!("0x{:x}", measurement_addr + 4)),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        assert_eq!(a2l_output.project.module[0].measurement.len(), 1);
+        assert_eq!(a2l_output.project.module[0].characteristic.len(), 1);
+        assert_eq!(a2l_output.project.module[0].group.len(), 0); // no --target-group used this time
+
+        // 3. insert by regex
+        let outfile = tempdir.join("output3.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("--create"),
+            OsString::from("--elffile"),
+            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("--characteristic-regex"),
+            OsString::from("C.*Value"),
+            OsString::from("--measurement-regex"),
+            OsString::from("M.*Valu."),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        assert_eq!(a2l_output.project.module[0].measurement.len(), 1);
+        assert_eq!(a2l_output.project.module[0].characteristic.len(), 1);
+
+        // 4. insert by section
+        let outfile = tempdir.join("output4.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("--create"),
+            OsString::from("--elffile"),
+            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("--characteristic-section"),
+            OsString::from(".data"),
+            OsString::from("--measurement-section"),
+            OsString::from(".bss"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        let result = core(args.into_iter());
+        assert!(result.is_ok());
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        assert!(!a2l_output.project.module[0].measurement.is_empty());
+        assert!(!a2l_output.project.module[0].characteristic.is_empty());
+    }
+
+    #[test]
+    fn test_option_merge() {
+        // merging can be done on the MODULE level with --merge and on the PROJECT level with --merge-project
+
+        // 1. merge on the MODULE level
+        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let outfile = tempdir.join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("--create"),
+            OsString::from("--merge"),
+            OsString::from("tests/update_test1.a2l"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_input =
+            a2lfile::load("tests/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        // there should be only one MODULE in the output
+        assert_eq!(a2l_output.project.module.len(), 1);
+        // the input file was merged with an empty file, so the output should be the same as the input
+        assert_eq!(
+            a2l_output.project.module[0].measurement.len(),
+            a2l_input.project.module[0].measurement.len()
+        );
+        assert_eq!(
+            a2l_output.project.module[0].characteristic.len(),
+            a2l_input.project.module[0].characteristic.len()
+        );
+        assert_eq!(
+            a2l_output.project.module[0].group.len(),
+            a2l_input.project.module[0].group.len()
+        );
+        assert_eq!(
+            a2l_output.project.module[0].record_layout.len(),
+            a2l_input.project.module[0].record_layout.len()
+        );
+        assert_eq!(
+            a2l_output.project.module[0].compu_method.len(),
+            a2l_input.project.module[0].compu_method.len()
+        );
+
+        // 2. merge on the PROJECT level
+        let outfile = tempdir.join("output2.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("--create"),
+            OsString::from("--merge-project"),
+            OsString::from("tests/update_test1.a2l"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_input =
+            a2lfile::load("tests/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        // there should be two MODULEs in the output
+        assert_eq!(a2l_output.project.module.len(), 2);
+        // one of the two MODULEs in the output should be the same as the input file
+        let output_idx = a2l_output
+            .project
+            .module
+            .iter()
+            .position(|m| m.name == a2l_input.project.module[0].name)
+            .unwrap();
+        assert_eq!(
+            a2l_output.project.module[output_idx],
+            a2l_input.project.module[0]
+        );
+    }
+
+    #[test]
+    fn test_option_remove() {
+        // items can be removed by name with --remove
+        let a2l_input =
+            a2lfile::load("tests/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+        // get the names of the first characteristic and measurement, so they can be removed
+        let characteristic_name = a2l_input.project.module[0].characteristic[0].name.clone();
+        let measurement_name = a2l_input.project.module[0].measurement[0].name.clone();
+
+        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let outfile = tempdir.join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/update_test1.a2l"),
+            OsString::from("--remove"),
+            OsString::from(characteristic_name),
+            OsString::from("--remove"),
+            OsString::from(measurement_name),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        // the output should have one less characteristic and one less measurement than the input
+        assert_eq!(
+            a2l_input.project.module[0].characteristic.len(),
+            a2l_output.project.module[0].characteristic.len() + 1
+        );
+        assert_eq!(
+            a2l_input.project.module[0].measurement.len(),
+            a2l_output.project.module[0].measurement.len() + 1
+        );
+    }
+
+    #[test]
+    fn test_option_a2lversion() {
+        // the a2l version can be set with --a2lversion
+        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let outfile = tempdir.join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("--create"),
+            OsString::from("--a2lversion"),
+            OsString::from("1.6.0"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        assert_eq!(a2l_output.asap2_version.as_ref().unwrap().version_no, 1);
+        assert_eq!(a2l_output.asap2_version.as_ref().unwrap().upgrade_no, 60);
+
+        // modify the a2l version of an existing file
+        let outfile2 = tempdir.join("output2.a2l");
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/update_test1.a2l"),
+            OsString::from("--a2lversion"),
+            OsString::from("1.5.0"),
+            OsString::from("--output"),
+            OsString::from(outfile2.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_output = a2lfile::load(outfile2, None, &mut Vec::new(), false).unwrap();
+        assert_eq!(a2l_output.asap2_version.as_ref().unwrap().version_no, 1);
+        assert_eq!(a2l_output.asap2_version.as_ref().unwrap().upgrade_no, 50);
+    }
+
+    #[test]
+    fn test_option_merge_includes() {
+        // the content of all included files can be merged with --merge-includes
+        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let outfile = tempdir.join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/merge_inc_test.a2l"),
+            OsString::from("--merge-includes"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let output_text = std::fs::read_to_string(outfile).unwrap();
+        // the output file should not contain any /include commands
+        assert!(!output_text.contains("/include"));
+    }
+
+    #[test]
+    fn test_option_sort() {
+        // all items in the file can be sorted with --sort
+        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let outfile = tempdir.join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/update_test1.a2l"),
+            OsString::from("--sort"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let a2l_input =
+            a2lfile::load("tests/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+
+        // Though sorting does not change the meaning of the file, the order of the items in the output is different.
+        // That means the files are not directly equal.
+        assert_ne!(a2l_input, a2l_output);
+        // Comparing the number of items is a reasonable approximation to show that the content remains the same.
+        assert_eq!(
+            a2l_input.project.module[0].measurement.len(),
+            a2l_output.project.module[0].measurement.len()
+        );
+        assert_eq!(
+            a2l_input.project.module[0].characteristic.len(),
+            a2l_output.project.module[0].characteristic.len()
+        );
+        assert_eq!(
+            a2l_input.project.module[0].group.len(),
+            a2l_output.project.module[0].group.len()
+        );
+        assert_eq!(
+            a2l_input.project.module[0].record_layout.len(),
+            a2l_output.project.module[0].record_layout.len()
+        );
+        assert_eq!(
+            a2l_input.project.module[0].compu_method.len(),
+            a2l_output.project.module[0].compu_method.len()
+        );
+        assert_eq!(
+            a2l_input.project.module[0].instance.len(),
+            a2l_output.project.module[0].instance.len()
+        );
+    }
+
+    #[test]
+    fn test_option_xcp() {
+        // the XCP settings in the file can be displayed with --show-xcp
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("tests/xcp_test.a2l"),
+            OsString::from("--show-xcp"),
+        ];
+        // Passing the option --show-xcp should neither panic nor return an error
+        // The option only prints some information, so it is not possisble to check the output
+        core(args.into_iter()).unwrap();
     }
 }
