@@ -513,7 +513,7 @@ fn adjust_limits(
                         //   y = (bx + c) / f
                         // which can be inverted to
                         //   x = (fy - c) / b
-                        let func = |y: f64| (c.f * y - c.c) / c.b;
+                        let func = |y: f64| (c.f / c.b) * y - (c.c / c.b);
                         new_lower_limit = func(new_lower_limit);
                         new_upper_limit = func(new_upper_limit);
                         if new_lower_limit > new_upper_limit {
@@ -546,6 +546,19 @@ fn adjust_limits(
         if new_upper_limit > old_upper_limit {
             new_upper_limit = old_upper_limit;
         }
+    }
+
+    // safety check: the limits may not be infinite.
+    // This could happen if the compu method multiplies an f64 datatype limit with any number > 1
+    if new_lower_limit == -f64::INFINITY {
+        new_lower_limit = f64::MIN;
+    } else if new_lower_limit == f64::INFINITY {
+        new_lower_limit = f64::MAX;
+    }
+    if new_upper_limit == -f64::INFINITY {
+        new_upper_limit = f64::MIN;
+    } else if new_upper_limit == f64::INFINITY {
+        new_upper_limit = f64::MAX;
     }
 
     (new_lower_limit, new_upper_limit)
@@ -685,6 +698,28 @@ mod test {
         let (lower, upper) = adjust_limits(&typeinfo, 0.0, 0.0, Some(&compu_method));
         assert_eq!(lower, 0.0);
         assert_eq!(upper, 10200.0);
+
+        // for some RAT_FUNC compu method parameters, the limit calculation can go to infinity.
+        // Even the calculation order is a concern here, since multiplication before division
+        // could cause this even if the end result should be smaller than f64::MAX
+        let typeinfo = TypeInfo {
+            name: None,
+            unit_idx: 0,
+            datatype: DwarfDataType::Double,
+            dbginfo_offset: 0,
+        };
+        let mut compu_method = CompuMethod::new(
+            "name".to_string(),
+            "".to_string(),
+            ConversionType::RatFunc,
+            "".to_string(),
+            "".to_string(),
+        );
+        compu_method.coeffs = Some(Coeffs::new(0., 4.0, 0., 0., 0., 2.0));
+
+        let (lower, upper) = adjust_limits(&typeinfo, f64::MIN, f64::MAX, Some(&compu_method));
+        assert_ne!(lower, f64::MIN);
+        assert_ne!(upper, f64::MAX);
     }
 
     fn test_setup(a2l_name: &str) -> (crate::dwarf::DebugData, a2lfile::A2lFile) {
