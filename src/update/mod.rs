@@ -1,4 +1,4 @@
-use crate::dwarf::{make_simple_unit_name, DebugData, TypeInfo};
+use crate::debuginfo::{make_simple_unit_name, DebugData, TypeInfo};
 use crate::{ifdata, A2lVersion};
 use a2lfile::{
     A2lFile, A2lObject, AddrType, AddressType, BitMask, CompuMethod, EcuAddress, IfData, MatrixDim,
@@ -19,7 +19,7 @@ mod record_layout;
 pub(crate) mod typedef;
 
 use crate::datatype::{get_a2l_datatype, get_type_limits};
-use crate::dwarf::DwarfDataType;
+use crate::debuginfo::DbgDataType;
 use crate::symbol::{find_symbol, SymbolInfo};
 use axis_pts::*;
 use blob::{cleanup_removed_blobs, update_all_module_blobs};
@@ -333,23 +333,30 @@ fn log_update_results(errorlog: &mut Vec<String>, results: &[UpdateResult]) -> (
 
 pub(crate) fn make_symbol_link_string(sym_info: &SymbolInfo, debug_data: &DebugData) -> String {
     let mut name = sym_info.name.to_string();
+    let mut has_discriminiant = false;
     if !sym_info.is_unique {
         if let Some(funcname) = &sym_info.function_name {
             name.push_str("{Function:");
             name.push_str(funcname);
             name.push('}');
+            has_discriminiant = true;
         }
         for ns in sym_info.namespaces {
             name.push_str("{Namespace:");
             name.push_str(ns);
             name.push('}');
+            has_discriminiant = true;
         }
         if let Some(unit_name) = make_simple_unit_name(debug_data, sym_info.unit_idx) {
             name.push_str("{CompileUnit:");
             name.push_str(&unit_name);
             name.push('}');
+            has_discriminiant = true;
         }
-        name.push_str("{Namespace:Global}");
+        if has_discriminiant {
+            // adding the tag {Namespace:Global} only makes sense if there are other tags
+            name.push_str("{Namespace:Global}");
+        }
     }
     name
 }
@@ -373,7 +380,7 @@ pub(crate) fn set_matrix_dim(
     let mut cur_typeinfo = typeinfo;
     // compilers can represent multi-dimensional arrays in two different ways:
     // either as nested arrays, each with one dimension, or as one array with multiple dimensions
-    while let DwarfDataType::Array { dim, arraytype, .. } = &cur_typeinfo.datatype {
+    while let DbgDataType::Array { dim, arraytype, .. } = &cur_typeinfo.datatype {
         for val in dim {
             matrix_dim_values.push(u16::try_from(*val).unwrap_or(u16::MAX));
         }
@@ -414,7 +421,7 @@ fn set_measurement_ecu_address(opt_ecu_address: &mut Option<EcuAddress>, address
 // CHARACTERISTIC and MEASUREMENT objects contain a BIT_MASK for bitfield elements
 // it will be created/updated/deleted here, depending on the new data type of the variable
 pub(crate) fn set_bitmask(opt_bitmask: &mut Option<BitMask>, typeinfo: &TypeInfo) {
-    if let DwarfDataType::Bitfield {
+    if let DbgDataType::Bitfield {
         bit_offset,
         bit_size,
         ..
@@ -441,7 +448,7 @@ pub(crate) fn set_bitmask(opt_bitmask: &mut Option<BitMask>, typeinfo: &TypeInfo
 
 /// set or delete the `ADDRESS_TYPE`
 pub(crate) fn set_address_type(address_type_opt: &mut Option<AddressType>, newtype: &TypeInfo) {
-    if let DwarfDataType::Pointer(ptsize, _) = &newtype.datatype {
+    if let DbgDataType::Pointer(ptsize, _) = &newtype.datatype {
         let address_type = address_type_opt.get_or_insert(AddressType::new(AddrType::Direct));
         address_type.address_type = match ptsize {
             1 => AddrType::Pbyte,
@@ -652,7 +659,7 @@ impl AddAssign for UpdateSumary {
 mod test {
     use super::*;
     use crate::{
-        dwarf::{DwarfDataType, TypeInfo},
+        debuginfo::{DbgDataType, TypeInfo},
         A2lVersion,
     };
     use a2lfile::{Coeffs, CoeffsLinear, CompuMethod, ConversionType};
@@ -663,7 +670,7 @@ mod test {
         let typeinfo = TypeInfo {
             name: None,
             unit_idx: 0,
-            datatype: DwarfDataType::Uint8,
+            datatype: DbgDataType::Uint8,
             dbginfo_offset: 0,
         };
         let mut compu_method = CompuMethod::new(
@@ -683,7 +690,7 @@ mod test {
         let typeinfo = TypeInfo {
             name: None,
             unit_idx: 0,
-            datatype: DwarfDataType::Uint8,
+            datatype: DbgDataType::Uint8,
             dbginfo_offset: 0,
         };
         let mut compu_method = CompuMethod::new(
@@ -705,7 +712,7 @@ mod test {
         let typeinfo = TypeInfo {
             name: None,
             unit_idx: 0,
-            datatype: DwarfDataType::Double,
+            datatype: DbgDataType::Double,
             dbginfo_offset: 0,
         };
         let mut compu_method = CompuMethod::new(
@@ -722,7 +729,7 @@ mod test {
         assert_ne!(upper, f64::MAX);
     }
 
-    fn test_setup(a2l_name: &str) -> (crate::dwarf::DebugData, a2lfile::A2lFile) {
+    fn test_setup(a2l_name: &str) -> (crate::debuginfo::DebugData, a2lfile::A2lFile) {
         let mut log_msgs = Vec::new();
         let a2l = a2lfile::load(
             a2l_name,
@@ -731,9 +738,11 @@ mod test {
             true,
         )
         .unwrap();
-        let debug_data =
-            crate::dwarf::DebugData::load(&OsString::from("tests/elffiles/update_test.elf"), false)
-                .unwrap();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("tests/elffiles/update_test.elf"),
+            false,
+        )
+        .unwrap();
         (debug_data, a2l)
     }
 
@@ -956,7 +965,7 @@ mod test {
         );
 
         let mut log_msgs = Vec::new();
-        let typedef_names = TypedefNames::new(&data.module);
+        let typedef_names = TypedefNames::new(data.module);
         let (result, _) = update_all_module_instances(&mut data, &info, &typedef_names);
         assert!(result.iter().all(|r| r == &UpdateResult::Updated));
         assert_eq!(result.len(), 1);
@@ -977,7 +986,7 @@ mod test {
         );
 
         let mut log_msgs = Vec::new();
-        let typedef_names = TypedefNames::new(&data.module);
+        let typedef_names = TypedefNames::new(data.module);
         let (result, _) = update_all_module_instances(&mut data, &info, &typedef_names);
         assert!(result.iter().all(|r| r == &UpdateResult::Updated));
         assert_eq!(result.len(), 1);
@@ -1001,7 +1010,7 @@ mod test {
             UpdateMode::Strict,
             true,
         );
-        let typedef_names = TypedefNames::new(&data.module);
+        let typedef_names = TypedefNames::new(data.module);
         let (result, _) = update_all_module_instances(&mut data, &info, &typedef_names);
         assert_eq!(result.len(), 3);
         assert!(matches!(result[0], UpdateResult::Updated));
@@ -1093,7 +1102,7 @@ mod test {
             UpdateMode::Strict,
             false,
         );
-        assert_eq!(strict_error, false);
+        assert!(!strict_error);
         assert_eq!(summary.axis_pts_not_updated, 0);
         assert_eq!(summary.axis_pts_updated, 3);
         assert_eq!(summary.blob_not_updated, 0);

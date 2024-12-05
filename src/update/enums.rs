@@ -1,4 +1,4 @@
-use crate::dwarf::{DwarfDataType, TypeInfo};
+use crate::debuginfo::{DbgDataType, TypeInfo};
 use a2lfile::{
     CompuMethod, CompuTabRef, CompuVtab, ConversionType, Module, ValuePairsStruct,
     ValueTriplesStruct,
@@ -77,7 +77,7 @@ pub(crate) fn update_enum_compu_methods(
     // check all COMPU_VTABs in the module to see if we know of an associated enum type
     for compu_vtab in &mut module.compu_vtab {
         if let Some(TypeInfo {
-            datatype: DwarfDataType::Enum { enumerators, .. },
+            datatype: DbgDataType::Enum { enumerators, .. },
             ..
         }) = enum_compu_tab.get(&compu_vtab.name)
         {
@@ -111,7 +111,7 @@ pub(crate) fn update_enum_compu_methods(
     // do the same for COMPU_VTAB_RANGE, because the enum could also be stored as a COMPU_VTAB_RANGE where min = max for all entries
     for compu_vtab_range in &mut module.compu_vtab_range {
         if let Some(TypeInfo {
-            datatype: DwarfDataType::Enum { enumerators, .. },
+            datatype: DbgDataType::Enum { enumerators, .. },
             ..
         }) = enum_compu_tab.get(&compu_vtab_range.name)
         {

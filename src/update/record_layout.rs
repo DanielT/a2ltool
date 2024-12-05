@@ -1,4 +1,4 @@
-use crate::dwarf::{DwarfDataType, TypeInfo};
+use crate::debuginfo::{DbgDataType, TypeInfo};
 use crate::update::get_a2l_datatype;
 use a2lfile::{Module, RecordLayout};
 use std::collections::HashMap;
@@ -46,7 +46,7 @@ pub(crate) fn get_inner_type(typeinfo: &TypeInfo, memberid: u16) -> Option<&Type
     };
 
     match &typeinfo.datatype {
-        DwarfDataType::Struct { members, .. } => {
+        DbgDataType::Struct { members, .. } => {
             if id < members.len() {
                 Some(&members[id].0)
             } else {
@@ -93,7 +93,7 @@ pub(crate) fn update_record_layout(
         if let Some(axis_pts_x) = &mut new_reclayout.axis_pts_x {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_x.position) {
                 axis_pts_x.datatype = get_a2l_datatype(itemtype);
-                if let DwarfDataType::Array { dim, .. } = &itemtype.datatype {
+                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                     // FIX_NO_AXIS_PTS_X
                     if let Some(fix_no_axis_pts_x) = &mut new_reclayout.fix_no_axis_pts_x {
                         fix_no_axis_pts_x.number_of_axis_points = dim[0] as u16;
@@ -112,7 +112,7 @@ pub(crate) fn update_record_layout(
         if let Some(axis_pts_y) = &mut new_reclayout.axis_pts_y {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_y.position) {
                 axis_pts_y.datatype = get_a2l_datatype(itemtype);
-                if let DwarfDataType::Array { dim, .. } = &itemtype.datatype {
+                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                     // FIX_NO_AXIS_PTS_Y
                     if let Some(fix_no_axis_pts_y) = &mut new_reclayout.fix_no_axis_pts_y {
                         fix_no_axis_pts_y.number_of_axis_points = dim[0] as u16;
@@ -131,7 +131,7 @@ pub(crate) fn update_record_layout(
         if let Some(axis_pts_z) = &mut new_reclayout.axis_pts_z {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_z.position) {
                 axis_pts_z.datatype = get_a2l_datatype(itemtype);
-                if let DwarfDataType::Array { dim, .. } = &itemtype.datatype {
+                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                     // FIX_NO_AXIS_PTS_Z
                     if let Some(fix_no_axis_pts_z) = &mut new_reclayout.fix_no_axis_pts_z {
                         fix_no_axis_pts_z.number_of_axis_points = dim[0] as u16;
@@ -150,7 +150,7 @@ pub(crate) fn update_record_layout(
         if let Some(axis_pts_4) = &mut new_reclayout.axis_pts_4 {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_4.position) {
                 axis_pts_4.datatype = get_a2l_datatype(itemtype);
-                if let DwarfDataType::Array { dim, .. } = &itemtype.datatype {
+                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                     // FIX_NO_AXIS_PTS_4
                     if let Some(fix_no_axis_pts_4) = &mut new_reclayout.fix_no_axis_pts_4 {
                         fix_no_axis_pts_4.number_of_axis_points = dim[0] as u16;
@@ -169,7 +169,7 @@ pub(crate) fn update_record_layout(
         if let Some(axis_pts_5) = &mut new_reclayout.axis_pts_5 {
             if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_5.position) {
                 axis_pts_5.datatype = get_a2l_datatype(itemtype);
-                if let DwarfDataType::Array { dim, .. } = &itemtype.datatype {
+                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                     // FIX_NO_AXIS_PTS_5
                     if let Some(fix_no_axis_pts_5) = &mut new_reclayout.fix_no_axis_pts_5 {
                         fix_no_axis_pts_5.number_of_axis_points = dim[0] as u16;

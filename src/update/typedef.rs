@@ -1,4 +1,4 @@
-use crate::dwarf::{make_simple_unit_name, DebugData, DwarfDataType, TypeInfo};
+use crate::debuginfo::{make_simple_unit_name, DbgDataType, DebugData, TypeInfo};
 use crate::update::enums::{cond_create_enum_conversion, update_enum_compu_methods};
 use crate::update::{
     adjust_limits, get_a2l_datatype, get_fnc_values_memberid, get_inner_type, set_address_type,
@@ -1044,7 +1044,7 @@ impl<'dbg, 'a2l, 'rl, 'log, 'cm> TypedefUpdater<'dbg, 'a2l, 'rl, 'log, 'cm> {
         let member_id =
             get_fnc_values_memberid(self.module, self.recordlayout_info, &td_char.record_layout);
         if let Some(inner_typeinfo) = get_inner_type(char_type, member_id) {
-            if let DwarfDataType::Enum { enumerators, .. } = &inner_typeinfo.datatype {
+            if let DbgDataType::Enum { enumerators, .. } = &inner_typeinfo.datatype {
                 // the values of this struct are of type enum
                 let enum_name = inner_typeinfo
                     .name
@@ -1077,7 +1077,7 @@ impl<'dbg, 'a2l, 'rl, 'log, 'cm> TypedefUpdater<'dbg, 'a2l, 'rl, 'log, 'cm> {
         if td_char.characteristic_type == CharacteristicType::Ascii {
             // a string is an array of characters. We only require the array, because a
             // character type can be different things in different situations or languages: e.g. char / wchar_t
-            if let DwarfDataType::Array { dim, .. } = &char_type.datatype {
+            if let DbgDataType::Array { dim, .. } = &char_type.datatype {
                 if dim.len() == 1 {
                     let number = td_char.number.get_or_insert(Number::new(0));
                     td_char.matrix_dim = None;
@@ -1167,7 +1167,7 @@ impl<'dbg, 'a2l, 'rl, 'log, 'cm> TypedefUpdater<'dbg, 'a2l, 'rl, 'log, 'cm> {
     ) {
         td_meas.datatype = get_a2l_datatype(meas_type);
         set_bitmask(&mut td_meas.bit_mask, meas_type);
-        if let DwarfDataType::Enum { enumerators, .. } = &meas_type.datatype {
+        if let DbgDataType::Enum { enumerators, .. } = &meas_type.datatype {
             if td_meas.conversion == "NO_COMPU_METHOD" {
                 td_meas.conversion = meas_type
                     .name
@@ -1245,13 +1245,13 @@ impl<'dbg, 'a2l, 'rl, 'log, 'cm> TypedefUpdater<'dbg, 'a2l, 'rl, 'log, 'cm> {
             .map_or(typeinfo, |(_, t)| t);
 
         match &typeinfo.datatype {
-            DwarfDataType::Struct { members, .. }
-            | DwarfDataType::Union { members, .. }
-            | DwarfDataType::Class { members, .. } => {
+            DbgDataType::Struct { members, .. }
+            | DbgDataType::Union { members, .. }
+            | DbgDataType::Class { members, .. } => {
                 // typical case: the data type of the typedef struct is "structlike" and has a list of members
                 self.update_typedef_struct_content(td_struct, members, enum_convlist, is_calib);
             }
-            DwarfDataType::Array { .. } => {
+            DbgDataType::Array { .. } => {
                 // This type is not a struct, it is actually an array.
                 // In this case, there is only one STRUCTURE_COMPONENT which represents the array element type
                 // The structure component has an offset of 0 and a MATRIX_DIM to represent the array correctly
@@ -1280,7 +1280,7 @@ impl<'dbg, 'a2l, 'rl, 'log, 'cm> TypedefUpdater<'dbg, 'a2l, 'rl, 'log, 'cm> {
                     td_struct.structure_component.truncate(0);
                 }
             }
-            DwarfDataType::Pointer(_, _) => {
+            DbgDataType::Pointer(_, _) => {
                 // insanity! - the original declaration would have to be something like "sometype*** var".
                 // In that situation, the INSTANCE would consume the first layer of indirection and set ADDRESS_TYPE,
                 // then this TYPEDEF_STRUCTURE gets the second layer and also sets ADDRESS_TYPE, and finally we get here.
@@ -1362,8 +1362,8 @@ impl<'dbg, 'a2l, 'rl, 'log, 'cm> TypedefUpdater<'dbg, 'a2l, 'rl, 'log, 'cm> {
             {
                 // only create a STRUCTURE_COMPONENT for items whose inner datatype is not FuncPtr
                 // Other is used for void pointers, which is only allowed for calibration as a TYPEDEF_BLOB
-                if !matches!(&final_typeinfo.datatype, DwarfDataType::FuncPtr(_))
-                    && (is_calib || !matches!(&final_typeinfo.datatype, DwarfDataType::Other(_)))
+                if !matches!(&final_typeinfo.datatype, DbgDataType::FuncPtr(_))
+                    && (is_calib || !matches!(&final_typeinfo.datatype, DbgDataType::Other(_)))
                 {
                     sc.component_name = cur_member_name.clone();
                     // set ADDRESS_TYPE if cur_member_typeinfo is a pointer, or delete it
@@ -1583,26 +1583,26 @@ fn get_structure_component_typeinfo<'dbg>(
 fn is_structure_typeinfo(typeinfo: &TypeInfo, types: &HashMap<usize, TypeInfo>) -> bool {
     let typeinfo = typeinfo.get_pointer(types).map_or(typeinfo, |(_, t)| t);
     match &typeinfo.datatype {
-        DwarfDataType::Pointer(_, offset) => {
-            if let Some(pt_type) = types.get(&offset.0) {
+        DbgDataType::Pointer(_, offset) => {
+            if let Some(pt_type) = types.get(offset) {
                 // inner type can be a pointer to anything, or a valid structure datatype
-                matches!(&pt_type.datatype, DwarfDataType::Pointer(_, _))
+                matches!(&pt_type.datatype, DbgDataType::Pointer(_, _))
                     || is_structure_typeinfo(pt_type, types)
             } else {
                 false
             }
         }
-        DwarfDataType::TypeRef(offset, _) => {
+        DbgDataType::TypeRef(offset, _) => {
             if let Some(pt_type) = types.get(offset) {
                 is_structure_typeinfo(pt_type, types)
             } else {
                 false
             }
         }
-        DwarfDataType::Struct { .. }
-        | DwarfDataType::Class { .. }
-        | DwarfDataType::Union { .. }
-        | DwarfDataType::Array { .. } => true,
+        DbgDataType::Struct { .. }
+        | DbgDataType::Class { .. }
+        | DbgDataType::Union { .. }
+        | DbgDataType::Array { .. } => true,
         _ => false,
     }
 }
@@ -1613,11 +1613,11 @@ fn is_calibration_typeinfo(typeinfo: &TypeInfo) -> bool {
     let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
     !matches!(
         &typeinfo.datatype,
-        DwarfDataType::Pointer(_, _)
-            | DwarfDataType::FuncPtr(_)
-            | DwarfDataType::Other(_)
-            | DwarfDataType::Union { .. }
-            | DwarfDataType::TypeRef(_, _)
+        DbgDataType::Pointer(_, _)
+            | DbgDataType::FuncPtr(_)
+            | DbgDataType::Other(_)
+            | DbgDataType::Union { .. }
+            | DbgDataType::TypeRef(_, _)
     )
 }
 
@@ -1626,21 +1626,21 @@ fn is_measurement_typeinfo(typeinfo: &TypeInfo, types: &HashMap<usize, TypeInfo>
     let typeinfo = typeinfo.get_pointer(types).map_or(typeinfo, |(_, t)| t);
     let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
     match &typeinfo.datatype {
-        DwarfDataType::Pointer(_, offset) => {
-            if let Some(pt_type) = types.get(&offset.0) {
+        DbgDataType::Pointer(_, offset) => {
+            if let Some(pt_type) = types.get(offset) {
                 // inner type must be a measurement type, except it can't be a pointer itself
-                !matches!(&pt_type.datatype, DwarfDataType::Pointer(_, _))
+                !matches!(&pt_type.datatype, DbgDataType::Pointer(_, _))
                     && is_measurement_typeinfo(pt_type, types)
             } else {
                 false
             }
         }
-        DwarfDataType::Other(_)
-        | DwarfDataType::Struct { .. }
-        | DwarfDataType::Class { .. }
-        | DwarfDataType::Union { .. }
-        | DwarfDataType::Array { .. }
-        | DwarfDataType::TypeRef(_, _) => false,
+        DbgDataType::Other(_)
+        | DbgDataType::Struct { .. }
+        | DbgDataType::Class { .. }
+        | DbgDataType::Union { .. }
+        | DbgDataType::Array { .. }
+        | DbgDataType::TypeRef(_, _) => false,
         _ => true,
     }
 }
@@ -1702,7 +1702,7 @@ fn calc_distinct_types<'a>(
 /// create a suitable name for a TYPEDEF_* based on the given typeinfo
 fn make_typedef_name(debug_data: &DebugData, typeinfo: &TypeInfo, is_calib: bool) -> String {
     match &typeinfo.datatype {
-        DwarfDataType::Pointer(pt_size, pt_dbg_offset) => {
+        DbgDataType::Pointer(pt_size, pt_dbg_offset) => {
             let prefix = match pt_size {
                 1 => "BytePointer",
                 2 => "ShortPointer",
@@ -1710,7 +1710,7 @@ fn make_typedef_name(debug_data: &DebugData, typeinfo: &TypeInfo, is_calib: bool
                 8 => "LongLongPointer",
                 _ => "Pointer",
             };
-            let basename: Cow<str> = if let Some(pt_type) = debug_data.types.get(&pt_dbg_offset.0) {
+            let basename: Cow<str> = if let Some(pt_type) = debug_data.types.get(pt_dbg_offset) {
                 make_typedef_name(debug_data, pt_type, is_calib).into()
             } else if let Some(pt_name) = &typeinfo.name {
                 pt_name.into()
@@ -1719,7 +1719,7 @@ fn make_typedef_name(debug_data: &DebugData, typeinfo: &TypeInfo, is_calib: bool
             };
             format!("{prefix}_{basename}")
         }
-        DwarfDataType::Array { dim, arraytype, .. } => {
+        DbgDataType::Array { dim, arraytype, .. } => {
             let basename = make_typedef_name(debug_data, arraytype, is_calib);
             // ex: dim = [3, 4, 5] -> "Array_3_4_5"
             let mut outstr = dim.iter().fold("Array".to_string(), |mut txt, val| {
@@ -1730,32 +1730,32 @@ fn make_typedef_name(debug_data: &DebugData, typeinfo: &TypeInfo, is_calib: bool
             outstr.push_str(&basename);
             outstr
         }
-        DwarfDataType::Struct { .. } => typeinfo
+        DbgDataType::Struct { .. } => typeinfo
             .name
             .as_deref()
             .unwrap_or("_unnamed_struct_")
             .to_string(),
-        DwarfDataType::Class { .. } => {
+        DbgDataType::Class { .. } => {
             // there is no such thing as an unnamed class
             typeinfo.name.clone().unwrap()
         }
-        DwarfDataType::Union { .. } => typeinfo
+        DbgDataType::Union { .. } => typeinfo
             .name
             .as_deref()
             .unwrap_or("_unnamed_union_")
             .to_string(),
-        DwarfDataType::Enum { .. } => typeinfo
+        DbgDataType::Enum { .. } => typeinfo
             .name
             .as_deref()
             .unwrap_or("_unnamed_enum_")
             .to_string(),
-        DwarfDataType::TypeRef(offset, _) => debug_data
+        DbgDataType::TypeRef(offset, _) => debug_data
             .types
             .get(offset)
             .map_or("_invalid_reference_".to_string(), |t| {
                 make_typedef_name(debug_data, t, is_calib)
             }),
-        DwarfDataType::FuncPtr(_) | DwarfDataType::Other(_) => {
+        DbgDataType::FuncPtr(_) | DbgDataType::Other(_) => {
             // BLOBs might refer to void pointers, which can be represented as Other()
             typeinfo
                 .name
@@ -1763,17 +1763,17 @@ fn make_typedef_name(debug_data: &DebugData, typeinfo: &TypeInfo, is_calib: bool
                 .unwrap_or("_unnamed_item_")
                 .to_string()
         }
-        DwarfDataType::Uint8 => make_basic_name(is_calib, "UByte"),
-        DwarfDataType::Uint16 => make_basic_name(is_calib, "UWord"),
-        DwarfDataType::Uint32 => make_basic_name(is_calib, "ULong"),
-        DwarfDataType::Uint64 => make_basic_name(is_calib, "UInt64"),
-        DwarfDataType::Sint8 => make_basic_name(is_calib, "SByte"),
-        DwarfDataType::Sint16 => make_basic_name(is_calib, "SWord"),
-        DwarfDataType::Sint32 => make_basic_name(is_calib, "SLong"),
-        DwarfDataType::Sint64 => make_basic_name(is_calib, "SInt64"),
-        DwarfDataType::Float => make_basic_name(is_calib, "Float32"),
-        DwarfDataType::Double => make_basic_name(is_calib, "Double"),
-        DwarfDataType::Bitfield {
+        DbgDataType::Uint8 => make_basic_name(is_calib, "UByte"),
+        DbgDataType::Uint16 => make_basic_name(is_calib, "UWord"),
+        DbgDataType::Uint32 => make_basic_name(is_calib, "ULong"),
+        DbgDataType::Uint64 => make_basic_name(is_calib, "UInt64"),
+        DbgDataType::Sint8 => make_basic_name(is_calib, "SByte"),
+        DbgDataType::Sint16 => make_basic_name(is_calib, "SWord"),
+        DbgDataType::Sint32 => make_basic_name(is_calib, "SLong"),
+        DbgDataType::Sint64 => make_basic_name(is_calib, "SInt64"),
+        DbgDataType::Float => make_basic_name(is_calib, "Float32"),
+        DbgDataType::Double => make_basic_name(is_calib, "Double"),
+        DbgDataType::Bitfield {
             basetype,
             bit_offset,
             bit_size,
@@ -1802,18 +1802,18 @@ fn fully_unwrap_typeinfo<'dbg>(
     // fully unwrap all indirections, until the type is not one of Pointer / Array / TypeRef
     loop {
         match &cur_typeinfo.datatype {
-            DwarfDataType::Pointer(_, off) => {
+            DbgDataType::Pointer(_, off) => {
                 // for void* the off may be 0, then debug_data.types.get() fails
-                if let Some(ptype) = debug_data.types.get(&off.0) {
+                if let Some(ptype) = debug_data.types.get(off) {
                     cur_typeinfo = ptype;
                 } else {
                     return None;
                 }
             }
-            DwarfDataType::Array { arraytype, .. } => {
+            DbgDataType::Array { arraytype, .. } => {
                 cur_typeinfo = arraytype;
             }
-            DwarfDataType::TypeRef(off, _) => {
+            DbgDataType::TypeRef(off, _) => {
                 if let Some(reftype) = debug_data.types.get(off) {
                     cur_typeinfo = reftype;
                 } else {
@@ -1829,7 +1829,7 @@ fn fully_unwrap_typeinfo<'dbg>(
 mod test {
     use super::{update_module_typedefs, TypedefUpdater};
     use crate::{
-        dwarf::{DebugData, TypeInfo},
+        debuginfo::{DebugData, TypeInfo},
         update::{get_symbol_info, A2lUpdateInfo, RecordLayoutInfo, TypedefNames, TypedefReferrer},
         A2lVersion,
     };
@@ -1845,7 +1845,8 @@ mod test {
     ) -> (A2lFile, DebugData, TypedefNames, RecordLayoutInfo) {
         let mut log_msgs = Vec::new();
         let a2l = a2lfile::load(a2l_name, None, &mut log_msgs, true).unwrap();
-        let debug_data = crate::dwarf::DebugData::load(&OsString::from(elf_name), false).unwrap();
+        let debug_data =
+            crate::debuginfo::DebugData::load_dwarf(&OsString::from(elf_name), false).unwrap();
         let typedef_names = TypedefNames::new(&a2l.project.module[0]);
         let recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
         (a2l, debug_data, typedef_names, recordlayout_info)
@@ -1975,7 +1976,7 @@ mod test {
     fn test_create_missing_instance_targets() {
         let mut a2l = a2lfile::new();
         let elf_name = OsString::from("tests/elffiles/update_typedef_test.elf");
-        let debug_data = crate::dwarf::DebugData::load(&elf_name, false).unwrap();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(&elf_name, false).unwrap();
         let typedef_names = TypedefNames::new(&a2l.project.module[0]);
         let mut recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
 
@@ -2031,7 +2032,7 @@ mod test {
     fn test_create_typedef() {
         let mut a2l = a2lfile::new();
         let elf_name = OsString::from("tests/elffiles/update_typedef_test.elf");
-        let debug_data = crate::dwarf::DebugData::load(&elf_name, false).unwrap();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(&elf_name, false).unwrap();
         let typedef_names = TypedefNames::new(&a2l.project.module[0]);
         let mut recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
         let mut msgs = Vec::new();
@@ -2106,7 +2107,7 @@ mod test {
     fn test_create_typedef2() {
         let mut a2l = a2lfile::new();
         let elf_name = OsString::from("tests/elffiles/update_typedef_test.elf");
-        let debug_data = crate::dwarf::DebugData::load(&elf_name, false).unwrap();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(&elf_name, false).unwrap();
         let typedef_names = TypedefNames::new(&a2l.project.module[0]);
         let mut recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
         let mut msgs = Vec::new();

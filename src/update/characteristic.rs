@@ -1,6 +1,6 @@
 use crate::datatype::get_a2l_datatype;
-use crate::dwarf::DwarfDataType;
-use crate::dwarf::{DebugData, TypeInfo};
+use crate::debuginfo::DbgDataType;
+use crate::debuginfo::{DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
 use crate::A2lVersion;
 use a2lfile::{A2lObject, AxisDescr, Characteristic, CharacteristicType, Module, RecordLayout};
@@ -172,7 +172,7 @@ fn update_characteristic_datatype<'enumlist, 'typeinfo: 'enumlist>(
     let member_id =
         get_fnc_values_memberid(data.module, &data.reclayout_info, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
-        if let DwarfDataType::Enum { enumerators, .. } = &inner_typeinfo.datatype {
+        if let DbgDataType::Enum { enumerators, .. } = &inner_typeinfo.datatype {
             let enum_name = inner_typeinfo
                 .name
                 .clone()
@@ -294,7 +294,7 @@ pub(crate) fn update_characteristic_axis(
             // an internal axis, using info from the typeinfo and the record layout
             if let Some(&Some(position)) = axis_positions.get(idx) {
                 if let Some(TypeInfo {
-                    datatype: DwarfDataType::Array { dim, .. },
+                    datatype: DbgDataType::Array { dim, .. },
                     ..
                 }) = get_inner_type(typeinfo, position)
                 {
@@ -316,7 +316,7 @@ fn verify_characteristic_datatype<'dbg>(
     let member_id =
         get_fnc_values_memberid(data.module, &data.reclayout_info, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
-        if let DwarfDataType::Enum { .. } = &inner_typeinfo.datatype {
+        if let DbgDataType::Enum { .. } = &inner_typeinfo.datatype {
             if characteristic.conversion == "NO_COMPU_METHOD" {
                 bad_characteristic = true;
             }

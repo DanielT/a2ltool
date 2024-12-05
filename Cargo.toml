@@ -18,6 +18,7 @@ regex = "1"
 indexmap = "2.2.0"
 fxhash = "0.2.1"
 argfile = { version ="0.2.0", features=["response"]}
+pdb2 = "0.9.2"
 
 [dev-dependencies]
 tempfile = "3.13"

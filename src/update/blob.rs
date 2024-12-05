@@ -1,4 +1,4 @@
-use crate::dwarf::DebugData;
+use crate::debuginfo::DebugData;
 use crate::symbol::SymbolInfo;
 use a2lfile::{A2lObject, Blob, Module};
 use std::collections::HashSet;

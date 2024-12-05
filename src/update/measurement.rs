@@ -1,5 +1,5 @@
-use crate::dwarf::DwarfDataType;
-use crate::dwarf::{DebugData, TypeInfo};
+use crate::debuginfo::DbgDataType;
+use crate::debuginfo::{DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
 use crate::A2lVersion;
 use a2lfile::{A2lObject, Measurement, Module};
@@ -143,7 +143,7 @@ fn update_measurement_datatype<'enumlist, 'typeinfo: 'enumlist>(
     measurement.array_size = None;
     let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
 
-    if let DwarfDataType::Enum { enumerators, .. } = &typeinfo.datatype {
+    if let DbgDataType::Enum { enumerators, .. } = &typeinfo.datatype {
         if measurement.conversion == "NO_COMPU_METHOD" {
             measurement.conversion = typeinfo
                 .name
@@ -191,7 +191,7 @@ fn verify_measurement_datatype<'enumlist, 'typeinfo: 'enumlist>(
     let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
 
     let mut bad_conversion = false;
-    if let DwarfDataType::Enum { .. } = &typeinfo.datatype {
+    if let DbgDataType::Enum { .. } = &typeinfo.datatype {
         if measurement.conversion == "NO_COMPU_METHOD" {
             // the type is enum, so there should be a conversion method, but there is none
             bad_conversion = true;

@@ -1,5 +1,5 @@
 use crate::{
-    dwarf::{DebugData, TypeInfo},
+    debuginfo::{DebugData, TypeInfo},
     symbol::SymbolInfo,
 };
 use a2lfile::{A2lObject, Instance, Module};
@@ -128,7 +128,7 @@ fn update_module_instance<'dbg>(
 fn update_instance_datatype(
     info: &A2lUpdateInfo,
     instance: &mut Instance,
-    typeinfo: &crate::dwarf::TypeInfo,
+    typeinfo: &crate::debuginfo::TypeInfo,
 ) {
     // Each INSTANCE can have:
     // - an ADDRESS_TYPE, which means that it is a pointer to some data

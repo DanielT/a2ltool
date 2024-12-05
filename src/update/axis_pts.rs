@@ -1,6 +1,6 @@
 use crate::datatype::get_a2l_datatype;
-use crate::dwarf::DwarfDataType;
-use crate::dwarf::{DebugData, TypeInfo};
+use crate::debuginfo::DbgDataType;
+use crate::debuginfo::{DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
 use crate::A2lVersion;
 use a2lfile::{A2lObject, AxisPts, Module};
@@ -127,7 +127,7 @@ fn update_axis_pts_datatype<'dbg>(
         get_axis_pts_x_memberid(data.module, &data.reclayout_info, &axis_pts.deposit_record);
     if let Some(inner_typeinfo) = get_inner_type(sym_info.typeinfo, member_id) {
         match &inner_typeinfo.datatype {
-            DwarfDataType::Array { dim, arraytype, .. } => {
+            DbgDataType::Array { dim, arraytype, .. } => {
                 // this is the only reasonable case for an AXIS_PTS object
                 // update max_axis_points to match the size of the array
                 if !dim.is_empty() {
@@ -135,7 +135,7 @@ fn update_axis_pts_datatype<'dbg>(
                 }
                 update_axis_pts_conversion(data.module, axis_pts, arraytype, enum_convlist);
             }
-            DwarfDataType::Enum { .. } => {
+            DbgDataType::Enum { .. } => {
                 // likely not useful, because what purpose would an axis consisting of a single enum value serve?
                 // print warning?
                 axis_pts.max_axis_points = 1;
@@ -176,7 +176,7 @@ fn update_axis_pts_conversion<'dbg>(
     typeinfo: &'dbg TypeInfo,
     enum_convlist: &mut HashMap<String, &'dbg TypeInfo>,
 ) {
-    if let DwarfDataType::Enum { enumerators, .. } = &typeinfo.datatype {
+    if let DbgDataType::Enum { enumerators, .. } = &typeinfo.datatype {
         if axis_pts.conversion == "NO_COMPU_METHOD" {
             axis_pts.conversion = typeinfo
                 .name
@@ -199,7 +199,7 @@ fn verify_axis_pts_datatype(
     let member_id =
         get_axis_pts_x_memberid(data.module, &data.reclayout_info, &axis_pts.deposit_record);
     if let Some(inner_typeinfo) = get_inner_type(sym_info.typeinfo, member_id) {
-        let max_axis_pts = if let DwarfDataType::Array { dim, .. } = &inner_typeinfo.datatype {
+        let max_axis_pts = if let DbgDataType::Array { dim, .. } = &inner_typeinfo.datatype {
             *dim.first().unwrap_or(&1) as u16
         } else {
             1

@@ -6,7 +6,7 @@ use a2lfile::{
 use std::collections::HashMap;
 
 use crate::datatype::{get_a2l_datatype, get_type_limits};
-use crate::dwarf::{DebugData, DwarfDataType, TypeInfo};
+use crate::debuginfo::{DbgDataType, DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
 use crate::update::{
     self, enums, make_symbol_link_string, set_address_type, set_bitmask, set_matrix_dim,
@@ -117,7 +117,7 @@ pub(crate) fn insert_items(
                 }
             }
         } else if enable_structures
-            && !matches!(sym_info.typeinfo.datatype, DwarfDataType::FuncPtr(_))
+            && !matches!(sym_info.typeinfo.datatype, DbgDataType::FuncPtr(_))
         {
             match insert_instance_sym(
                 module, debug_data, sym_name, &sym_info, &name_map, &sym_map, is_calib,
@@ -205,7 +205,7 @@ fn insert_measurement_sym(
     );
     let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
 
-    if let DwarfDataType::Enum { enumerators, .. } = &typeinfo.datatype {
+    if let DbgDataType::Enum { enumerators, .. } = &typeinfo.datatype {
         // create a conversion table for enums
         let enum_name = typeinfo
             .name
@@ -264,7 +264,7 @@ fn insert_characteristic_sym(
 
     set_bitmask(&mut new_characteristic.bit_mask, typeinfo);
 
-    if let DwarfDataType::Enum { enumerators, .. } = &typeinfo.datatype {
+    if let DbgDataType::Enum { enumerators, .. } = &typeinfo.datatype {
         let enum_name = typeinfo
             .name
             .clone()
@@ -543,17 +543,17 @@ pub(crate) fn insert_many<'param>(
     while let Some(sym_info) = current_item {
         let mut skip_children = false;
         match &sym_info.typeinfo.datatype {
-            DwarfDataType::TypeRef(_, _) | DwarfDataType::FuncPtr(_) => {}
-            DwarfDataType::Other(_)
-            | DwarfDataType::Pointer(_, _)
-            | DwarfDataType::Struct { .. }
-            | DwarfDataType::Class { .. }
-            | DwarfDataType::Union { .. } => {
+            DbgDataType::TypeRef(_, _) | DbgDataType::FuncPtr(_) => {}
+            DbgDataType::Other(_)
+            | DbgDataType::Pointer(_, _)
+            | DbgDataType::Struct { .. }
+            | DbgDataType::Class { .. }
+            | DbgDataType::Union { .. } => {
                 if enable_structures && check_and_insert_instance(&mut isupp, &sym_info, log_msgs) {
                     skip_children = true;
                 }
             }
-            DwarfDataType::Array { arraytype, .. } => {
+            DbgDataType::Array { arraytype, .. } => {
                 if is_simple_type(arraytype) {
                     if check_and_insert_simple_type(&mut isupp, &sym_info, log_msgs) {
                         skip_children = true;
@@ -564,18 +564,18 @@ pub(crate) fn insert_many<'param>(
                     skip_children = true;
                 }
             }
-            DwarfDataType::Enum { .. }
-            | DwarfDataType::Float
-            | DwarfDataType::Double
-            | DwarfDataType::Sint8
-            | DwarfDataType::Sint16
-            | DwarfDataType::Sint32
-            | DwarfDataType::Sint64
-            | DwarfDataType::Uint8
-            | DwarfDataType::Uint16
-            | DwarfDataType::Uint32
-            | DwarfDataType::Uint64
-            | DwarfDataType::Bitfield { .. } => {
+            DbgDataType::Enum { .. }
+            | DbgDataType::Float
+            | DbgDataType::Double
+            | DbgDataType::Sint8
+            | DbgDataType::Sint16
+            | DbgDataType::Sint32
+            | DbgDataType::Sint64
+            | DbgDataType::Uint8
+            | DbgDataType::Uint16
+            | DbgDataType::Uint32
+            | DbgDataType::Uint64
+            | DbgDataType::Bitfield { .. } => {
                 check_and_insert_simple_type(&mut isupp, &sym_info, log_msgs);
                 skip_children = true;
             }
@@ -617,17 +617,17 @@ pub(crate) fn insert_many<'param>(
 fn is_simple_type(typeinfo: &TypeInfo) -> bool {
     matches!(
         &typeinfo.datatype,
-        DwarfDataType::Enum { .. }
-            | DwarfDataType::Float
-            | DwarfDataType::Double
-            | DwarfDataType::Sint8
-            | DwarfDataType::Sint16
-            | DwarfDataType::Sint32
-            | DwarfDataType::Sint64
-            | DwarfDataType::Uint8
-            | DwarfDataType::Uint16
-            | DwarfDataType::Uint32
-            | DwarfDataType::Uint64
+        DbgDataType::Enum { .. }
+            | DbgDataType::Float
+            | DbgDataType::Double
+            | DbgDataType::Sint8
+            | DbgDataType::Sint16
+            | DbgDataType::Sint32
+            | DbgDataType::Sint64
+            | DbgDataType::Uint8
+            | DbgDataType::Uint16
+            | DbgDataType::Uint32
+            | DbgDataType::Uint64
     )
 }
 
@@ -891,7 +891,7 @@ fn insert_instance_sym<'dbg>(
     sym_map: &HashMap<String, Vec<ItemType>>,
     is_calib: bool,
 ) -> Result<(String, &'dbg TypeInfo), String> {
-    if !matches!(&sym_info.typeinfo.datatype, DwarfDataType::FuncPtr(_)) {
+    if !matches!(&sym_info.typeinfo.datatype, DbgDataType::FuncPtr(_)) {
         // Abort if a INSTANCE for this symbol already exists. Warn if any other reference to the symbol exists
         let item_name = make_unique_instance_name(module, sym_map, &sym_info.name, name_map)?;
 
@@ -979,9 +979,11 @@ mod test {
     #[test]
     fn test_insert_items_normal() {
         let mut a2l = a2lfile::new();
-        let debug_data =
-            crate::dwarf::DebugData::load(&OsString::from("tests/elffiles/update_test.elf"), false)
-                .unwrap();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("tests/elffiles/update_test.elf"),
+            false,
+        )
+        .unwrap();
 
         // insert some MEASUREMENTs and CHARACTERISTICs
         let measurement_symbols = vec!["Measurement_Value", "Measurement_Matrix"];
@@ -1054,9 +1056,11 @@ mod test {
     #[test]
     fn test_insert_items_nonexistent() {
         let mut a2l = a2lfile::new();
-        let debug_data =
-            crate::dwarf::DebugData::load(&OsString::from("tests/elffiles/update_test.elf"), false)
-                .unwrap();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("tests/elffiles/update_test.elf"),
+            false,
+        )
+        .unwrap();
 
         // adding non-existing items does nothing
         let measurement_symbols = vec!["Nonexistent_Measurement"];
@@ -1098,9 +1102,11 @@ mod test {
     #[test]
     fn test_insert_items_structures() {
         let mut a2l = a2lfile::new();
-        let debug_data =
-            crate::dwarf::DebugData::load(&OsString::from("tests/elffiles/update_test.elf"), false)
-                .unwrap();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("tests/elffiles/update_test.elf"),
+            false,
+        )
+        .unwrap();
 
         // insert items. The basic types are inserted as MEASUREMENTs and CHARACTERISTICs, the complex types are inserted as INSTANCEs
         let measurement_symbols = vec![
@@ -1143,9 +1149,11 @@ mod test {
     #[test]
     fn test_insert_multiple_normal() {
         let mut a2l = a2lfile::new();
-        let debug_data =
-            crate::dwarf::DebugData::load(&OsString::from("tests/elffiles/update_test.elf"), false)
-                .unwrap();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("tests/elffiles/update_test.elf"),
+            false,
+        )
+        .unwrap();
 
         // insert MEASUREMENTs and CHARACTERISTICs for multiple symbols, using regexes
         let measurement_ranges = &[];
@@ -1207,9 +1215,11 @@ mod test {
     #[test]
     fn test_insert_multiple_structures() {
         let mut a2l = a2lfile::new();
-        let debug_data =
-            crate::dwarf::DebugData::load(&OsString::from("tests/elffiles/update_test.elf"), false)
-                .unwrap();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("tests/elffiles/update_test.elf"),
+            false,
+        )
+        .unwrap();
 
         // insert MEASUREMENTs and CHARACTERISTICs for multiple symbols, using regexes
         let measurement_ranges = &[];
@@ -1284,7 +1294,7 @@ mod test {
     #[test]
     fn reject_unsuitable_types() {
         let mut a2l = a2lfile::new();
-        let debug_data = crate::dwarf::DebugData::load(
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
             &OsString::from("tests/elffiles/update_typedef_test.elf"),
             false,
         )

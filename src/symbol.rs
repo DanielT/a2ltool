@@ -1,5 +1,5 @@
-use crate::dwarf::{make_simple_unit_name, DebugData, TypeInfo};
-use crate::dwarf::{DwarfDataType, VarInfo};
+use crate::debuginfo::{make_simple_unit_name, DebugData, TypeInfo};
+use crate::debuginfo::{DbgDataType, VarInfo};
 
 #[derive(Clone)]
 pub(crate) struct SymbolInfo<'dbg> {
@@ -94,7 +94,7 @@ fn find_symbol_from_components<'a>(
                     name: "".to_string(),
                     address: varinfo.address,
                     typeinfo: &TypeInfo {
-                        datatype: DwarfDataType::Uint8,
+                        datatype: DbgDataType::Uint8,
                         name: None,
                         unit_idx: usize::MAX,
                         dbginfo_offset: 0,
@@ -205,7 +205,7 @@ fn find_membertype<'a>(
         Ok((address, typeinfo))
     } else {
         match &typeinfo.datatype {
-            DwarfDataType::Class {
+            DbgDataType::Class {
                 members,
                 inheritance,
                 ..
@@ -241,7 +241,7 @@ fn find_membertype<'a>(
                     ))
                 }
             }
-            DwarfDataType::Struct { members, .. } | DwarfDataType::Union { members, .. } => {
+            DbgDataType::Struct { members, .. } | DbgDataType::Union { members, .. } => {
                 if let Some((membertype, offset)) = members.get(components[component_index]) {
                     let membertype = membertype.get_reference(&debug_data.types);
                     find_membertype(
@@ -259,7 +259,7 @@ fn find_membertype<'a>(
                     ))
                 }
             }
-            DwarfDataType::Array {
+            DbgDataType::Array {
                 dim,
                 stride,
                 arraytype,
@@ -356,7 +356,7 @@ mod test {
         // global variable: uint32_t my_array[2]
         dbgdata.variables.insert(
             "my_array".to_string(),
-            vec![crate::dwarf::VarInfo {
+            vec![crate::debuginfo::VarInfo {
                 address: 0x1234,
                 typeref: 1,
                 unit_idx: 0,
@@ -367,9 +367,9 @@ mod test {
         dbgdata.types.insert(
             1,
             TypeInfo {
-                datatype: DwarfDataType::Array {
+                datatype: DbgDataType::Array {
                     arraytype: Box::new(TypeInfo {
-                        datatype: DwarfDataType::Uint32,
+                        datatype: DbgDataType::Uint32,
                         name: None,
                         unit_idx: usize::MAX,
                         dbginfo_offset: 0,
@@ -422,9 +422,9 @@ mod test {
             "array_item".to_string(),
             (
                 TypeInfo {
-                    datatype: DwarfDataType::Array {
+                    datatype: DbgDataType::Array {
                         arraytype: Box::new(TypeInfo {
-                            datatype: DwarfDataType::Uint32,
+                            datatype: DbgDataType::Uint32,
                             name: None,
                             unit_idx: usize::MAX,
                             dbginfo_offset: 0,
@@ -442,7 +442,7 @@ mod test {
         );
         dbgdata.variables.insert(
             "my_struct".to_string(),
-            vec![crate::dwarf::VarInfo {
+            vec![crate::debuginfo::VarInfo {
                 address: 0x00ca_fe00,
                 typeref: 2,
                 unit_idx: 0,
@@ -453,7 +453,7 @@ mod test {
         dbgdata.types.insert(
             2,
             TypeInfo {
-                datatype: DwarfDataType::Struct {
+                datatype: DbgDataType::Struct {
                     members: structmembers,
                     size: 4,
                 },
@@ -488,7 +488,7 @@ mod test {
         debug_data.types.insert(
             0,
             TypeInfo {
-                datatype: DwarfDataType::Uint32,
+                datatype: DbgDataType::Uint32,
                 name: None,
                 unit_idx: 0,
                 dbginfo_offset: 0,
