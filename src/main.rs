@@ -221,7 +221,12 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     if let Some(merge_modules) = arg_matches.get_many::<OsString>("MERGEMODULE") {
         for merge_module_path in merge_modules {
             let mut load_log_msgs = Vec::<A2lError>::new();
-            let load_result = a2lfile::load(merge_module_path, None, &mut load_log_msgs, strict);
+            let load_result = a2lfile::load(
+                merge_module_path,
+                Some(ifdata::A2MLVECTOR_TEXT.to_string()),
+                &mut load_log_msgs,
+                strict,
+            );
 
             if let Ok(mut merge_a2l) = load_result {
                 // display any log messages from the load
@@ -238,7 +243,10 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
                         merge_module_path.to_string_lossy()
                     )
                 );
-            } else if let Ok(mut other_module) = a2lfile::load_fragment_file(merge_module_path) {
+            } else if let Ok(mut other_module) = a2lfile::load_fragment_file2(
+                merge_module_path,
+                Some(ifdata::A2MLVECTOR_TEXT.to_string()),
+            ) {
                 // failed to load the file as a full A2L file, but loaded it as a module fragment
                 a2l_file.project.module[0].merge(&mut other_module);
                 cond_print!(
@@ -546,7 +554,10 @@ fn load_or_create_a2l(
                 },
             ) if block == "A2L_FILE" => {
                 // parse error in the outermost block "A2L_FILE" could indicate that this is an a2l fragment containing only the content of a MODULE
-                if let Ok(module) = a2lfile::load_fragment_file(input_filename) {
+                if let Ok(module) = a2lfile::load_fragment_file2(
+                    input_filename,
+                    Some(ifdata::A2MLVECTOR_TEXT.to_string()),
+                ) {
                     // successfully loaded a module, now upgrade it to a full file
                     let mut a2l_file = a2lfile::new();
                     a2l_file.project.module[0] = module;
