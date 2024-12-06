@@ -112,12 +112,16 @@ fn update_ifdata_type_canape_ext(canape_ext: &mut ifdata::CanapeExt, typeinfo: &
                 link_map.bit_offset = 0;
                 link_map.datatype_valid = 1;
             }
-            DbgDataType::Enum { size, .. } => {
-                match *size {
-                    1 => link_map.datatype = 0x87, // 0x40 | 0x07 -> unsigned, 8 bits
-                    2 => link_map.datatype = 0x8f, // 0x40 | 0x0f -> unsigned, 16 bits
-                    4 => link_map.datatype = 0x9f, // 0x40 | 0x1f -> unsigned, 32 bits
-                    8 => link_map.datatype = 0xbf, // 0x40 | 0x3f -> unsigned, 64 bits
+            DbgDataType::Enum { size, signed, .. } => {
+                match (*size, *signed) {
+                    (1, false) => link_map.datatype = 0x87, // 0x40 | 0x07 -> unsigned, 8 bits
+                    (1, true) => link_map.datatype = 0xc7,  // 0xC0 | 0x07 -> signed, 8 bits
+                    (2, false) => link_map.datatype = 0x8f, // 0x40 | 0x0f -> unsigned, 16 bits
+                    (2, true) => link_map.datatype = 0xcf,  // 0xC0 | 0x0f -> signed, 16 bits
+                    (4, false) => link_map.datatype = 0x9f, // 0x40 | 0x1f -> unsigned, 32 bits
+                    (4, true) => link_map.datatype = 0xdf,  // 0xC0 | 0x1f -> signed, 32 bits
+                    (8, false) => link_map.datatype = 0xbf, // 0x40 | 0x3f -> unsigned, 64 bits
+                    (8, true) => link_map.datatype = 0xff,  // 0xC0 | 0x3f -> signed, 64 bits
                     _ => link_map.datatype = 0,
                 }
                 link_map.bit_offset = 0;
