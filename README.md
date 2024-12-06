@@ -1,5 +1,7 @@
 # a2ltool
 
+[![Github Actions](https://github.com/DanielT/a2ltool/actions/workflows/CI.yml/badge.svg)](https://github.com/DanielT/a2ltool/actions)
+
 A tool to edit, merge and update a2l files
 
 ## Features of a2ltool
