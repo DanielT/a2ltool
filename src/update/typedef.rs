@@ -1886,7 +1886,7 @@ mod test {
         );
         assert!(!(*tdu.is_calib_struct.get("DeadEnd").unwrap()));
         assert!(!(*tdu.is_calib_struct.get("DeadEnd2").unwrap()));
-        assert!(tdu.is_calib_struct.get("Unconnected").is_none());
+        assert!(!tdu.is_calib_struct.contains_key("Unconnected"));
     }
 
     #[test]
@@ -2170,7 +2170,7 @@ mod test {
 
         let version = A2lVersion::from(&a2l);
         let mut log_msgs = Vec::new();
-        let mut info = A2lUpdateInfo {
+        let info = A2lUpdateInfo {
             debug_data: &debug_data,
             preserve_unknown: false,
             strict_update: false,
@@ -2180,7 +2180,7 @@ mod test {
             compu_method_index: HashMap::new(),
         };
         update_module_typedefs(
-            &mut info,
+            &info,
             &mut a2l.project.module[0],
             &mut log_msgs,
             typedef_ref_info,
