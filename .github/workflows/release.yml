@@ -1,0 +1,92 @@
+name: Release Workflow
+
+on:
+  push:
+    tags:
+      - 'v*' # e.g. v1.0.0
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            binary: a2ltool
+          - os: windows
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: a2ltool.exe
+    env:
+      ZIP_NAME: a2ltool-${{ matrix.os }}-${{ github.ref_name }}.zip
+          
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+  
+      - name: Cache Rust artifacts
+        # cache all dependencies to speed up the workflow
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: zip-linux
+        # On linux we use the zip command to create the archive
+        if: matrix.os == 'linux'
+        run: |
+          cd target/${{ matrix.target }}/release/
+          zip ${{ env.ZIP_NAME }} ${{ matrix.binary }}
+  
+      - name: zip-windows
+        # windows doesn't have the zip copmmand so we use the compress-archive powershell command
+        if: matrix.os == 'windows'
+        run: |
+          cd target/${{ matrix.target }}/release/
+          compress-archive -Path ${{ matrix.binary }} -DestinationPath ${{ env.ZIP_NAME }}
+  
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-zip
+          path: target/${{ matrix.target }}/release/${{ env.ZIP_NAME }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name:                # because name is empty, it will download all artifacts
+          merge-multiple: true # merge all artifacts into one directory
+
+      - name: Create Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag: ${{ github.ref }}
+          name: Version ${{ github.ref_name }}
+          body: ${{ github.event.head_commit.message }}
+          draft: true
+          prerelease: false
+          artifacts: "*.zip"
+
