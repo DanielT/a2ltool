@@ -1135,7 +1135,7 @@ mod test {
     fn test_option_input() {
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/update_test1.a2l"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
         ];
         let result = core(args.into_iter());
         // Passing the option --input should neither panic nor return an error
@@ -1146,7 +1146,7 @@ mod test {
     fn test_option_check() {
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/check_test.a2l"),
+            OsString::from("fixtures/a2l/check_test.a2l"),
             OsString::from("--check"),
         ];
         let result = core(args.into_iter());
@@ -1156,7 +1156,7 @@ mod test {
 
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/check_test.a2l"),
+            OsString::from("fixtures/a2l/check_test.a2l"),
             OsString::from("--check"),
             OsString::from("--strict"),
         ];
@@ -1172,7 +1172,7 @@ mod test {
             OsString::from("a2ltool"),
             OsString::from("--create"),
             OsString::from("--elffile"),
-            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("fixtures/bin/update_test.elf"),
         ];
         // Passing the option --elffile should neither panic nor return an error
         core(args.into_iter()).unwrap();
@@ -1185,7 +1185,7 @@ mod test {
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/cleanup_test.a2l"),
+            OsString::from("fixtures/a2l/cleanup_test.a2l"),
             OsString::from("--cleanup"),
             OsString::from("--output"),
             OsString::from(outfile.clone()),
@@ -1195,7 +1195,7 @@ mod test {
         core(args.into_iter()).unwrap();
 
         let a2l_input =
-            a2lfile::load("tests/cleanup_test.a2l", None, &mut Vec::new(), false).unwrap();
+            a2lfile::load("fixtures/a2l/cleanup_test.a2l", None, &mut Vec::new(), false).unwrap();
         let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
         assert_ne!(a2l_input, a2l_output);
         // all items in cleanup_test.a2l are used
@@ -1213,9 +1213,9 @@ mod test {
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/update_test1.a2l"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
             OsString::from("--elffile"),
-            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("fixtures/bin/update_test.elf"),
             OsString::from("--update"),
             OsString::from("FULL"),
             OsString::from("-v"),
@@ -1240,9 +1240,9 @@ mod test {
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/update_test1.a2l"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
             OsString::from("--elffile"),
-            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("fixtures/bin/update_test.elf"),
             OsString::from("--update"),
             OsString::from("ADDRESSES"),
             OsString::from("--update-mode"),
@@ -1260,9 +1260,9 @@ mod test {
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/update_test2.a2l"),
+            OsString::from("fixtures/a2l/update_test2.a2l"),
             OsString::from("--elffile"),
-            OsString::from("tests/elffiles/update_test_invalid.elf"),
+            OsString::from("fixtures/bin/update_test_invalid.elf"),
             OsString::from("--update"),
             OsString::from("ADDRESSES"),
             OsString::from("--update-mode"),
@@ -1292,7 +1292,7 @@ mod test {
             OsString::from("a2ltool"),
             OsString::from("--create"),
             OsString::from("--elffile"),
-            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("fixtures/bin/update_test.elf"),
             OsString::from("--characteristic"),
             OsString::from("Characteristic_Value"),
             OsString::from("--measurement"),
@@ -1324,7 +1324,7 @@ mod test {
             OsString::from("a2ltool"),
             OsString::from("--create"),
             OsString::from("--elffile"),
-            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("fixtures/bin/update_test.elf"),
             OsString::from("--characteristic-range"),
             OsString::from(format!("0x{:x}", characteristic_addr)),
             OsString::from(format!("0x{:x}", characteristic_addr + 4)),
@@ -1347,7 +1347,7 @@ mod test {
             OsString::from("a2ltool"),
             OsString::from("--create"),
             OsString::from("--elffile"),
-            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("fixtures/bin/update_test.elf"),
             OsString::from("--characteristic-regex"),
             OsString::from("C.*Value"),
             OsString::from("--measurement-regex"),
@@ -1367,7 +1367,7 @@ mod test {
             OsString::from("a2ltool"),
             OsString::from("--create"),
             OsString::from("--elffile"),
-            OsString::from("tests/elffiles/update_test.elf"),
+            OsString::from("fixtures/bin/update_test.elf"),
             OsString::from("--characteristic-section"),
             OsString::from(".data"),
             OsString::from("--measurement-section"),
@@ -1394,13 +1394,13 @@ mod test {
             OsString::from("a2ltool"),
             OsString::from("--create"),
             OsString::from("--merge"),
-            OsString::from("tests/update_test1.a2l"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
             OsString::from("--output"),
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
         let a2l_input =
-            a2lfile::load("tests/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+            a2lfile::load("fixtures/a2l/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
         let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
         // there should be only one MODULE in the output
         assert_eq!(a2l_output.project.module.len(), 1);
@@ -1433,13 +1433,13 @@ mod test {
             OsString::from("a2ltool"),
             OsString::from("--create"),
             OsString::from("--merge-project"),
-            OsString::from("tests/update_test1.a2l"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
             OsString::from("--output"),
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
         let a2l_input =
-            a2lfile::load("tests/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+            a2lfile::load("fixtures/a2l/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
         let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
         // there should be two MODULEs in the output
         assert_eq!(a2l_output.project.module.len(), 2);
@@ -1460,7 +1460,7 @@ mod test {
     fn test_option_remove() {
         // items can be removed by name with --remove
         let a2l_input =
-            a2lfile::load("tests/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+            a2lfile::load("fixtures/a2l/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
         // get the names of the first characteristic and measurement, so they can be removed
         let characteristic_name = a2l_input.project.module[0].characteristic[0].name.clone();
         let measurement_name = a2l_input.project.module[0].measurement[0].name.clone();
@@ -1470,7 +1470,7 @@ mod test {
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/update_test1.a2l"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
             OsString::from("--remove"),
             OsString::from(characteristic_name),
             OsString::from("--remove"),
@@ -1514,7 +1514,7 @@ mod test {
         let outfile2 = tempdir.join("output2.a2l");
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/update_test1.a2l"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
             OsString::from("--a2lversion"),
             OsString::from("1.5.0"),
             OsString::from("--output"),
@@ -1534,7 +1534,7 @@ mod test {
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/merge_inc_test.a2l"),
+            OsString::from("fixtures/a2l/merge_inc_test.a2l"),
             OsString::from("--merge-includes"),
             OsString::from("--output"),
             OsString::from(outfile.clone()),
@@ -1553,14 +1553,14 @@ mod test {
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/update_test1.a2l"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
             OsString::from("--sort"),
             OsString::from("--output"),
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
         let a2l_input =
-            a2lfile::load("tests/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+            a2lfile::load("fixtures/a2l/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
         let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
 
         // Though sorting does not change the meaning of the file, the order of the items in the output is different.
@@ -1598,7 +1598,7 @@ mod test {
         // the XCP settings in the file can be displayed with --show-xcp
         let args = vec![
             OsString::from("a2ltool"),
-            OsString::from("tests/xcp_test.a2l"),
+            OsString::from("fixtures/a2l/xcp_test.a2l"),
             OsString::from("--show-xcp"),
         ];
         // Passing the option --show-xcp should neither panic nor return an error

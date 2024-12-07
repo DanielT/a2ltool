@@ -980,7 +980,7 @@ mod test {
     fn test_insert_items_normal() {
         let mut a2l = a2lfile::new();
         let debug_data = crate::debuginfo::DebugData::load_dwarf(
-            &OsString::from("tests/elffiles/update_test.elf"),
+            &OsString::from("fixtures/bin/update_test.elf"),
             false,
         )
         .unwrap();
@@ -1057,7 +1057,7 @@ mod test {
     fn test_insert_items_nonexistent() {
         let mut a2l = a2lfile::new();
         let debug_data = crate::debuginfo::DebugData::load_dwarf(
-            &OsString::from("tests/elffiles/update_test.elf"),
+            &OsString::from("fixtures/bin/update_test.elf"),
             false,
         )
         .unwrap();
@@ -1103,7 +1103,7 @@ mod test {
     fn test_insert_items_structures() {
         let mut a2l = a2lfile::new();
         let debug_data = crate::debuginfo::DebugData::load_dwarf(
-            &OsString::from("tests/elffiles/update_test.elf"),
+            &OsString::from("fixtures/bin/update_test.elf"),
             false,
         )
         .unwrap();
@@ -1150,7 +1150,7 @@ mod test {
     fn test_insert_multiple_normal() {
         let mut a2l = a2lfile::new();
         let debug_data = crate::debuginfo::DebugData::load_dwarf(
-            &OsString::from("tests/elffiles/update_test.elf"),
+            &OsString::from("fixtures/bin/update_test.elf"),
             false,
         )
         .unwrap();
@@ -1216,7 +1216,7 @@ mod test {
     fn test_insert_multiple_structures() {
         let mut a2l = a2lfile::new();
         let debug_data = crate::debuginfo::DebugData::load_dwarf(
-            &OsString::from("tests/elffiles/update_test.elf"),
+            &OsString::from("fixtures/bin/update_test.elf"),
             false,
         )
         .unwrap();
@@ -1295,7 +1295,7 @@ mod test {
     fn reject_unsuitable_types() {
         let mut a2l = a2lfile::new();
         let debug_data = crate::debuginfo::DebugData::load_dwarf(
-            &OsString::from("tests/elffiles/update_typedef_test.elf"),
+            &OsString::from("fixtures/bin/update_typedef_test.elf"),
             false,
         )
         .unwrap();

@@ -380,13 +380,13 @@ mod test {
     use super::*;
 
     static ELF_FILE_NAMES: [&str; 7] = [
-        "tests/elffiles/debugdata_clang.elf",
-        "tests/elffiles/debugdata_clang_dw4.elf",
-        "tests/elffiles/debugdata_clang_dw4_dwz.elf",
-        "tests/elffiles/debugdata_gcc.elf",
-        "tests/elffiles/debugdata_gcc_dw3.elf",
-        "tests/elffiles/debugdata_gcc_dw3_dwz.elf",
-        "tests/elffiles/debugdata_gcc_dwz.elf",
+        "fixtures/bin/debugdata_clang.elf",
+        "fixtures/bin/debugdata_clang_dw4.elf",
+        "fixtures/bin/debugdata_clang_dw4_dwz.elf",
+        "fixtures/bin/debugdata_gcc.elf",
+        "fixtures/bin/debugdata_gcc_dw3.elf",
+        "fixtures/bin/debugdata_gcc_dw3_dwz.elf",
+        "fixtures/bin/debugdata_gcc_dwz.elf",
     ];
 
     #[test]
@@ -637,14 +637,29 @@ mod test {
 
     #[test]
     fn test_load_mingw_exe() {
-        // The file tests/elffiles/update_test.c was compiled with mingw64 gcc
+        // The file fixtures/bin/update_test.c was compiled with mingw64 gcc
         // (update_test.exe) as well as with gcc for arm (update_test.elf).
         // Both file contain the same debug information, though the windows exe
         // file has some additional items from the starup code.
         let debugdata_exe =
-            DebugData::load_dwarf(OsStr::new("tests/elffiles/update_test.exe"), true).unwrap();
+            DebugData::load_dwarf(OsStr::new("fixtures/bin/update_test.exe"), true).unwrap();
         let debugdata_elf =
-            DebugData::load_dwarf(OsStr::new("tests/elffiles/update_test.elf"), true).unwrap();
+            DebugData::load_dwarf(OsStr::new("fixtures/bin/update_test.elf"), true).unwrap();
+
+        // every variable in the elf file should also be in the exe file
+        for var in debugdata_elf.variables.keys() {
+            assert!(debugdata_exe.variables.contains_key(var));
+        }
+    }
+
+    #[test]
+    fn test_load_mingw_exe2() {
+        // Both file contain the same debug information, though the windows exe
+        // file has some additional items from the starup code.
+        let debugdata_exe =
+            DebugData::load_dwarf(OsStr::new("fixtures/bin/debugdata_gcc.exe"), true).unwrap();
+        let debugdata_elf =
+            DebugData::load_dwarf(OsStr::new("fixtures/bin/debugdata_gcc.elf"), true).unwrap();
 
         // every variable in the elf file should also be in the exe file
         for var in debugdata_elf.variables.keys() {

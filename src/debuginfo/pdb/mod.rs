@@ -222,8 +222,8 @@ mod test {
     use super::*;
 
     static PDB_FILE_NAMES: [&str; 2] = [
-        "tests/elffiles/debugdata_cl.pdb",
-        "tests/elffiles/debugdata_clang.pdb",
+        "fixtures/bin/debugdata_cl.pdb",
+        "fixtures/bin/debugdata_clang.pdb",
     ];
 
     #[test]

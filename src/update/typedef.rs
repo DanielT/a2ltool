@@ -1855,8 +1855,8 @@ mod test {
     #[test]
     fn test_calc_structure_category() {
         let (mut a2l, debug_data, names, mut reclayout) = test_setup(
-            "tests/update_typedef_test1.a2l",
-            "tests/elffiles/update_typedef_test.elf",
+            "fixtures/a2l/update_typedef_test1.a2l",
+            "fixtures/bin/update_typedef_test.elf",
         );
         let mut msgs = Vec::new();
         let dummy_cm_index = HashMap::new();
@@ -1892,8 +1892,8 @@ mod test {
     #[test]
     fn test_build_structure_hash() {
         let (mut a2l, debug_data, names, mut reclayout) = test_setup(
-            "tests/update_typedef_test1.a2l",
-            "tests/elffiles/update_typedef_test.elf",
+            "fixtures/a2l/update_typedef_test1.a2l",
+            "fixtures/bin/update_typedef_test.elf",
         );
         let num_structs = a2l.project.module[0].typedef_structure.len();
         let mut msgs = Vec::new();
@@ -1933,8 +1933,8 @@ mod test {
     #[test]
     fn test_process_structure_components() {
         let (mut a2l, debug_data, names, mut reclayout) = test_setup(
-            "tests/update_typedef_test2.a2l",
-            "tests/elffiles/update_typedef_test.elf",
+            "fixtures/a2l/update_typedef_test2.a2l",
+            "fixtures/bin/update_typedef_test.elf",
         );
         let mut msgs = Vec::new();
         let dummy_cm_index = HashMap::new();
@@ -1975,7 +1975,7 @@ mod test {
     #[test]
     fn test_create_missing_instance_targets() {
         let mut a2l = a2lfile::new();
-        let elf_name = OsString::from("tests/elffiles/update_typedef_test.elf");
+        let elf_name = OsString::from("fixtures/bin/update_typedef_test.elf");
         let debug_data = crate::debuginfo::DebugData::load_dwarf(&elf_name, false).unwrap();
         let typedef_names = TypedefNames::new(&a2l.project.module[0]);
         let mut recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
@@ -2031,7 +2031,7 @@ mod test {
     #[test]
     fn test_create_typedef() {
         let mut a2l = a2lfile::new();
-        let elf_name = OsString::from("tests/elffiles/update_typedef_test.elf");
+        let elf_name = OsString::from("fixtures/bin/update_typedef_test.elf");
         let debug_data = crate::debuginfo::DebugData::load_dwarf(&elf_name, false).unwrap();
         let typedef_names = TypedefNames::new(&a2l.project.module[0]);
         let mut recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
@@ -2106,7 +2106,7 @@ mod test {
     #[test]
     fn test_create_typedef2() {
         let mut a2l = a2lfile::new();
-        let elf_name = OsString::from("tests/elffiles/update_typedef_test.elf");
+        let elf_name = OsString::from("fixtures/bin/update_typedef_test.elf");
         let debug_data = crate::debuginfo::DebugData::load_dwarf(&elf_name, false).unwrap();
         let typedef_names = TypedefNames::new(&a2l.project.module[0]);
         let mut recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
@@ -2147,8 +2147,8 @@ mod test {
     #[test]
     fn test_update() {
         let (mut a2l, debug_data, names, mut reclayout) = test_setup(
-            "tests/update_typedef_test3.a2l",
-            "tests/elffiles/update_typedef_test.elf",
+            "fixtures/a2l/update_typedef_test3.a2l",
+            "fixtures/bin/update_typedef_test.elf",
         );
 
         let mut typedef_ref_info: HashMap<String, Vec<_>> = HashMap::new();
@@ -2190,7 +2190,7 @@ mod test {
 
         let mut log_msgs = Vec::new();
         let mut reference_a2l =
-            a2lfile::load("tests/update_typedef_test4.a2l", None, &mut log_msgs, true).unwrap();
+            a2lfile::load("fixtures/a2l/update_typedef_test4.a2l", None, &mut log_msgs, true).unwrap();
 
         // ordering is not guaranteed, so sort both files before comparing them
         a2l.sort();

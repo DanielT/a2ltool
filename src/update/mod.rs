@@ -739,7 +739,7 @@ mod test {
         )
         .unwrap();
         let debug_data = crate::debuginfo::DebugData::load_dwarf(
-            &OsString::from("tests/elffiles/update_test.elf"),
+            &OsString::from("fixtures/bin/update_test.elf"),
             false,
         )
         .unwrap();
@@ -748,7 +748,7 @@ mod test {
 
     #[test]
     fn test_update_axis_pts_ok() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test1.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -793,7 +793,7 @@ mod test {
 
     #[test]
     fn test_update_axis_pts_bad() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test2.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -815,7 +815,7 @@ mod test {
 
     #[test]
     fn test_update_blob_ok() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test1.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -860,7 +860,7 @@ mod test {
 
     #[test]
     fn test_update_blob_bad() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test2.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -881,7 +881,7 @@ mod test {
 
     #[test]
     fn test_update_characteristic_ok() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test1.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -926,7 +926,7 @@ mod test {
 
     #[test]
     fn test_update_characteristic_bad() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test2.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -951,7 +951,7 @@ mod test {
 
     #[test]
     fn test_update_instance_ok() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test1.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -998,7 +998,7 @@ mod test {
 
     #[test]
     fn test_update_instance_bad() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test2.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -1020,7 +1020,7 @@ mod test {
 
     #[test]
     fn test_update_measurement_ok() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test1.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -1065,7 +1065,7 @@ mod test {
 
     #[test]
     fn test_update_measurement_bad() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test2.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test2.a2l");
 
         // test address only update, in strict mode
         let version = A2lVersion::from(&a2l);
@@ -1090,7 +1090,7 @@ mod test {
 
     #[test]
     fn test_update_a2l_ok() {
-        let (debug_data, mut a2l) = test_setup("tests/update_test1.a2l");
+        let (debug_data, mut a2l) = test_setup("fixtures/a2l/update_test1.a2l");
 
         // test address only update, in strict mode
         let mut log_msgs = Vec::new();
