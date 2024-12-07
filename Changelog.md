@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 2.5.0
+
+- Support program information in PDB format
+  The new option `--pdbfile` can be used instead of `--elffile` in order to read address and data type information from a PDB file. This supports the "virtual ECU" use case, where some parts of a microcontroller application are built on Windows and run inside a simulation environment.
+- Improve the limit adjustment logic
+  If an object with a 64-bit float data type had a compu-method, the limit calculation could produce +-INF.
+  This has been prevented.
+- Update to a2lfile 2.4.0, which brings the following improvements:
+  - The handling of /include normlizes the path separators, so that Windows paths work on Linux (by @AkhilTThomas)
+  - a2l checker improvements:
+    - The RECORD_LAYOUT used by a CHARACTERISTIC must contain FNC_VALUES
+    - A RECORD_LAYOUT must contain an AXIS_PTS_X/Y/Z for each internal axis
+    - There should be a specific number of AXIS_DESCR depending on the type of RECORD_LAYOUT
+    - The lower and upper limits of CHARACTERISTICs, MEASUREMENTs and AXIS_PTS
+      are checked for plausibility based on the data type of the item and its COMPU_METHOD.
+- Bugfix: in some cases IF_DATA of newly merged files was not updated
+- Bugfix: For both DWARF and PDB input the signedness of enums is now read and used.
+  Previously all enums were treated as unsigned.
+- Expanded and improved unit tests
+- a new relase workflow automatically builds binaries for Windows and Linux
+
 ## Version 2.4.0
 
 - Document and validate the ability to use exe/DWARF2+ files, which are produced by MinGW gcc.
