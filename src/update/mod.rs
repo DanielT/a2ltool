@@ -20,7 +20,7 @@ pub(crate) mod typedef;
 
 use crate::datatype::{get_a2l_datatype, get_type_limits};
 use crate::debuginfo::DbgDataType;
-use crate::symbol::{find_symbol, SymbolInfo};
+use crate::symbol::{find_symbol, find_symbol_by_offset, SymbolInfo};
 use axis_pts::*;
 use blob::{cleanup_removed_blobs, update_all_module_blobs};
 use characteristic::*;
@@ -245,7 +245,16 @@ fn get_symbol_info<'a>(
     // preferred: get symbol information from a SYMBOL_LINK attribute
     if let Some(symbol_link) = opt_symbol_link {
         match find_symbol(&symbol_link.symbol_name, debug_data) {
-            Ok(sym_info) => return Ok(sym_info),
+            Ok(sym_info) => {
+                if symbol_link.offset == 0 {
+                    return Ok(sym_info);
+                } else {
+                    match find_symbol_by_offset(&sym_info, symbol_link.offset, debug_data) {
+                        Ok(sym_info) => return Ok(sym_info),
+                        Err(errmsg) => return Err(vec![errmsg]),
+                    }
+                }
+            }
             Err(errmsg) => symbol_link_errmsg = Some(errmsg),
         };
     }
@@ -1136,5 +1145,57 @@ mod test {
         assert_eq!(summary.instance_not_updated, 0);
         assert_eq!(summary.instance_updated, 1);
         assert!(log_msgs.is_empty());
+    }
+
+    #[test]
+    fn test_symbol_with_offset() {
+        // load update_test.elf
+        // This file contains:
+        //    struct UpdateTest_ComplexBlobData {
+        //        uint32_t value_1[16];
+        //        struct {
+        //            uint16_t value_2_1;
+        //            uint32_t value_2_2;
+        //        } value_2[8];
+        //    };
+        //    struct UpdateTest_ComplexBlobData Blob_1;
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("fixtures/bin/update_test.elf"),
+            false,
+        )
+        .unwrap();
+
+        let symbol_link_base = a2lfile::SymbolLink::new("Blob_1".to_string(), 0);
+        let sym_info = get_symbol_info("", &Some(symbol_link_base), &[], &debug_data).unwrap();
+        let base_address = sym_info.address;
+        assert!(base_address != 0);
+        assert!(matches!(
+            sym_info.typeinfo.datatype,
+            DbgDataType::Struct { .. }
+        ));
+
+        // offset 8 is inside the first array of the struct, so the symbol name should be "Blob_1.value_1[2]"
+        let symbol_link_elem = a2lfile::SymbolLink::new("Blob_1".to_string(), 8);
+        let sym_info = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data).unwrap();
+        assert_eq!(sym_info.address, base_address + 8);
+        assert_eq!(sym_info.name, "Blob_1.value_1._2_");
+        assert!(matches!(sym_info.typeinfo.datatype, DbgDataType::Uint32));
+
+        // offset 68 is inside the second array of the struct
+        let symbol_link_elem = a2lfile::SymbolLink::new("Blob_1".to_string(), 68);
+        let sym_info = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data).unwrap();
+        assert_eq!(sym_info.address, base_address + 68);
+        assert_eq!(sym_info.name, "Blob_1.value_2._0_.value_2_2");
+        assert!(matches!(sym_info.typeinfo.datatype, DbgDataType::Uint32));
+
+        // offset 1000 is outside the struct, which should trigger an error
+        let symbol_link_elem = a2lfile::SymbolLink::new("Blob_1".to_string(), 1000);
+        let sym_info_result = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data);
+        assert!(sym_info_result.is_err());
+
+        // a2l allows negative offsets, which makes no sense at all. This also triggers an error
+        let symbol_link_elem = a2lfile::SymbolLink::new("Blob_1".to_string(), -1);
+        let sym_info_result = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data);
+        assert!(sym_info_result.is_err());
     }
 }
