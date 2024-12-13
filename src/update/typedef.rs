@@ -2189,8 +2189,13 @@ mod test {
         );
 
         let mut log_msgs = Vec::new();
-        let mut reference_a2l =
-            a2lfile::load("fixtures/a2l/update_typedef_test4.a2l", None, &mut log_msgs, true).unwrap();
+        let mut reference_a2l = a2lfile::load(
+            "fixtures/a2l/update_typedef_test4.a2l",
+            None,
+            &mut log_msgs,
+            true,
+        )
+        .unwrap();
 
         // ordering is not guaranteed, so sort both files before comparing them
         a2l.sort();

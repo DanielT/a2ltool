@@ -1194,8 +1194,13 @@ mod test {
         // cleanup_test.a2l has unused items, but --cleanup should remove them
         core(args.into_iter()).unwrap();
 
-        let a2l_input =
-            a2lfile::load("fixtures/a2l/cleanup_test.a2l", None, &mut Vec::new(), false).unwrap();
+        let a2l_input = a2lfile::load(
+            "fixtures/a2l/cleanup_test.a2l",
+            None,
+            &mut Vec::new(),
+            false,
+        )
+        .unwrap();
         let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
         assert_ne!(a2l_input, a2l_output);
         // all items in cleanup_test.a2l are used
@@ -1399,8 +1404,13 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_input =
-            a2lfile::load("fixtures/a2l/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+        let a2l_input = a2lfile::load(
+            "fixtures/a2l/update_test1.a2l",
+            None,
+            &mut Vec::new(),
+            false,
+        )
+        .unwrap();
         let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
         // there should be only one MODULE in the output
         assert_eq!(a2l_output.project.module.len(), 1);
@@ -1438,8 +1448,13 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_input =
-            a2lfile::load("fixtures/a2l/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+        let a2l_input = a2lfile::load(
+            "fixtures/a2l/update_test1.a2l",
+            None,
+            &mut Vec::new(),
+            false,
+        )
+        .unwrap();
         let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
         // there should be two MODULEs in the output
         assert_eq!(a2l_output.project.module.len(), 2);
@@ -1459,8 +1474,13 @@ mod test {
     #[test]
     fn test_option_remove() {
         // items can be removed by name with --remove
-        let a2l_input =
-            a2lfile::load("fixtures/a2l/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+        let a2l_input = a2lfile::load(
+            "fixtures/a2l/update_test1.a2l",
+            None,
+            &mut Vec::new(),
+            false,
+        )
+        .unwrap();
         // get the names of the first characteristic and measurement, so they can be removed
         let characteristic_name = a2l_input.project.module[0].characteristic[0].name.clone();
         let measurement_name = a2l_input.project.module[0].measurement[0].name.clone();
@@ -1559,8 +1579,13 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_input =
-            a2lfile::load("fixtures/a2l/update_test1.a2l", None, &mut Vec::new(), false).unwrap();
+        let a2l_input = a2lfile::load(
+            "fixtures/a2l/update_test1.a2l",
+            None,
+            &mut Vec::new(),
+            false,
+        )
+        .unwrap();
         let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
 
         // Though sorting does not change the meaning of the file, the order of the items in the output is different.

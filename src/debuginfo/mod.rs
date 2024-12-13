@@ -4,7 +4,7 @@ use std::ffi::OsStr;
 use std::fmt::Display;
 
 mod dwarf;
-mod iter;
+pub(crate) mod iter;
 mod pdb;
 
 #[derive(Debug)]

@@ -1,3 +1,4 @@
+use crate::debuginfo::iter::TypeInfoIter;
 use crate::debuginfo::{make_simple_unit_name, DebugData, TypeInfo};
 use crate::debuginfo::{DbgDataType, VarInfo};
 
@@ -318,6 +319,43 @@ fn get_index(idxstr: &str) -> Option<usize> {
     } else {
         None
     }
+}
+
+/// find a component of a symbol based on an offset from the base address
+/// For example this could be a particular array element or struct member
+pub(crate) fn find_symbol_by_offset<'a>(
+    base_symbol: &SymbolInfo<'a>,
+    offset: i32,
+    debug_data: &'a DebugData,
+) -> Result<SymbolInfo<'a>, String> {
+    if offset < 0 || offset > base_symbol.typeinfo.get_size() as i32 {
+        return Err(format!(
+            "Offset {} is out of bounds for symbol \"{}\"",
+            offset, base_symbol.name
+        ));
+    }
+
+    let offset = offset as u64;
+
+    let iter = TypeInfoIter::new(&debug_data.types, base_symbol.typeinfo, false);
+    for (name, typeinfo, item_offset) in iter {
+        if item_offset == offset {
+            return Ok(SymbolInfo {
+                name: format!("{}{}", base_symbol.name, name),
+                address: item_offset + base_symbol.address,
+                typeinfo,
+                unit_idx: base_symbol.unit_idx,
+                function_name: base_symbol.function_name,
+                namespaces: base_symbol.namespaces,
+                is_unique: base_symbol.is_unique,
+            });
+        }
+    }
+
+    Err(format!(
+        "Could not find a symbol component at offset {offset} from \"{}\"",
+        base_symbol.name
+    ))
 }
 
 #[cfg(test)]
