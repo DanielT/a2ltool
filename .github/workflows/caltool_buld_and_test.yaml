@@ -1,21 +1,23 @@
-name: Rust
+name: Caltool build and test
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master_caltool ]
   pull_request:
-    branches: [ master ]
+    branches: [ master_caltool ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --release --verbose
+    - name: Test
+      run: cargo test
+      env:
+        RUST_BACKTRACE: full
 
