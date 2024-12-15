@@ -324,6 +324,7 @@ fn get_index(idxstr: &str) -> Option<usize> {
 mod test {
     use super::*;
     use indexmap::IndexMap;
+    use object::Endianness;
     use std::collections::HashMap;
 
     #[test]
@@ -346,6 +347,7 @@ mod test {
     #[test]
     fn test_find_symbol_of_array() {
         let mut dbgdata = DebugData {
+            endian: Endianness::Little,
             types: HashMap::new(),
             typenames: HashMap::new(),
             variables: IndexMap::new(),
@@ -406,6 +408,7 @@ mod test {
     #[test]
     fn test_find_symbol_of_array_in_struct() {
         let mut dbgdata = DebugData {
+            endian: Endianness::Little,
             types: HashMap::new(),
             typenames: HashMap::new(),
             variables: IndexMap::new(),
@@ -478,6 +481,7 @@ mod test {
     #[test]
     fn test_select_varinfo() {
         let mut debug_data = DebugData {
+            endian: Endianness::Little,
             types: HashMap::new(),
             typenames: HashMap::new(),
             variables: IndexMap::new(),

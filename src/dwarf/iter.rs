@@ -244,6 +244,7 @@ impl<'dbg> VariablesIterator<'dbg> {
 mod test {
     use super::*;
     use indexmap::IndexMap;
+    use object::Endianness;
 
     const DEFAULT_TYPEINFO: TypeInfo = TypeInfo {
         name: None,
@@ -394,6 +395,7 @@ mod test {
         types.insert(1, structtype);
         let demangled_names = HashMap::new();
         let debugdata = DebugData {
+            endian: Endianness::Little,
             variables,
             types,
             typenames: HashMap::new(),

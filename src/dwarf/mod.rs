@@ -87,6 +87,7 @@ pub(crate) struct UnitList<'a> {
 
 #[derive(Debug)]
 pub(crate) struct DebugData {
+    pub(crate) endian: Endianness,
     pub(crate) variables: IndexMap<String, Vec<VarInfo>>,
     pub(crate) types: HashMap<usize, TypeInfo>,
     pub(crate) typenames: HashMap<String, Vec<usize>>,
@@ -224,6 +225,7 @@ impl<'elffile> DebugDataReader<'elffile> {
         std::mem::swap(&mut unit_names, &mut self.unit_names);
 
         DebugData {
+            endian: self.endian,
             variables,
             types,
             typenames,
@@ -963,6 +965,14 @@ mod test {
                     ..
                 }
             ));
+        }
+    }
+
+    #[test]
+    fn test_elf_endianess() {
+        for filename in ELF_FILE_NAMES {
+            let debugdata = DebugData::load(OsStr::new(filename), true).unwrap();
+            assert!(debugdata.endian == Endianness::Little);
         }
     }
 }
