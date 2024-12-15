@@ -1,6 +1,7 @@
+use bin_file::BinFile;
 use clap::{builder::ValueParser, parser::ValuesRef, Arg, ArgGroup, ArgMatches, Command};
 
-use a2lfile::{A2lError, A2lFile, A2lObject};
+use a2lfile::{A2lError, A2lFile, A2lObject, ByteOrderEnum};
 use dwarf::DebugData;
 use std::{
     ffi::{OsStr, OsString},
@@ -8,11 +9,13 @@ use std::{
     time::Instant,
 };
 
+mod calibrate;
 mod datatype;
 mod dwarf;
 mod ifdata;
 mod insert;
 mod remove;
+mod search;
 mod symbol;
 mod update;
 mod version;
@@ -82,6 +85,8 @@ fn main() {
 //  8) clean up ifdata
 //  9) sort the file
 // 10) output
+// 11) Binary calibration read
+// 12) Binary calibration write
 fn core() -> Result<(), String> {
     let arg_matches = get_args();
 
@@ -118,6 +123,9 @@ fn core() -> Result<(), String> {
     let merge_includes = *arg_matches
         .get_one::<bool>("MERGEINCLUDES")
         .expect("option merge-includes must always exist");
+    let calibrate = *arg_matches
+        .get_one::<bool>("CALIBRATE")
+        .expect("option calibrate must always exist");
     let verbose = arg_matches.get_count("VERBOSE");
 
     let now = Instant::now();
@@ -487,6 +495,35 @@ fn core() -> Result<(), String> {
         }
     }
 
+    // Read or write calibrations in a binary file
+    if calibrate {
+        let mut log_msgs: Vec<String> = Vec::new();
+        let guessed_default_endianess = calibrate::guess_default_endianess(&a2l_file, &elf_info);
+        let default_endianess = if let Some(endianess) = arg_matches.get_one("DEAFULT_BYTE_ORDER").or(guessed_default_endianess.as_ref()) {
+            endianess
+        } else {
+            return Err(String::from("Cannot detect a default BYTE_ORDER. Specify the --default_byte_order on the command line."));
+        };
+        log_msgs.push(format!("Using default byte order {}", default_endianess));
+
+        if let Some(binary_file) = arg_matches.get_one::<OsString>("BINARY") {
+            let mut binfile = match BinFile::from_file(binary_file) {
+                Ok(bf) => bf,
+                Err(e) => { return Err(format!("Error opening binary file. {}", e.to_string())); },
+            };
+            if let Some(csv_file) = arg_matches.get_one::<OsString>("CALIB_WRITE") {
+                calibrate::calibration_from_csv_to_binary(&mut a2l_file, &elf_info, enable_structures, default_endianess, &mut binfile, &csv_file, &binary_file, &mut log_msgs)?;
+            } 
+            if let Some(csv_file) = arg_matches.get_one::<OsString>("CALIB_READ") {
+                calibrate::calibration_from_binary_to_csv(&mut a2l_file, &elf_info, enable_structures, default_endianess, &binfile, &csv_file, &mut log_msgs)?;
+            }
+        }
+
+        for msg in log_msgs {
+            cond_print!(verbose, now, msg);
+        }
+    }
+
     cond_print!(verbose, now, "\nRun complete. Have a nice day!\n\n");
 
     Ok(())
@@ -543,7 +580,7 @@ fn load_or_create_a2l(
             format!("Input \"{}\" loaded", input_filename.to_string_lossy())
         );
         Ok((input_filename, a2l_file))
-    } else if arg_matches.contains_id("CREATE") {
+    } else if arg_matches.contains_id("CREATE") | arg_matches.contains_id("CALIBRATE") {
         // dummy file name
         let input_filename = OsStr::new("<newly created>");
         // a minimal a2l file needs only a PROJECT containing a MODULE
@@ -565,7 +602,29 @@ fn load_or_create_a2l(
         Ok((input_filename, a2l_file))
     } else {
         // shouldn't be able to get here, the clap config requires either INPUT or CREATE
-        Err("impossible: no input filename and no --create".to_string())
+        Err("impossible: no input filename and no --create nor --calibrate".to_string())
+    }
+}
+
+#[derive(Clone)]
+struct ByteOrderEnumParser;
+
+impl clap::builder::TypedValueParser for ByteOrderEnumParser {
+    type Value = ByteOrderEnum;
+
+    fn parse_ref(
+        &self,
+        _cmd: &clap::Command,
+        _arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        match value.to_str().unwrap_or_default() {
+            "MSB_FIRST" => Ok(ByteOrderEnum::MsbFirst),
+            "MSB_LAST" => Ok(ByteOrderEnum::MsbLast),
+            "LITTLE_ENDIAN" => Ok(ByteOrderEnum::LittleEndian),
+            "BIG_ENDIAN" => Ok(ByteOrderEnum::BigEndian),
+            _ => Err(clap::Error::raw(clap::error::ErrorKind::ValueValidation, format!("Unknown {} value '{}'\n", _arg.unwrap(), value.to_str().unwrap_or_default())))
+        }
     }
 }
 
@@ -591,6 +650,36 @@ fn get_args() -> ArgMatches {
         .long("create")
         .number_of_values(0)
         .action(clap::ArgAction::SetTrue)
+    )
+    .arg(Arg::new("CALIBRATE")
+        .help("Read of write calibrations in a binary file")
+        .long("calibrate")
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
+    )
+    .arg(Arg::new("CALIB_READ")
+        .help("CSV file containing the symbols to read from binary. The CSV file will be updated with the values read from the binary.")
+        .short('r')
+        .long("readcal")
+        .number_of_values(1)
+        .value_name("CSVFILE")
+        .value_parser(ValueParser::os_string())
+    )
+    .arg(Arg::new("CALIB_WRITE")
+        .help("CSV file containing the symbols to write to binary. The binary file will be updated with the values from the CSV.")
+        .short('w')
+        .long("writecal")
+        .number_of_values(1)
+        .value_name("CSVFILE")
+        .value_parser(ValueParser::os_string())
+    )
+    .arg(Arg::new("BINARY")
+        .help("Binary file (srecord, HEX, etc.)")
+        .short('b')
+        .long("binary")
+        .number_of_values(1)
+        .value_name("BINARY")
+        .value_parser(ValueParser::os_string())
     )
     .arg(Arg::new("ELFFILE")
         .help("Elf file containing symbols and address information")
@@ -807,10 +896,19 @@ fn get_args() -> ArgMatches {
         .value_name("REGEX")
         .action(clap::ArgAction::Append)
     )
+    .arg(Arg::new("DEAFULT_BYTE_ORDER")
+        .help("Default byte order applied when not specified in the A2L file: MSB_LAST, MSB_FIRST, BIG_ENDIAN, LITTLE_ENDIAN.")
+        .long("default-byte-order")
+        .number_of_values(1)
+        // .value_parser(["MSB_LAST", "MSB_FIRST", "BIG_ENDIAN", "LITTLE_ENDIAN"])
+        .value_parser(ByteOrderEnumParser)
+        .requires("CALIBRATE")
+        .value_name("BYTE_ORDER")
+    )
     .group(
         ArgGroup::new("INPUT_ARGGROUP")
-            .args(["INPUT", "CREATE"])
-            .multiple(false)
+            .args(["INPUT", "CREATE", "CALIBRATE"])
+            .multiple(true)
             .required(true)
      )
     .group(
