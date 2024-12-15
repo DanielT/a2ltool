@@ -1,0 +1,6 @@
+# Test
+cal_sleep_time;250
+cal_float;8.8888
+cal_text;"aaa";
+cal_sleep_counts;(2,4,6)
+cal_double;(1.23456789,9.87654321)
