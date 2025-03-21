@@ -1,5 +1,17 @@
 # Changelog
 
+## Version 2.6.0
+
+- handle offset values other than zero in SYMBOL_LINK
+  Offset values are still restricted to only point to the beginning of values, and cannot refer to e.g. the second byte of a 32-bit value.
+- update to a2lfile 2.5.0, which brings some bug fixes:
+  - improvements for the merge function:
+    - TYPEDEF_CHARACTERISTIC may reference a MEASUREMENT, but this reference was not updated during merges
+    - USER_RIGHTS can no longer get duplicate user entries as a result of the merge
+    - all items are merged in the order in which they appear in the merge file. Previously they were merged in reverse order
+  - During checking, accept referneces from an AXIS_PRS_REF or CURVE_AXIS_REF of a TYPEDEF_CHARACTERISTIC
+    to a structure component of the containing structure using the notation THIS.component_name.
+
 ## Version 2.5.0
 
 - Support program information in PDB format
