@@ -5,13 +5,13 @@ use a2lfile::{
 };
 use std::collections::HashMap;
 
+use crate::A2lVersion;
 use crate::datatype::{get_a2l_datatype, get_type_limits};
 use crate::debuginfo::{DbgDataType, DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
 use crate::update::{
     self, enums, make_symbol_link_string, set_address_type, set_bitmask, set_matrix_dim,
 };
-use crate::A2lVersion;
 use regex::Regex;
 
 #[derive(Debug, Clone, Copy)]
@@ -182,7 +182,7 @@ fn insert_measurement_sym(
     );
     // create an ECU_ADDRESS attribute, and set it to hex display mode
     let mut ecu_address = EcuAddress::new(sym_info.address as u32);
-    ecu_address.get_layout_mut().item_location.0 .1 = true;
+    ecu_address.get_layout_mut().item_location.0.1 = true;
     new_measurement.ecu_address = Some(ecu_address);
 
     // create a SYMBOL_LINK attribute
@@ -274,7 +274,7 @@ fn insert_characteristic_sym(
     }
 
     // enable hex mode for the address (item 3 in the CHARACTERISTIC)
-    new_characteristic.get_layout_mut().item_location.3 .1 = true;
+    new_characteristic.get_layout_mut().item_location.3.1 = true;
 
     if version >= A2lVersion::V1_6_0 {
         // create a SYMBOL_LINK
@@ -1020,15 +1020,19 @@ mod test {
         );
         // verify that the new items were added with a prefix
         assert_eq!(a2l.project.module[0].measurement.len(), 4);
-        assert!(a2l.project.module[0]
-            .measurement
-            .iter()
-            .any(|m| m.name == "MEASUREMENT.Characteristic_Value"));
+        assert!(
+            a2l.project.module[0]
+                .measurement
+                .iter()
+                .any(|m| m.name == "MEASUREMENT.Characteristic_Value")
+        );
         assert_eq!(a2l.project.module[0].characteristic.len(), 4);
-        assert!(a2l.project.module[0]
-            .characteristic
-            .iter()
-            .any(|c| c.name == "CHARACTERISTIC.Measurement_Value"));
+        assert!(
+            a2l.project.module[0]
+                .characteristic
+                .iter()
+                .any(|c| c.name == "CHARACTERISTIC.Measurement_Value")
+        );
 
         // insert some more MEASUREMENTs and CHARACTERISTICs, with conflicting names
         // conflicting items of the same type are not added
@@ -1135,14 +1139,18 @@ mod test {
         assert_eq!(a2l.project.module[0].characteristic.len(), 2);
         // Curve_InternalAxis and Map_InternalAxis are inserted as INSTANCEs, because they are structs
         assert_eq!(a2l.project.module[0].instance.len(), 2);
-        assert!(a2l.project.module[0]
-            .instance
-            .iter()
-            .any(|i| i.name == "Curve_InternalAxis"));
-        assert!(a2l.project.module[0]
-            .instance
-            .iter()
-            .any(|i| i.name == "Map_InternalAxis"));
+        assert!(
+            a2l.project.module[0]
+                .instance
+                .iter()
+                .any(|i| i.name == "Curve_InternalAxis")
+        );
+        assert!(
+            a2l.project.module[0]
+                .instance
+                .iter()
+                .any(|i| i.name == "Map_InternalAxis")
+        );
         assert_eq!(a2l.project.module[0].typedef_structure.len(), 2);
     }
 
@@ -1202,14 +1210,18 @@ mod test {
         );
         assert!(a2l.project.module[0].measurement.len() > 8);
         assert!(a2l.project.module[0].characteristic.len() > 6);
-        assert!(a2l.project.module[0]
-            .measurement
-            .iter()
-            .any(|m| m.name == "MEASUREMENT.Characteristic_Value"));
-        assert!(a2l.project.module[0]
-            .characteristic
-            .iter()
-            .any(|c| c.name == "CHARACTERISTIC.Measurement_Value"));
+        assert!(
+            a2l.project.module[0]
+                .measurement
+                .iter()
+                .any(|m| m.name == "MEASUREMENT.Characteristic_Value")
+        );
+        assert!(
+            a2l.project.module[0]
+                .characteristic
+                .iter()
+                .any(|c| c.name == "CHARACTERISTIC.Measurement_Value")
+        );
     }
 
     #[test]
@@ -1246,24 +1258,32 @@ mod test {
         // Measurement_Bitfield, Curve_InternalAxis, Curve_ExternalAxis, Map_InternalAxis
         // and Map_ExternalAxis are inserted as INSTANCEs, because they are structs
         assert_eq!(a2l.project.module[0].instance.len(), 5);
-        assert!(a2l.project.module[0]
-            .instance
-            .iter()
-            .any(|i| i.name == "Curve_InternalAxis"));
-        assert!(a2l.project.module[0]
-            .instance
-            .iter()
-            .any(|i| i.name == "Map_InternalAxis"));
-        assert!(a2l.project.module[0]
-            .instance
-            .iter()
-            .any(|t| t.name == "Measurement_Bitfield"));
+        assert!(
+            a2l.project.module[0]
+                .instance
+                .iter()
+                .any(|i| i.name == "Curve_InternalAxis")
+        );
+        assert!(
+            a2l.project.module[0]
+                .instance
+                .iter()
+                .any(|i| i.name == "Map_InternalAxis")
+        );
+        assert!(
+            a2l.project.module[0]
+                .instance
+                .iter()
+                .any(|t| t.name == "Measurement_Bitfield")
+        );
         // In the C code of update_test.c, the type of Map_ExternalAxis is "struct UpdateTest_Map_ExternalAxis"
         // a corresponding TYPEDEF_STRUCTURE should be created
-        assert!(a2l.project.module[0]
-            .typedef_structure
-            .iter()
-            .any(|t| t.name == "UpdateTest_Map_ExternalAxis"));
+        assert!(
+            a2l.project.module[0]
+                .typedef_structure
+                .iter()
+                .any(|t| t.name == "UpdateTest_Map_ExternalAxis")
+        );
 
         // try to insert Map_ExternalAxis again, and verify that no duplicate is created
         let num_typedefs_before = a2l.project.module[0].typedef_structure.len();

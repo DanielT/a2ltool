@@ -1,6 +1,6 @@
 use crate::debuginfo::{DbgDataType, DebugData, VarInfo};
 use indexmap::IndexMap;
-use pdb2::{AddressMap, FallibleIterator, RawString, SymbolData, PDB};
+use pdb2::{AddressMap, FallibleIterator, PDB, RawString, SymbolData};
 use std::{collections::HashMap, ffi::OsStr, fs::File, vec};
 use typereader::TypeReaderData;
 

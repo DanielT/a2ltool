@@ -1,5 +1,5 @@
-use crate::debuginfo::{make_simple_unit_name, DebugData, TypeInfo};
-use crate::{ifdata, A2lVersion};
+use crate::debuginfo::{DebugData, TypeInfo, make_simple_unit_name};
+use crate::{A2lVersion, ifdata};
 use a2lfile::{
     A2lFile, A2lObject, AddrType, AddressType, BitMask, CompuMethod, EcuAddress, IfData, MatrixDim,
     Module, SymbolLink,
@@ -20,7 +20,7 @@ pub(crate) mod typedef;
 
 use crate::datatype::{get_a2l_datatype, get_type_limits};
 use crate::debuginfo::DbgDataType;
-use crate::symbol::{find_symbol, find_symbol_by_offset, SymbolInfo};
+use crate::symbol::{SymbolInfo, find_symbol, find_symbol_by_offset};
 use axis_pts::*;
 use blob::{cleanup_removed_blobs, update_all_module_blobs};
 use characteristic::*;
@@ -419,7 +419,7 @@ fn set_measurement_ecu_address(opt_ecu_address: &mut Option<EcuAddress>, address
     if let Some(ecu_address) = opt_ecu_address {
         if ecu_address.address == 0 {
             // force hex output for the address, if the address was set as "0" (decimal)
-            ecu_address.get_layout_mut().item_location.0 .1 = true;
+            ecu_address.get_layout_mut().item_location.0.1 = true;
         }
         ecu_address.address = address as u32;
     } else {
@@ -668,8 +668,8 @@ impl AddAssign for UpdateSumary {
 mod test {
     use super::*;
     use crate::{
-        debuginfo::{DbgDataType, TypeInfo},
         A2lVersion,
+        debuginfo::{DbgDataType, TypeInfo},
     };
     use a2lfile::{Coeffs, CoeffsLinear, CompuMethod, ConversionType};
     use std::ffi::OsString;

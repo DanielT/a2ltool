@@ -1,19 +1,19 @@
+use crate::A2lVersion;
 use crate::datatype::get_a2l_datatype;
 use crate::debuginfo::DbgDataType;
 use crate::debuginfo::{DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
-use crate::A2lVersion;
 use a2lfile::{A2lObject, AxisPts, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::vec;
 
 use crate::update::{
-    adjust_limits,
+    A2lUpdateInfo, A2lUpdater, adjust_limits,
     enums::{cond_create_enum_conversion, update_enum_compu_methods},
     get_axis_pts_x_memberid, get_inner_type, get_symbol_info,
     ifdata_update::{update_ifdata_address, update_ifdata_type, zero_if_data},
-    make_symbol_link_string, set_symbol_link, update_record_layout, A2lUpdateInfo, A2lUpdater,
+    make_symbol_link_string, set_symbol_link, update_record_layout,
 };
 
 use super::UpdateResult;
@@ -108,7 +108,7 @@ pub(crate) fn update_axis_pts_address(
 
     if axis_pts.address == 0 {
         // if the address was previously "0" then force it to be displayed as hex after the update
-        axis_pts.get_layout_mut().item_location.2 .1 = true;
+        axis_pts.get_layout_mut().item_location.2.1 = true;
     }
     axis_pts.address = sym_info.address as u32;
 }

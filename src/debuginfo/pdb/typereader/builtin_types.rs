@@ -230,7 +230,7 @@ pub(crate) fn read_builtin_type(
         _ => {
             return Err(format!(
                 "Unknown built-in pointer type: {pointer_type} for type {type_index:04x}"
-            ))
+            ));
         }
     };
     if let Some(pointer_datatype) = pointer_datatype {

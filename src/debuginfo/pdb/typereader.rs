@@ -1,6 +1,6 @@
 use crate::debuginfo::{DbgDataType, TypeInfo, VarInfo};
 use indexmap::IndexMap;
-use pdb2::{FallibleIterator, ItemIter, TypeData, TypeIndex, PDB};
+use pdb2::{FallibleIterator, ItemIter, PDB, TypeData, TypeIndex};
 use std::{collections::HashMap, fs::File};
 
 mod builtin_types;
@@ -682,7 +682,9 @@ fn read_array(
     // assumption: multi-dimensional arrays are created by nesting arrays in the element type
     // this matches the observed behavior PDB files created in MSVC
     if array_type.dimensions.len() > 1 {
-        return Err(format!("Unsupported encoding of a multi-dimenasional array: {array_type:?}, element type: {element_type:?}"));
+        return Err(format!(
+            "Unsupported encoding of a multi-dimenasional array: {array_type:?}, element type: {element_type:?}"
+        ));
     }
 
     let size = array_type.dimensions[0] as u64;

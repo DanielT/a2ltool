@@ -1,4 +1,4 @@
-use clap::{builder::ValueParser, parser::ValuesRef, Arg, ArgGroup, ArgMatches, Command};
+use clap::{Arg, ArgGroup, ArgMatches, Command, builder::ValueParser, parser::ValuesRef};
 
 use a2lfile::{A2lError, A2lFile, A2lObject};
 use debuginfo::DebugData;
@@ -186,7 +186,9 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
 
     let current_version = A2lVersion::from(&a2l_file);
     if enable_structures && current_version < A2lVersion::V1_7_1 {
-        return Err(format!("Error: The option --enable-structures requires input file version 1.7.1, but the current version is {current_version}"));
+        return Err(format!(
+            "Error: The option --enable-structures requires input file version 1.7.1, but the current version is {current_version}"
+        ));
     }
 
     // load debuginfo from an elf or pdb file

@@ -1,6 +1,6 @@
 use crate::debuginfo::iter::TypeInfoIter;
-use crate::debuginfo::{make_simple_unit_name, DebugData, TypeInfo};
 use crate::debuginfo::{DbgDataType, VarInfo};
+use crate::debuginfo::{DebugData, TypeInfo, make_simple_unit_name};
 
 #[derive(Clone)]
 pub(crate) struct SymbolInfo<'dbg> {
@@ -274,8 +274,12 @@ fn find_membertype<'a>(
                         format!("could not interpret \"{arraycomponent}\" as an array index")
                     })?;
                     if indexval >= *current_dim as usize {
-                        return Err(format!("requested array index {} in expression \"{}\", but the array only has {} elements",
-                            indexval, components.join("."), current_dim));
+                        return Err(format!(
+                            "requested array index {} in expression \"{}\", but the array only has {} elements",
+                            indexval,
+                            components.join("."),
+                            current_dim
+                        ));
                     }
                     multi_index = multi_index * (*current_dim) as usize + indexval;
                 }
@@ -583,7 +587,9 @@ mod test {
         let (base, _add_spec) = get_additional_spec("varname");
         assert_eq!(base, "varname");
 
-        let (base, add_spec) = get_additional_spec("varname{Function:func}{Namespace:Foo}{Namespace:Bar}{CompileUnit:file_c}{Namespace:Global}");
+        let (base, add_spec) = get_additional_spec(
+            "varname{Function:func}{Namespace:Foo}{Namespace:Bar}{CompileUnit:file_c}{Namespace:Global}",
+        );
         assert_eq!(base, "varname");
         let add_spec = add_spec.unwrap();
         assert_eq!(add_spec.function_name, Some("func".to_string()));

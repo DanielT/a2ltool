@@ -5,8 +5,8 @@ use std::collections::HashSet;
 
 use super::ifdata_update::{update_ifdata_address, update_ifdata_type, zero_if_data};
 use super::{
-    cleanup_item_list, get_symbol_info, make_symbol_link_string, set_symbol_link, A2lUpdateInfo,
-    A2lUpdater, UpdateResult,
+    A2lUpdateInfo, A2lUpdater, UpdateResult, cleanup_item_list, get_symbol_info,
+    make_symbol_link_string, set_symbol_link,
 };
 
 // update all BLOB objects in a module

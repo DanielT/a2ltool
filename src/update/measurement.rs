@@ -1,20 +1,20 @@
+use crate::A2lVersion;
 use crate::debuginfo::DbgDataType;
 use crate::debuginfo::{DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
-use crate::A2lVersion;
 use a2lfile::{A2lObject, Measurement, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::update::{
-    adjust_limits, cleanup_item_list,
+    A2lUpdater, adjust_limits, cleanup_item_list,
     enums::{cond_create_enum_conversion, update_enum_compu_methods},
     get_a2l_datatype, get_symbol_info,
     ifdata_update::{update_ifdata_address, update_ifdata_type, zero_if_data},
-    set_bitmask, set_matrix_dim, set_measurement_ecu_address, set_symbol_link, A2lUpdater,
+    set_bitmask, set_matrix_dim, set_measurement_ecu_address, set_symbol_link,
 };
 
-use super::{make_symbol_link_string, set_address_type, A2lUpdateInfo, UpdateResult};
+use super::{A2lUpdateInfo, UpdateResult, make_symbol_link_string, set_address_type};
 
 pub(crate) fn update_all_module_measurements(
     data: &mut A2lUpdater,

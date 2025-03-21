@@ -48,7 +48,10 @@ pub(crate) fn load_dwarf(filename: &OsStr, verbose: bool) -> Result<DebugData, S
     let dwarf = load_dwarf_sections(&elffile)?;
 
     if !verify_dwarf_compile_units(&dwarf) {
-        return Err(format!("Error: {} does not contain DWARF2+ debug info - zero compile units contain debug info.", filename.to_string_lossy()));
+        return Err(format!(
+            "Error: {} does not contain DWARF2+ debug info - zero compile units contain debug info.",
+            filename.to_string_lossy()
+        ));
     }
 
     let sections = get_elf_sections(&elffile);
@@ -73,7 +76,7 @@ fn load_filedata(filename: &OsStr) -> Result<memmap2::Mmap, String> {
             return Err(format!(
                 "Error: could not open file {}: {error}",
                 filename.to_string_lossy()
-            ))
+            ));
         }
     };
 

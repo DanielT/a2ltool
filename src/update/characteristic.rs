@@ -1,19 +1,18 @@
+use crate::A2lVersion;
 use crate::datatype::get_a2l_datatype;
 use crate::debuginfo::DbgDataType;
 use crate::debuginfo::{DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
-use crate::A2lVersion;
 use a2lfile::{A2lObject, AxisDescr, Characteristic, CharacteristicType, Module, RecordLayout};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::update::{
-    adjust_limits, cleanup_item_list,
+    A2lUpdateInfo, A2lUpdater, UpdateResult, adjust_limits, cleanup_item_list,
     enums::{cond_create_enum_conversion, update_enum_compu_methods},
     get_fnc_values_memberid, get_inner_type, get_symbol_info,
     ifdata_update::{update_ifdata_address, update_ifdata_type, zero_if_data},
     make_symbol_link_string, set_bitmask, set_matrix_dim, set_symbol_link, update_record_layout,
-    A2lUpdateInfo, A2lUpdater, UpdateResult,
 };
 
 // update all CHARACTERISTICs in the module
@@ -154,7 +153,7 @@ fn update_characteristic_address<'dbg>(
     }
 
     if characteristic.address == 0 {
-        characteristic.get_layout_mut().item_location.3 .1 = true;
+        characteristic.get_layout_mut().item_location.3.1 = true;
     }
     characteristic.address = sym_info.address as u32;
 }

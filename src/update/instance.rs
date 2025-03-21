@@ -6,11 +6,11 @@ use a2lfile::{A2lObject, Instance, Module};
 use std::collections::HashSet;
 
 use crate::update::{
+    A2lUpdateInfo, A2lUpdater, TypedefNames, TypedefReferrer, TypedefsRefInfo, UpdateResult,
     cleanup_removed_axis_pts, cleanup_removed_blobs, cleanup_removed_characteristics,
     cleanup_removed_measurements, get_symbol_info,
     ifdata_update::{update_ifdata_address, update_ifdata_type, zero_if_data},
-    make_symbol_link_string, set_address_type, set_matrix_dim, set_symbol_link, A2lUpdateInfo,
-    A2lUpdater, TypedefNames, TypedefReferrer, TypedefsRefInfo, UpdateResult,
+    make_symbol_link_string, set_address_type, set_matrix_dim, set_symbol_link,
 };
 
 // update all INSTANCE objects in a module
@@ -163,7 +163,7 @@ fn update_instance_address<'a>(
 
     if instance.start_address == 0 {
         // if the start address was previously "0" then force it to be displayed as hex after the update
-        instance.get_layout_mut().item_location.3 .1 = true;
+        instance.get_layout_mut().item_location.3.1 = true;
     }
     instance.start_address = sym_info.address as u32;
 }

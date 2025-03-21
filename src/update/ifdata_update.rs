@@ -25,7 +25,7 @@ fn update_ifdata_address_canape_ext(
     if let Some(link_map) = &mut canape_ext.link_map {
         if link_map.address == 0 {
             // if the address was previously "0" then force it to be displayed as hex after the update
-            link_map.get_layout_mut().item_location.1 .1 = true;
+            link_map.get_layout_mut().item_location.1.1 = true;
         }
         link_map.address = address as i32;
         link_map.symbol_name = symbol_name.to_string();

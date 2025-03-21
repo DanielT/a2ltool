@@ -1,9 +1,9 @@
-use crate::debuginfo::{make_simple_unit_name, DbgDataType, DebugData, TypeInfo};
+use crate::debuginfo::{DbgDataType, DebugData, TypeInfo, make_simple_unit_name};
 use crate::update::enums::{cond_create_enum_conversion, update_enum_compu_methods};
 use crate::update::{
-    adjust_limits, get_a2l_datatype, get_fnc_values_memberid, get_inner_type, set_address_type,
-    set_bitmask, set_matrix_dim, update_characteristic_axis, update_record_layout, A2lUpdateInfo,
-    RecordLayoutInfo, TypedefNames, TypedefReferrer, TypedefsRefInfo,
+    A2lUpdateInfo, RecordLayoutInfo, TypedefNames, TypedefReferrer, TypedefsRefInfo, adjust_limits,
+    get_a2l_datatype, get_fnc_values_memberid, get_inner_type, set_address_type, set_bitmask,
+    set_matrix_dim, update_characteristic_axis, update_record_layout,
 };
 use a2lfile::{
     A2lObject, AddrType, CharacteristicType, FncValues, IndexMode, Module, Number, RecordLayout,
@@ -1827,11 +1827,11 @@ fn fully_unwrap_typeinfo<'dbg>(
 
 #[cfg(test)]
 mod test {
-    use super::{update_module_typedefs, TypedefUpdater};
+    use super::{TypedefUpdater, update_module_typedefs};
     use crate::{
-        debuginfo::{DebugData, TypeInfo},
-        update::{get_symbol_info, A2lUpdateInfo, RecordLayoutInfo, TypedefNames, TypedefReferrer},
         A2lVersion,
+        debuginfo::{DebugData, TypeInfo},
+        update::{A2lUpdateInfo, RecordLayoutInfo, TypedefNames, TypedefReferrer, get_symbol_info},
     };
     use a2lfile::A2lFile;
     use std::{
@@ -1916,9 +1916,10 @@ mod test {
         assert!(tdu.typedef_structs.contains_key("RegDef"));
         assert!(tdu.typedef_structs.contains_key("TestStruct"));
         assert!(tdu.typedef_structs.contains_key("LongPointer_TestStruct"));
-        assert!(tdu
-            .typedef_structs
-            .contains_key("LongPointer_Array_10_TestStruct"));
+        assert!(
+            tdu.typedef_structs
+                .contains_key("LongPointer_Array_10_TestStruct")
+        );
 
         assert!(tdu.preserved_structs.contains_key("Unconnected"));
         assert!(tdu.preserved_structs.contains_key("DeadEnd"));
@@ -1962,14 +1963,18 @@ mod test {
         let struct_a = tdu.typedef_structs.get("StructA").unwrap();
         let struct_b = tdu.typedef_structs.get("StructB").unwrap();
         // the "nonexistent_nothing" STRUCTURE_COMPONENTs in both structs were removed
-        assert!(!struct_a
-            .structure_component
-            .iter()
-            .any(|sc| sc.component_name == "nonexistent_nothing"));
-        assert!(!struct_b
-            .structure_component
-            .iter()
-            .any(|sc| sc.component_name == "nonexistent_nothing"));
+        assert!(
+            !struct_a
+                .structure_component
+                .iter()
+                .any(|sc| sc.component_name == "nonexistent_nothing")
+        );
+        assert!(
+            !struct_b
+                .structure_component
+                .iter()
+                .any(|sc| sc.component_name == "nonexistent_nothing")
+        );
     }
 
     #[test]

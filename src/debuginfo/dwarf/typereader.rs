@@ -1,5 +1,5 @@
-use super::{attributes::*, DebugDataReader};
 use super::{DbgDataType, TypeInfo, VarInfo};
+use super::{DebugDataReader, attributes::*};
 use gimli::{DebugInfoOffset, DwTag, EndianSlice, EntriesTreeNode, RunTimeEndian, UnitOffset};
 use indexmap::IndexMap;
 use object::Endianness;
@@ -258,7 +258,7 @@ impl DebugDataReader<'_> {
             other_tag => {
                 return Err(format!(
                     "unexpected DWARF tag {other_tag} in type definition"
-                ))
+                ));
             }
         };
 
