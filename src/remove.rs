@@ -1,4 +1,4 @@
-use a2lfile::A2lFile;
+use a2lfile::{A2lFile, A2lObjectName, ItemList};
 
 pub(crate) fn remove_items(
     a2l_file: &mut A2lFile,
@@ -22,15 +22,18 @@ pub(crate) fn remove_items(
 
     for module in &mut a2l_file.project.module {
         // remove all characteristics that match any of the regexes
-        let mut swapped_characteristics = Vec::with_capacity(module.characteristic.len());
+        let mut swapped_characteristics = ItemList::with_capacity(module.characteristic.len());
         std::mem::swap(&mut module.characteristic, &mut swapped_characteristics);
         for characteristic in swapped_characteristics {
             let mut removed = false;
             for regex in &compiled_regexes {
-                if regex.is_match(&characteristic.name) {
-                    removed_items.insert(characteristic.name.clone());
+                if regex.is_match(characteristic.get_name()) {
+                    log_messages.push(format!(
+                        "Removed characteristic {}",
+                        characteristic.get_name()
+                    ));
+                    removed_items.insert(characteristic.get_name().to_string());
                     removed = true;
-                    log_messages.push(format!("Removed characteristic {}", characteristic.name));
                 }
             }
             if !removed {
@@ -39,15 +42,15 @@ pub(crate) fn remove_items(
         }
 
         // remove all measurements that match any of the regexes
-        let mut swapped_measurements = Vec::with_capacity(module.measurement.len());
+        let mut swapped_measurements = ItemList::with_capacity(module.measurement.len());
         std::mem::swap(&mut module.measurement, &mut swapped_measurements);
         for measurement in swapped_measurements {
             let mut removed = false;
             for regex in &compiled_regexes {
-                if regex.is_match(&measurement.name) {
-                    removed_items.insert(measurement.name.clone());
+                if regex.is_match(measurement.get_name()) {
+                    log_messages.push(format!("Removed measurement {}", measurement.get_name()));
+                    removed_items.insert(measurement.get_name().to_string());
                     removed = true;
-                    log_messages.push(format!("Removed measurement {}", measurement.name));
                 }
             }
             if !removed {
@@ -56,15 +59,15 @@ pub(crate) fn remove_items(
         }
 
         // remove all instances that match any of the regexes
-        let mut swapped_instances = Vec::with_capacity(module.instance.len());
+        let mut swapped_instances = ItemList::with_capacity(module.instance.len());
         std::mem::swap(&mut module.instance, &mut swapped_instances);
         for instance in swapped_instances {
             let mut removed = false;
             for regex in &compiled_regexes {
-                if regex.is_match(&instance.name) {
-                    removed_items.insert(instance.name.clone());
+                if regex.is_match(instance.get_name()) {
+                    log_messages.push(format!("Removed instance {}", instance.get_name()));
+                    removed_items.insert(instance.get_name().to_string());
                     removed = true;
-                    log_messages.push(format!("Removed instance {}", instance.name));
                 }
             }
             if !removed {

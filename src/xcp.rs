@@ -6,7 +6,7 @@ use crate::ifdata::{
     MaxFlxLenBuf, Offset, PoolBuffer, ResErr, Stim2, TCP_IP_Parameters, UDP_IP_Parameters, XCPplus,
     Xcp, XcpPacket,
 };
-use a2lfile::{A2lFile, A2lObject};
+use a2lfile::{A2lFile, A2lObject, A2lObjectName};
 
 pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
     let multi_module = a2l_file.project.module.len() > 1;
@@ -15,7 +15,7 @@ pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
 
     for module in &a2l_file.project.module {
         if multi_module {
-            println!("XCP settings for module {}", module.name);
+            println!("XCP settings for module {}", module.get_name());
         }
 
         let mut found = false;
@@ -39,7 +39,7 @@ pub(crate) fn show_settings(a2l_file: &A2lFile, filename: &OsStr) {
         }
 
         if !found {
-            println!("No XCP settings found in module {}", module.name);
+            println!("No XCP settings found in module {}", module.get_name());
         }
     }
     println!();

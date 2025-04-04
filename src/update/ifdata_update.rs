@@ -236,14 +236,9 @@ mod test {
     };
 
     fn test_setup(input: &str) -> a2lfile::A2lFile {
-        let mut log_msgs = Vec::new();
-        let mut a2l = a2lfile::load_from_string(
-            input,
-            Some(ifdata::A2MLVECTOR_TEXT.to_string()),
-            &mut log_msgs,
-            false,
-        )
-        .unwrap();
+        let (mut a2l, _) =
+            a2lfile::load_from_string(input, Some(ifdata::A2MLVECTOR_TEXT.to_string()), false)
+                .unwrap();
         let module = &mut a2l.project.module[0];
         let ifdata = &module.measurement[0].if_data[0];
         assert!(ifdata::A2mlVector::load_from_ifdata(ifdata).is_some());

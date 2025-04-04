@@ -2,7 +2,7 @@ use crate::{
     debuginfo::{DebugData, TypeInfo},
     symbol::SymbolInfo,
 };
-use a2lfile::{A2lObject, Instance, Module};
+use a2lfile::{A2lObject, A2lObjectName, Instance, ItemList, Module};
 use std::collections::HashSet;
 
 use crate::update::{
@@ -23,7 +23,7 @@ pub(crate) fn update_all_module_instances<'dbg>(
     let mut typedef_types = TypedefsRefInfo::new();
     let mut results = Vec::new();
 
-    let mut instance_list = Vec::new();
+    let mut instance_list = ItemList::new();
     std::mem::swap(&mut data.module.instance, &mut instance_list);
     for mut instance in instance_list {
         let (update_result, opt_typeinfo) = update_module_instance(&mut instance, info, nameset);
@@ -43,7 +43,7 @@ pub(crate) fn update_all_module_instances<'dbg>(
                 // This only matters if enable_structures is set, since TYPEDEFS are not modified otherwise.
                 entry.or_default().push(typedef_map_value);
             } else {
-                removed_items.insert(instance.name.clone());
+                removed_items.insert(instance.get_name().to_string());
             }
         } else {
             data.module.instance.push(instance);
@@ -64,7 +64,7 @@ fn update_module_instance<'dbg>(
     nameset: &TypedefNames,
 ) -> (UpdateResult, Option<&'dbg TypeInfo>) {
     match get_symbol_info(
-        &instance.name,
+        instance.get_name(),
         &instance.symbol_link,
         &instance.if_data,
         info.debug_data,
@@ -101,7 +101,7 @@ fn update_module_instance<'dbg>(
                 if *instance != instance_copy {
                     let result = UpdateResult::InvalidDataType {
                         blocktype: "INSTANCE",
-                        name: instance.name.clone(),
+                        name: instance.get_name().to_string(),
                         line: instance.get_line(),
                     };
                     (result, Some(basetype))
@@ -116,7 +116,7 @@ fn update_module_instance<'dbg>(
         Err(errmsgs) => {
             let result = UpdateResult::SymbolNotFound {
                 blocktype: "INSTANCE",
-                name: instance.name.clone(),
+                name: instance.get_name().to_string(),
                 line: instance.get_line(),
                 errors: errmsgs,
             };

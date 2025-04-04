@@ -2,7 +2,7 @@ use crate::A2lVersion;
 use crate::debuginfo::DbgDataType;
 use crate::debuginfo::{DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
-use a2lfile::{A2lObject, Measurement, Module};
+use a2lfile::{A2lObject, A2lObjectName, ItemList, Measurement, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -22,7 +22,7 @@ pub(crate) fn update_all_module_measurements(
 ) -> Vec<UpdateResult> {
     let mut removed_items = HashSet::<String>::new();
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
-    let mut measurement_list = Vec::new();
+    let mut measurement_list = ItemList::new();
     let mut results = Vec::new();
 
     std::mem::swap(&mut data.module.measurement, &mut measurement_list);
@@ -35,7 +35,7 @@ pub(crate) fn update_all_module_measurements(
                 zero_if_data(&mut measurement.if_data);
                 data.module.measurement.push(measurement);
             } else {
-                removed_items.insert(measurement.name.clone());
+                removed_items.insert(measurement.get_name().to_string());
             }
         } else {
             data.module.measurement.push(measurement);
@@ -59,7 +59,7 @@ fn update_module_measurement<'dbg>(
     if measurement.var_virtual.is_none() {
         // only MEASUREMENTS that are not VIRTUAL can be updated
         match get_symbol_info(
-            &measurement.name,
+            measurement.get_name(),
             &measurement.symbol_link,
             &measurement.if_data,
             info.debug_data,
@@ -94,7 +94,7 @@ fn update_module_measurement<'dbg>(
             }
             Err(errmsgs) => UpdateResult::SymbolNotFound {
                 blocktype: "MEASUREMENT",
-                name: measurement.name.clone(),
+                name: measurement.get_name().to_string(),
                 line: measurement.get_line(),
                 errors: errmsgs,
             },
@@ -148,16 +148,13 @@ fn update_measurement_datatype<'enumlist, 'typeinfo: 'enumlist>(
             measurement.conversion = typeinfo
                 .name
                 .clone()
-                .unwrap_or_else(|| format!("{}_compu_method", measurement.name));
+                .unwrap_or_else(|| format!("{}_compu_method", measurement.get_name()));
         }
         cond_create_enum_conversion(module, &measurement.conversion, enumerators);
         enum_convlist.insert(measurement.conversion.clone(), typeinfo);
     }
 
-    let opt_compu_method = info
-        .compu_method_index
-        .get(&measurement.conversion)
-        .and_then(|idx| module.compu_method.get(*idx));
+    let opt_compu_method = module.compu_method.get(&measurement.conversion);
     let (ll, ul) = adjust_limits(
         typeinfo,
         measurement.lower_limit,
@@ -198,10 +195,7 @@ fn verify_measurement_datatype<'enumlist, 'typeinfo: 'enumlist>(
         }
     }
 
-    let opt_compu_method = info
-        .compu_method_index
-        .get(&measurement.conversion)
-        .and_then(|idx| module.compu_method.get(*idx));
+    let opt_compu_method = module.compu_method.get(&measurement.conversion);
     let (ll, ul) = adjust_limits(
         typeinfo,
         measurement.lower_limit,
@@ -224,7 +218,7 @@ fn verify_measurement_datatype<'enumlist, 'typeinfo: 'enumlist>(
         // the information based on the data type of the MEASUREMENT is not correct
         UpdateResult::InvalidDataType {
             blocktype: "MEASUREMENT",
-            name: measurement.name.clone(),
+            name: measurement.get_name().to_string(),
             line: measurement.get_line(),
         }
     } else {

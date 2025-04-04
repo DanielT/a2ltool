@@ -95,7 +95,6 @@ pub(crate) struct A2lUpdateInfo<'dbg> {
     pub(crate) full_update: bool,
     pub(crate) version: A2lVersion,
     pub(crate) enable_structures: bool,
-    pub(crate) compu_method_index: HashMap<String, usize>,
 }
 
 // This struct contains the data that is modified / updated during the a2l update process.
@@ -150,12 +149,6 @@ pub fn init_update<'a2l, 'dbg>(
     let full_update = update_type == UpdateType::Full;
     let reclayout_info = RecordLayoutInfo::build(module);
 
-    let compu_method_index = module
-        .compu_method
-        .iter()
-        .enumerate()
-        .map(|(idx, item)| (item.name.clone(), idx))
-        .collect::<HashMap<_, _>>();
     (
         A2lUpdater {
             module,
@@ -168,7 +161,6 @@ pub fn init_update<'a2l, 'dbg>(
             full_update,
             version,
             enable_structures,
-            compu_method_index,
         },
     )
 }
@@ -436,9 +428,13 @@ pub(crate) fn set_bitmask(opt_bitmask: &mut Option<BitMask>, typeinfo: &TypeInfo
         ..
     } = &typeinfo.datatype
     {
-        // make sure we don't panic for bit_size = 32
-        let wide_mask: u64 = ((1 << bit_size) - 1) << bit_offset;
-        let mask: u32 = wide_mask.try_into().unwrap_or(0xffff_ffff);
+        // make sure we don't panic for bit_size >= 64
+        let mask: u64 = if *bit_size >= 64 {
+            // this is a bitfield with more than 64 bits, so we need to use the full 64 bits
+            u64::MAX
+        } else {
+            ((1 << bit_size) - 1) << bit_offset
+        };
         if let Some(bit_mask) = opt_bitmask {
             bit_mask.mask = mask;
         } else {
@@ -612,31 +608,11 @@ impl UpdateSumary {
 impl TypedefNames {
     pub(crate) fn new(module: &Module) -> Self {
         Self {
-            axis: module
-                .typedef_axis
-                .iter()
-                .map(|item| item.name.clone())
-                .collect(),
-            blob: module
-                .typedef_blob
-                .iter()
-                .map(|item| item.name.clone())
-                .collect(),
-            characteristic: module
-                .typedef_characteristic
-                .iter()
-                .map(|item| item.name.clone())
-                .collect(),
-            measurement: module
-                .typedef_measurement
-                .iter()
-                .map(|item| item.name.clone())
-                .collect(),
-            structure: module
-                .typedef_structure
-                .iter()
-                .map(|item| item.name.clone())
-                .collect(),
+            axis: module.typedef_axis.keys().cloned().collect(),
+            blob: module.typedef_blob.keys().cloned().collect(),
+            characteristic: module.typedef_characteristic.keys().cloned().collect(),
+            measurement: module.typedef_measurement.keys().cloned().collect(),
+            structure: module.typedef_structure.keys().cloned().collect(),
         }
     }
 
@@ -739,14 +715,8 @@ mod test {
     }
 
     fn test_setup(a2l_name: &str) -> (crate::debuginfo::DebugData, a2lfile::A2lFile) {
-        let mut log_msgs = Vec::new();
-        let a2l = a2lfile::load(
-            a2l_name,
-            Some(ifdata::A2MLVECTOR_TEXT.to_string()),
-            &mut log_msgs,
-            true,
-        )
-        .unwrap();
+        let (a2l, _) =
+            a2lfile::load(a2l_name, Some(ifdata::A2MLVECTOR_TEXT.to_string()), true).unwrap();
         let debug_data = crate::debuginfo::DebugData::load_dwarf(
             &OsString::from("fixtures/bin/update_test.elf"),
             false,

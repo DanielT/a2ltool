@@ -129,9 +129,7 @@ fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
         }
         if let Some(mod_par) = module.mod_par.as_mut() {
             for calmethod in &mut mod_par.calibration_method {
-                if let Some(calhandle) = calmethod.calibration_handle.as_mut() {
-                    calhandle.calibration_handle_text = None;
-                }
+                calmethod.calibration_handle.clear();
             }
         }
         for rl in &mut module.record_layout {
@@ -148,7 +146,7 @@ fn downgrade_v1_70_to_1_61(a2l_file: &mut A2lFile) {
             axis_pts.max_refresh = None;
             axis_pts.model_link = None;
         }
-        module.blob.truncate(0);
+        module.blob.clear();
         for characteristic in &mut module.characteristic {
             characteristic.encoding = None;
             characteristic.model_link = None;
@@ -159,7 +157,7 @@ fn downgrade_v1_70_to_1_61(a2l_file: &mut A2lFile) {
         for function in &mut module.function {
             function.ar_component = None;
         }
-        module.instance.truncate(0);
+        module.instance.clear();
         for measurement in &mut module.measurement {
             measurement.address_type = None;
             if let Some(matrix_dim) = measurement.matrix_dim.as_mut() {
@@ -176,12 +174,12 @@ fn downgrade_v1_70_to_1_61(a2l_file: &mut A2lFile) {
         for rl in &mut module.record_layout {
             rl.static_address_offsets = None;
         }
-        module.transformer.truncate(0);
-        module.typedef_axis.truncate(0);
-        module.typedef_blob.truncate(0);
-        module.typedef_characteristic.truncate(0);
-        module.typedef_measurement.truncate(0);
-        module.typedef_structure.truncate(0);
+        module.transformer.clear();
+        module.typedef_axis.clear();
+        module.typedef_blob.clear();
+        module.typedef_characteristic.clear();
+        module.typedef_measurement.clear();
+        module.typedef_structure.clear();
     }
 }
 

@@ -1,36 +1,26 @@
 use crate::debuginfo::{DbgDataType, TypeInfo};
 use crate::update::get_a2l_datatype;
-use a2lfile::{Module, RecordLayout};
-use std::collections::HashMap;
+use a2lfile::{A2lObjectName, A2lObjectNameSetter, ItemList, Module, RecordLayout};
 
 #[derive(Debug)]
 pub(crate) struct RecordLayoutInfo {
-    pub(crate) idxmap: HashMap<String, usize>,
     pub(crate) refcount: Vec<usize>,
 }
 
-pub(crate) fn get_axis_pts_x_memberid(
-    module: &Module,
-    recordlayout_info: &RecordLayoutInfo,
-    recordlayout_name: &str,
-) -> u16 {
+pub(crate) fn get_axis_pts_x_memberid(module: &Module, recordlayout_name: &str) -> u16 {
     let mut memberid = 1;
-    if let Some(rl_idx) = recordlayout_info.idxmap.get(recordlayout_name) {
-        if let Some(axis_pts_x) = &module.record_layout[*rl_idx].axis_pts_x {
+    if let Some(rl_idx) = module.record_layout.index(recordlayout_name) {
+        if let Some(axis_pts_x) = &module.record_layout[rl_idx].axis_pts_x {
             memberid = axis_pts_x.position;
         }
     }
     memberid
 }
 
-pub(crate) fn get_fnc_values_memberid(
-    module: &Module,
-    recordlayout_info: &RecordLayoutInfo,
-    recordlayout_name: &str,
-) -> u16 {
+pub(crate) fn get_fnc_values_memberid(module: &Module, recordlayout_name: &str) -> u16 {
     let mut memberid = 1;
-    if let Some(rl_idx) = recordlayout_info.idxmap.get(recordlayout_name) {
-        if let Some(fnc_values) = &module.record_layout[*rl_idx].fnc_values {
+    if let Some(rl_idx) = module.record_layout.index(recordlayout_name) {
+        if let Some(fnc_values) = &module.record_layout[rl_idx].fnc_values {
             memberid = fnc_values.position;
         }
     }
@@ -69,9 +59,9 @@ pub(crate) fn update_record_layout(
     name: &str,
     typeinfo: &TypeInfo,
 ) -> String {
-    if let Some(idx_ref) = recordlayout_info.idxmap.get(name) {
-        let idx = *idx_ref;
+    if let Some(idx) = module.record_layout.index(name) {
         let mut new_reclayout = module.record_layout[idx].clone();
+        let mut new_name = None;
 
         // FNC_VALUES - required in record layouts used by a CHARACTERISTIC
         if let Some(fnc_values) = &mut new_reclayout.fnc_values {
@@ -79,14 +69,17 @@ pub(crate) fn update_record_layout(
                 let new_datatype = get_a2l_datatype(itemtype);
                 if new_datatype != fnc_values.datatype {
                     // try to update the name based on the datatype, e.g. __UBYTE_S to __ULONG_S
-                    new_reclayout.name = new_reclayout.name.replacen(
+                    new_name = Some(module.record_layout[idx].get_name().replacen(
                         &fnc_values.datatype.to_string(),
                         &new_datatype.to_string(),
                         1,
-                    );
+                    ));
                     fnc_values.datatype = new_datatype;
                 }
             }
+        }
+        if let Some(new_name) = new_name {
+            new_reclayout.set_name(new_name);
         }
 
         // AXIS_PTS_X - required in record layouts used by an AXIS_PTS, optional for CHARACTERISTIC
@@ -198,32 +191,24 @@ pub(crate) fn update_record_layout(
                 // there already is a record layout with these parameters
                 recordlayout_info.refcount[idx] -= 1;
                 recordlayout_info.refcount[existing_idx] += 1;
-                existing_reclayout.name.clone()
+                existing_reclayout.get_name().to_string()
             } else if recordlayout_info.refcount[idx] == 1 {
-                // the original record layout only has one reference; that means we can simply overwrite it with the modified data
-                if module.record_layout[idx].name != new_reclayout.name {
-                    // the name has changed, so idxmap needs to be fixed
-                    recordlayout_info
-                        .idxmap
-                        .remove(&module.record_layout[idx].name);
-                    recordlayout_info
-                        .idxmap
-                        .insert(new_reclayout.name.clone(), idx);
-                }
-                module.record_layout[idx] = new_reclayout;
-                module.record_layout[idx].name.clone()
+                // the original record layout only has one reference; that means we can replace it
+                // append the new record layout to the and of the list, and then move it to idx using swap_remove
+                module.record_layout.push(new_reclayout);
+                module.record_layout.swap_remove_idx(idx);
+                module.record_layout[idx].get_name().to_string()
             } else {
                 // the original record layout has multiple users, so it's reference count
                 // decreases by one and the new record layout is added to the list
                 recordlayout_info.refcount[idx] -= 1;
-                new_reclayout.name =
-                    make_unique_reclayout_name(new_reclayout.name, recordlayout_info);
+                new_reclayout.set_name(make_unique_reclayout_name(
+                    new_reclayout.get_name().to_string(),
+                    &module.record_layout,
+                ));
                 recordlayout_info.refcount.push(1);
-                recordlayout_info
-                    .idxmap
-                    .insert(new_reclayout.name.clone(), module.record_layout.len());
                 module.record_layout.push(new_reclayout);
-                module.record_layout.last().unwrap().name.clone()
+                module.record_layout.last().unwrap().get_name().to_string()
             }
         }
     } else {
@@ -235,9 +220,9 @@ pub(crate) fn update_record_layout(
 
 fn make_unique_reclayout_name(
     initial_name: String,
-    recordlayout_info: &RecordLayoutInfo,
+    record_layout: &ItemList<RecordLayout>,
 ) -> String {
-    if recordlayout_info.idxmap.contains_key(&initial_name) {
+    if record_layout.contains_key(&initial_name) {
         // the record layout name already exists. Now we want to extend the name to make it unique
         // e.g. BASIC_RECORD_LAYOUT to BASIC_RECORD_LAYOUT_UPDATED
         // if there are multiple BASIC_RECORD_LAYOUT_UPDATED we want to continue with BASIC_RECORD_LAYOUT_UPDATED.2, .3 , etc
@@ -256,7 +241,7 @@ fn make_unique_reclayout_name(
         };
         let mut outname = basename.clone();
         let mut counter = 1;
-        while recordlayout_info.idxmap.contains_key(&outname) {
+        while record_layout.contains_key(&outname) {
             counter += 1;
             outname = format!("{basename}.{counter}");
         }
@@ -335,35 +320,29 @@ fn compare_rl_content(a: &RecordLayout, b: &RecordLayout) -> bool {
 
 impl RecordLayoutInfo {
     pub(crate) fn build(module: &Module) -> Self {
-        let idxmap: HashMap<String, usize> = module
-            .record_layout
-            .iter()
-            .enumerate()
-            .map(|(idx, rl)| (rl.name.clone(), idx))
-            .collect();
         let mut refcount = vec![0; module.record_layout.len()];
         refcount.resize(module.record_layout.len(), 0);
         for ap in &module.axis_pts {
-            if let Some(idx) = idxmap.get(&ap.deposit_record) {
-                refcount[*idx] += 1;
+            if let Some(idx) = module.record_layout.index(&ap.deposit_record) {
+                refcount[idx] += 1;
             }
         }
         for chr in &module.characteristic {
-            if let Some(idx) = idxmap.get(&chr.deposit) {
-                refcount[*idx] += 1;
+            if let Some(idx) = module.record_layout.index(&chr.deposit) {
+                refcount[idx] += 1;
             }
         }
         for td_axis in &module.typedef_axis {
-            if let Some(idx) = idxmap.get(&td_axis.record_layout) {
-                refcount[*idx] += 1;
+            if let Some(idx) = module.record_layout.index(&td_axis.record_layout) {
+                refcount[idx] += 1;
             }
         }
         for td_chr in &module.typedef_characteristic {
-            if let Some(idx) = idxmap.get(&td_chr.record_layout) {
-                refcount[*idx] += 1;
+            if let Some(idx) = module.record_layout.index(&td_chr.record_layout) {
+                refcount[idx] += 1;
             }
         }
 
-        Self { idxmap, refcount }
+        Self { refcount }
     }
 }

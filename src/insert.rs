@@ -1,7 +1,7 @@
 use a2lfile::{
-    A2lFile, A2lObject, AddrType, Characteristic, CharacteristicType, EcuAddress, FncValues, Group,
-    IndexMode, Instance, Measurement, Module, RecordLayout, RefCharacteristic, RefMeasurement,
-    Root, SymbolLink,
+    A2lFile, A2lObject, A2lObjectName, AddrType, Characteristic, CharacteristicType, EcuAddress,
+    FncValues, Group, IndexMode, Instance, Measurement, Module, RecordLayout, RefCharacteristic,
+    RefMeasurement, Root, SymbolLink,
 };
 use std::collections::HashMap;
 
@@ -210,7 +210,7 @@ fn insert_measurement_sym(
         let enum_name = typeinfo
             .name
             .clone()
-            .unwrap_or_else(|| format!("{}_compu_method", new_measurement.name));
+            .unwrap_or_else(|| format!("{}_compu_method", new_measurement.get_name()));
         enums::cond_create_enum_conversion(module, &enum_name, enumerators);
         new_measurement.conversion = enum_name;
     } else {
@@ -286,7 +286,7 @@ fn insert_characteristic_sym(
 
     // create a RECORD_LAYOUT for the CHARACTERISTIC if it doesn't exist yet
     // the used naming convention (__<type>_Z) matches default naming used by Vector tools
-    let mut recordlayout = RecordLayout::new(recordlayout_name.clone());
+    let mut recordlayout = RecordLayout::new(recordlayout_name);
     // set item 0 (name) to use an offset of 0 lines, i.e. no line break after /begin RECORD_LAYOUT
     recordlayout.get_layout_mut().item_location.0 = 0;
     recordlayout.fnc_values = Some(FncValues::new(
@@ -296,11 +296,7 @@ fn insert_characteristic_sym(
         AddrType::Direct,
     ));
     // search through all existing record layouts and only add the new one if it doesn't exist yet
-    if !module
-        .record_layout
-        .iter()
-        .any(|rl| rl.name == recordlayout_name)
-    {
+    if !module.record_layout.contains_key(recordlayout.get_name()) {
         module.record_layout.push(recordlayout);
     }
 
@@ -327,7 +323,7 @@ fn make_unique_measurement_name(
                 // there is already a MEASUREMENT for this symbol, and we don't want to create duplicates
                 return Err(format!(
                     "MEASUREMENT {} already references symbol {measure_sym}.",
-                    module.measurement[*idx].name
+                    module.measurement[*idx].get_name()
                 ));
             } else {
                 // there is another object for this symbol
@@ -367,7 +363,7 @@ fn make_unique_characteristic_name(
                 // there is already a CHARACTERISTIC for this symbol, and we don't want to create duplicates
                 return Err(format!(
                     "CHARACTERISTIC {} already references symbol {characteristic_sym}.",
-                    module.characteristic[*idx].name
+                    module.characteristic[*idx].get_name()
                 ));
             } else {
                 // there is another object for this symbol
@@ -407,7 +403,7 @@ fn make_unique_instance_name(
                 // there is already an INSTANCE for this symbol, and we don't want to create duplicates
                 return Err(format!(
                     "INSTANCE {} already references symbol {instance_sym}.",
-                    module.instance[*idx].name
+                    module.instance[*idx].get_name()
                 ));
             } else {
                 // there is another object for this symbol
@@ -431,7 +427,7 @@ fn build_maps(module: &Module) -> (HashMap<String, ItemType>, HashMap<String, Ve
     let mut name_map = HashMap::<String, ItemType>::new();
     let mut sym_map = HashMap::<String, Vec<ItemType>>::new();
     for (idx, chr) in module.characteristic.iter().enumerate() {
-        name_map.insert(chr.name.clone(), ItemType::Characteristic(idx));
+        name_map.insert(chr.get_name().to_string(), ItemType::Characteristic(idx));
         if let Some(sym_link) = &chr.symbol_link {
             sym_map
                 .entry(sym_link.symbol_name.clone())
@@ -440,7 +436,7 @@ fn build_maps(module: &Module) -> (HashMap<String, ItemType>, HashMap<String, Ve
         }
     }
     for (idx, meas) in module.measurement.iter().enumerate() {
-        name_map.insert(meas.name.clone(), ItemType::Measurement(idx));
+        name_map.insert(meas.get_name().to_string(), ItemType::Measurement(idx));
         if let Some(sym_link) = &meas.symbol_link {
             sym_map
                 .entry(sym_link.symbol_name.clone())
@@ -449,7 +445,7 @@ fn build_maps(module: &Module) -> (HashMap<String, ItemType>, HashMap<String, Ve
         }
     }
     for (idx, inst) in module.instance.iter().enumerate() {
-        name_map.insert(inst.name.clone(), ItemType::Instance(idx));
+        name_map.insert(inst.get_name().to_string(), ItemType::Instance(idx));
         if let Some(sym_link) = &inst.symbol_link {
             sym_map
                 .entry(sym_link.symbol_name.clone())
@@ -458,7 +454,7 @@ fn build_maps(module: &Module) -> (HashMap<String, ItemType>, HashMap<String, Ve
         }
     }
     for blob in &module.blob {
-        name_map.insert(blob.name.clone(), ItemType::Blob);
+        name_map.insert(blob.get_name().to_string(), ItemType::Blob);
         if let Some(sym_link) = &blob.symbol_link {
             sym_map
                 .entry(sym_link.symbol_name.clone())
@@ -467,7 +463,7 @@ fn build_maps(module: &Module) -> (HashMap<String, ItemType>, HashMap<String, Ve
         }
     }
     for axis_pts in &module.axis_pts {
-        name_map.insert(axis_pts.name.clone(), ItemType::AxisPts);
+        name_map.insert(axis_pts.get_name().to_string(), ItemType::AxisPts);
         if let Some(sym_link) = &axis_pts.symbol_link {
             sym_map
                 .entry(sym_link.symbol_name.clone())
@@ -843,7 +839,7 @@ fn create_or_update_group(
     measurement_list: Vec<String>,
 ) {
     // try to find an existing group with the given name
-    let existing_group = module.group.iter_mut().find(|grp| grp.name == group_name);
+    let existing_group = module.group.get_mut(group_name);
 
     let group: &mut Group = if let Some(grp) = existing_group {
         grp
@@ -1023,15 +1019,13 @@ mod test {
         assert!(
             a2l.project.module[0]
                 .measurement
-                .iter()
-                .any(|m| m.name == "MEASUREMENT.Characteristic_Value")
+                .contains_key("MEASUREMENT.Characteristic_Value")
         );
         assert_eq!(a2l.project.module[0].characteristic.len(), 4);
         assert!(
             a2l.project.module[0]
                 .characteristic
-                .iter()
-                .any(|c| c.name == "CHARACTERISTIC.Measurement_Value")
+                .contains_key("CHARACTERISTIC.Measurement_Value")
         );
 
         // insert some more MEASUREMENTs and CHARACTERISTICs, with conflicting names
@@ -1142,14 +1136,12 @@ mod test {
         assert!(
             a2l.project.module[0]
                 .instance
-                .iter()
-                .any(|i| i.name == "Curve_InternalAxis")
+                .contains_key("Curve_InternalAxis")
         );
         assert!(
             a2l.project.module[0]
                 .instance
-                .iter()
-                .any(|i| i.name == "Map_InternalAxis")
+                .contains_key("Map_InternalAxis")
         );
         assert_eq!(a2l.project.module[0].typedef_structure.len(), 2);
     }
@@ -1213,14 +1205,12 @@ mod test {
         assert!(
             a2l.project.module[0]
                 .measurement
-                .iter()
-                .any(|m| m.name == "MEASUREMENT.Characteristic_Value")
+                .contains_key("MEASUREMENT.Characteristic_Value")
         );
         assert!(
             a2l.project.module[0]
                 .characteristic
-                .iter()
-                .any(|c| c.name == "CHARACTERISTIC.Measurement_Value")
+                .contains_key("CHARACTERISTIC.Measurement_Value")
         );
     }
 
@@ -1261,28 +1251,24 @@ mod test {
         assert!(
             a2l.project.module[0]
                 .instance
-                .iter()
-                .any(|i| i.name == "Curve_InternalAxis")
+                .contains_key("Curve_InternalAxis")
         );
         assert!(
             a2l.project.module[0]
                 .instance
-                .iter()
-                .any(|i| i.name == "Map_InternalAxis")
+                .contains_key("Map_InternalAxis")
         );
         assert!(
             a2l.project.module[0]
                 .instance
-                .iter()
-                .any(|t| t.name == "Measurement_Bitfield")
+                .contains_key("Measurement_Bitfield")
         );
         // In the C code of update_test.c, the type of Map_ExternalAxis is "struct UpdateTest_Map_ExternalAxis"
         // a corresponding TYPEDEF_STRUCTURE should be created
         assert!(
             a2l.project.module[0]
                 .typedef_structure
-                .iter()
-                .any(|t| t.name == "UpdateTest_Map_ExternalAxis")
+                .contains_key("UpdateTest_Map_ExternalAxis")
         );
 
         // try to insert Map_ExternalAxis again, and verify that no duplicate is created
