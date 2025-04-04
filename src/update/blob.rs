@@ -1,6 +1,6 @@
 use crate::debuginfo::DebugData;
 use crate::symbol::SymbolInfo;
-use a2lfile::{A2lObject, Blob, Module};
+use a2lfile::{A2lObject, A2lObjectName, Blob, ItemList, Module};
 use std::collections::HashSet;
 
 use super::ifdata_update::{update_ifdata_address, update_ifdata_type, zero_if_data};
@@ -15,7 +15,7 @@ pub(crate) fn update_all_module_blobs(
     info: &A2lUpdateInfo,
 ) -> Vec<UpdateResult> {
     let mut removed_items = HashSet::<String>::new();
-    let mut blob_list = Vec::new();
+    let mut blob_list = ItemList::new();
     let mut results = Vec::new();
 
     std::mem::swap(&mut data.module.blob, &mut blob_list);
@@ -27,7 +27,7 @@ pub(crate) fn update_all_module_blobs(
                 zero_if_data(&mut blob.if_data);
                 data.module.blob.push(blob);
             } else {
-                removed_items.insert(blob.name.clone());
+                removed_items.insert(blob.get_name().to_string());
             }
         } else {
             data.module.blob.push(blob);
@@ -42,7 +42,7 @@ pub(crate) fn update_all_module_blobs(
 // update a single BLOB object
 fn update_module_blob(blob: &mut Blob, info: &A2lUpdateInfo<'_>) -> UpdateResult {
     match get_symbol_info(
-        &blob.name,
+        blob.get_name(),
         &blob.symbol_link,
         &blob.if_data,
         info.debug_data,
@@ -64,7 +64,7 @@ fn update_module_blob(blob: &mut Blob, info: &A2lUpdateInfo<'_>) -> UpdateResult
                 if blob.size != sym_info.typeinfo.get_size() as u32 {
                     UpdateResult::InvalidDataType {
                         blocktype: "BLOB",
-                        name: blob.name.clone(),
+                        name: blob.get_name().to_string(),
                         line: blob.get_line(),
                     }
                 } else {
@@ -77,7 +77,7 @@ fn update_module_blob(blob: &mut Blob, info: &A2lUpdateInfo<'_>) -> UpdateResult
         }
         Err(errmsgs) => UpdateResult::SymbolNotFound {
             blocktype: "BLOB",
-            name: blob.name.clone(),
+            name: blob.get_name().to_string(),
             line: blob.get_line(),
             errors: errmsgs,
         },

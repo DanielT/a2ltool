@@ -3,7 +3,10 @@ use crate::datatype::get_a2l_datatype;
 use crate::debuginfo::DbgDataType;
 use crate::debuginfo::{DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
-use a2lfile::{A2lObject, AxisDescr, Characteristic, CharacteristicType, Module, RecordLayout};
+use a2lfile::{
+    A2lObject, A2lObjectName, AxisDescr, Characteristic, CharacteristicType, ItemList, Module,
+    RecordLayout,
+};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -22,7 +25,7 @@ pub(crate) fn update_all_module_characteristics(
 ) -> Vec<UpdateResult> {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
     let mut removed_items = HashSet::<String>::new();
-    let mut characteristic_list = Vec::new();
+    let mut characteristic_list = ItemList::new();
     // let mut characteristic_updated: u32 = 0;
     // let mut characteristic_not_updated: u32 = 0;
     let mut results = vec![];
@@ -32,7 +35,7 @@ pub(crate) fn update_all_module_characteristics(
         .module
         .axis_pts
         .iter()
-        .map(|item| (item.name.clone(), item.max_axis_points))
+        .map(|item| (item.get_name().to_string(), item.max_axis_points))
         .collect();
 
     std::mem::swap(&mut data.module.characteristic, &mut characteristic_list);
@@ -50,7 +53,7 @@ pub(crate) fn update_all_module_characteristics(
                 zero_if_data(&mut characteristic.if_data);
                 data.module.characteristic.push(characteristic);
             } else {
-                removed_items.insert(characteristic.name.clone());
+                removed_items.insert(characteristic.get_name().to_string());
             }
         } else {
             data.module.characteristic.push(characteristic);
@@ -76,7 +79,7 @@ fn update_module_characteristic<'dbg>(
     if characteristic.virtual_characteristic.is_none() {
         // only update the address if the CHARACTERISTIC is not a VIRTUAL_CHARACTERISTIC
         match get_symbol_info(
-            &characteristic.name,
+            characteristic.get_name(),
             &characteristic.symbol_link,
             &characteristic.if_data,
             info.debug_data,
@@ -107,14 +110,12 @@ fn update_module_characteristic<'dbg>(
                         enum_convlist,
                         axis_pts_dim,
                         info.version >= A2lVersion::V1_7_0,
-                        &info.compu_method_index,
                     );
                     UpdateResult::Updated
                 } else if info.strict_update {
                     // verify that the data type of the CHARACTERISTIC object is still correct
                     verify_characteristic_datatype(
                         data,
-                        info,
                         characteristic,
                         sym_info.typeinfo,
                         info.version >= A2lVersion::V1_7_0,
@@ -126,7 +127,7 @@ fn update_module_characteristic<'dbg>(
             }
             Err(errors) => UpdateResult::SymbolNotFound {
                 blocktype: "CHARACTERISTIC",
-                name: characteristic.name.clone(),
+                name: characteristic.get_name().to_string(),
                 line: characteristic.get_line(),
                 errors,
             },
@@ -166,16 +167,14 @@ fn update_characteristic_datatype<'enumlist, 'typeinfo: 'enumlist>(
     enum_convlist: &'enumlist mut HashMap<String, &'typeinfo TypeInfo>,
     axis_pts_dim: &HashMap<String, u16>,
     use_new_matrix_dim: bool,
-    compu_method_index: &HashMap<String, usize>,
 ) {
-    let member_id =
-        get_fnc_values_memberid(data.module, &data.reclayout_info, &characteristic.deposit);
+    let member_id = get_fnc_values_memberid(data.module, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
         if let DbgDataType::Enum { enumerators, .. } = &inner_typeinfo.datatype {
             let enum_name = inner_typeinfo
                 .name
                 .clone()
-                .unwrap_or_else(|| format!("{}_compu_method", characteristic.name));
+                .unwrap_or_else(|| format!("{}_compu_method", characteristic.get_name()));
             if characteristic.conversion == "NO_COMPU_METHOD" {
                 characteristic.conversion = enum_name;
             }
@@ -183,9 +182,7 @@ fn update_characteristic_datatype<'enumlist, 'typeinfo: 'enumlist>(
             enum_convlist.insert(characteristic.conversion.clone(), inner_typeinfo);
         }
 
-        let opt_compu_method = compu_method_index
-            .get(&characteristic.conversion)
-            .and_then(|idx| data.module.compu_method.get(*idx));
+        let opt_compu_method = data.module.compu_method.get(&characteristic.conversion);
         let (ll, ul) = adjust_limits(
             inner_typeinfo,
             characteristic.lower_limit,
@@ -233,8 +230,9 @@ fn update_characteristic_datatype<'enumlist, 'typeinfo: 'enumlist>(
         characteristic.matrix_dim = None;
     }
 
-    let record_layout = if let Some(idx) = data.reclayout_info.idxmap.get(&characteristic.deposit) {
-        Some(&data.module.record_layout[*idx])
+    let record_layout = if let Some(idx) = data.module.record_layout.index(&characteristic.deposit)
+    {
+        Some(&data.module.record_layout[idx])
     } else {
         None
     };
@@ -304,16 +302,14 @@ pub(crate) fn update_characteristic_axis(
     }
 }
 
-fn verify_characteristic_datatype<'dbg>(
+fn verify_characteristic_datatype(
     data: &mut A2lUpdater,
-    info: &A2lUpdateInfo<'dbg>,
     characteristic: &Characteristic,
-    typeinfo: &'dbg TypeInfo,
+    typeinfo: &TypeInfo,
     use_new_matrix_dim: bool,
 ) -> UpdateResult {
     let mut bad_characteristic = false;
-    let member_id =
-        get_fnc_values_memberid(data.module, &data.reclayout_info, &characteristic.deposit);
+    let member_id = get_fnc_values_memberid(data.module, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
         if let DbgDataType::Enum { .. } = &inner_typeinfo.datatype {
             if characteristic.conversion == "NO_COMPU_METHOD" {
@@ -321,10 +317,7 @@ fn verify_characteristic_datatype<'dbg>(
             }
         }
 
-        let opt_compu_method = info
-            .compu_method_index
-            .get(&characteristic.conversion)
-            .and_then(|idx| data.module.compu_method.get(*idx));
+        let opt_compu_method = data.module.compu_method.get(&characteristic.conversion);
         let (ll, ul) = adjust_limits(
             inner_typeinfo,
             characteristic.lower_limit,
@@ -377,10 +370,9 @@ fn verify_characteristic_datatype<'dbg>(
         // check if the data type of the deposit record is correct
         // to do this, we need to look up the record layout, and get its fnc_values
         if let Some(fnc_values) = data
-            .reclayout_info
-            .idxmap
+            .module
+            .record_layout
             .get(&characteristic.deposit)
-            .and_then(|rl_idx| data.module.record_layout.get(*rl_idx))
             .and_then(|rl| rl.fnc_values.as_ref())
         {
             let a2l_datatype = get_a2l_datatype(inner_typeinfo);
@@ -399,7 +391,7 @@ fn verify_characteristic_datatype<'dbg>(
     if bad_characteristic {
         UpdateResult::InvalidDataType {
             blocktype: "CHARACTERISTIC",
-            name: characteristic.name.clone(),
+            name: characteristic.get_name().to_string(),
             line: characteristic.get_line(),
         }
     } else {

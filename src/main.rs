@@ -1,6 +1,6 @@
 use clap::{Arg, ArgGroup, ArgMatches, Command, builder::ValueParser, parser::ValuesRef};
 
-use a2lfile::{A2lError, A2lFile, A2lObject};
+use a2lfile::{A2lError, A2lFile, A2lObject, itemlist};
 use debuginfo::DebugData;
 use std::{
     ffi::{OsStr, OsString},
@@ -151,8 +151,7 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
                 input_filename.to_string_lossy()
             )
         );
-        let mut log_msgs = Vec::<String>::new();
-        a2l_file.check(&mut log_msgs);
+        let log_msgs = a2l_file.check();
         if log_msgs.is_empty() {
             ext_println!(
                 verbose,
@@ -222,15 +221,13 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     // merge at the module level
     if let Some(merge_modules) = arg_matches.get_many::<OsString>("MERGEMODULE") {
         for merge_module_path in merge_modules {
-            let mut load_log_msgs = Vec::<A2lError>::new();
             let load_result = a2lfile::load(
                 merge_module_path,
                 Some(ifdata::A2MLVECTOR_TEXT.to_string()),
-                &mut load_log_msgs,
                 strict,
             );
 
-            if let Ok(mut merge_a2l) = load_result {
+            if let Ok((mut merge_a2l, load_log_msgs)) = load_result {
                 // display any log messages from the load
                 for msg in load_log_msgs {
                     cond_print!(verbose, now, msg.to_string());
@@ -245,7 +242,7 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
                         merge_module_path.to_string_lossy()
                     )
                 );
-            } else if let Ok(mut other_module) = a2lfile::load_fragment_file2(
+            } else if let Ok(mut other_module) = a2lfile::load_fragment_file(
                 merge_module_path,
                 Some(ifdata::A2MLVECTOR_TEXT.to_string()),
             ) {
@@ -272,9 +269,8 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     // merge at the project level
     if let Some(merge_projects) = arg_matches.get_many::<OsString>("MERGEPROJECT") {
         for mergeproject in merge_projects {
-            let mut merge_log_msgs = Vec::<A2lError>::new();
-            let merge_a2l = a2lfile::load(mergeproject, None, &mut merge_log_msgs, strict)
-                .map_err(|a2lerr| a2lerr.to_string())?;
+            let (merge_a2l, _) =
+                a2lfile::load(mergeproject, None, strict).map_err(|a2lerr| a2lerr.to_string())?;
 
             a2l_file.project.module.extend(merge_a2l.project.module);
             cond_print!(
@@ -535,15 +531,13 @@ fn load_or_create_a2l(
     now: Instant,
 ) -> Result<(&std::ffi::OsStr, a2lfile::A2lFile), String> {
     if let Some(input_filename) = arg_matches.get_one::<OsString>("INPUT") {
-        let mut log_msgs = Vec::<A2lError>::new();
         let a2lresult = a2lfile::load(
             input_filename,
             Some(ifdata::A2MLVECTOR_TEXT.to_string()),
-            &mut log_msgs,
             strict,
         );
         let a2l_file = match a2lresult {
-            Ok(a2l_file) => {
+            Ok((a2l_file, log_msgs)) => {
                 for msg in log_msgs {
                     cond_print!(verbose, now, msg.to_string());
                 }
@@ -556,7 +550,7 @@ fn load_or_create_a2l(
                 },
             ) if block == "A2L_FILE" => {
                 // parse error in the outermost block "A2L_FILE" could indicate that this is an a2l fragment containing only the content of a MODULE
-                if let Ok(module) = a2lfile::load_fragment_file2(
+                if let Ok(module) = a2lfile::load_fragment_file(
                     input_filename,
                     Some(ifdata::A2MLVECTOR_TEXT.to_string()),
                 ) {
@@ -588,7 +582,7 @@ fn load_or_create_a2l(
             "new_project".to_string(),
             "description of project".to_string(),
         );
-        project.module = vec![a2lfile::Module::new(
+        project.module = itemlist![a2lfile::Module::new(
             "new_module".to_string(),
             String::new(),
         )];
@@ -1111,6 +1105,8 @@ impl clap::builder::TypedValueParser for UpdateTypeParser {
 
 #[cfg(test)]
 mod test {
+    use a2lfile::A2lObjectName;
+
     use super::*;
 
     #[test]
@@ -1196,14 +1192,8 @@ mod test {
         // cleanup_test.a2l has unused items, but --cleanup should remove them
         core(args.into_iter()).unwrap();
 
-        let a2l_input = a2lfile::load(
-            "fixtures/a2l/cleanup_test.a2l",
-            None,
-            &mut Vec::new(),
-            false,
-        )
-        .unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_input, _) = a2lfile::load("fixtures/a2l/cleanup_test.a2l", None, false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         assert_ne!(a2l_input, a2l_output);
         // all items in cleanup_test.a2l are used
         assert!(a2l_output.project.module[0].record_layout.is_empty());
@@ -1233,7 +1223,7 @@ mod test {
         // update_test.elf has symbols that can be updated in the a2l file
         core(args.into_iter()).unwrap();
 
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         // the output file should have updated addresses
         let module = &a2l_output.project.module[0];
         assert_ne!(module.characteristic[0].address, 0);
@@ -1259,7 +1249,7 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         assert!(a2l_output.project.module[0].characteristic[0].address != 0);
 
         // 3. address update only in strict mode on invalid input
@@ -1311,11 +1301,14 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         assert_eq!(a2l_output.project.module[0].measurement.len(), 1);
         assert_eq!(a2l_output.project.module[0].characteristic.len(), 1);
         assert_eq!(a2l_output.project.module[0].group.len(), 1);
-        assert_eq!(a2l_output.project.module[0].group[0].name, "TestGroup");
+        assert_eq!(
+            a2l_output.project.module[0].group[0].get_name(),
+            "TestGroup"
+        );
         // get the addresses of the inserted items for the second test
         let measurement_addr = a2l_output.project.module[0].measurement[0]
             .ecu_address
@@ -1342,7 +1335,7 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         assert_eq!(a2l_output.project.module[0].measurement.len(), 1);
         assert_eq!(a2l_output.project.module[0].characteristic.len(), 1);
         assert_eq!(a2l_output.project.module[0].group.len(), 0); // no --target-group used this time
@@ -1363,7 +1356,7 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         assert_eq!(a2l_output.project.module[0].measurement.len(), 1);
         assert_eq!(a2l_output.project.module[0].characteristic.len(), 1);
 
@@ -1384,7 +1377,7 @@ mod test {
         ];
         let result = core(args.into_iter());
         assert!(result.is_ok());
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         assert!(!a2l_output.project.module[0].measurement.is_empty());
         assert!(!a2l_output.project.module[0].characteristic.is_empty());
     }
@@ -1406,14 +1399,8 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_input = a2lfile::load(
-            "fixtures/a2l/update_test1.a2l",
-            None,
-            &mut Vec::new(),
-            false,
-        )
-        .unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_input, _) = a2lfile::load("fixtures/a2l/update_test1.a2l", None, false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         // there should be only one MODULE in the output
         assert_eq!(a2l_output.project.module.len(), 1);
         // the input file was merged with an empty file, so the output should be the same as the input
@@ -1450,42 +1437,30 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_input = a2lfile::load(
-            "fixtures/a2l/update_test1.a2l",
-            None,
-            &mut Vec::new(),
-            false,
-        )
-        .unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_input, _) = a2lfile::load("fixtures/a2l/update_test1.a2l", None, false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         // there should be two MODULEs in the output
         assert_eq!(a2l_output.project.module.len(), 2);
         // one of the two MODULEs in the output should be the same as the input file
-        let output_idx = a2l_output
+        let output_module = a2l_output
             .project
             .module
-            .iter()
-            .position(|m| m.name == a2l_input.project.module[0].name)
+            .get(a2l_input.project.module[0].get_name())
             .unwrap();
-        assert_eq!(
-            a2l_output.project.module[output_idx],
-            a2l_input.project.module[0]
-        );
+        assert_eq!(output_module, &a2l_input.project.module[0]);
     }
 
     #[test]
     fn test_option_remove() {
         // items can be removed by name with --remove
-        let a2l_input = a2lfile::load(
-            "fixtures/a2l/update_test1.a2l",
-            None,
-            &mut Vec::new(),
-            false,
-        )
-        .unwrap();
+        let (a2l_input, _) = a2lfile::load("fixtures/a2l/update_test1.a2l", None, false).unwrap();
         // get the names of the first characteristic and measurement, so they can be removed
-        let characteristic_name = a2l_input.project.module[0].characteristic[0].name.clone();
-        let measurement_name = a2l_input.project.module[0].measurement[0].name.clone();
+        let characteristic_name = a2l_input.project.module[0].characteristic[0]
+            .get_name()
+            .to_string();
+        let measurement_name = a2l_input.project.module[0].measurement[0]
+            .get_name()
+            .to_string();
 
         let tempdir = tempfile::tempdir().unwrap().into_path();
         let outfile = tempdir.join("output.a2l");
@@ -1501,7 +1476,7 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         // the output should have one less characteristic and one less measurement than the input
         assert_eq!(
             a2l_input.project.module[0].characteristic.len(),
@@ -1528,7 +1503,7 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
         assert_eq!(a2l_output.asap2_version.as_ref().unwrap().version_no, 1);
         assert_eq!(a2l_output.asap2_version.as_ref().unwrap().upgrade_no, 60);
 
@@ -1543,7 +1518,7 @@ mod test {
             OsString::from(outfile2.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_output = a2lfile::load(outfile2, None, &mut Vec::new(), false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile2, None, false).unwrap();
         assert_eq!(a2l_output.asap2_version.as_ref().unwrap().version_no, 1);
         assert_eq!(a2l_output.asap2_version.as_ref().unwrap().upgrade_no, 50);
     }
@@ -1581,14 +1556,8 @@ mod test {
             OsString::from(outfile.clone()),
         ];
         core(args.into_iter()).unwrap();
-        let a2l_input = a2lfile::load(
-            "fixtures/a2l/update_test1.a2l",
-            None,
-            &mut Vec::new(),
-            false,
-        )
-        .unwrap();
-        let a2l_output = a2lfile::load(outfile, None, &mut Vec::new(), false).unwrap();
+        let (a2l_input, _) = a2lfile::load("fixtures/a2l/update_test1.a2l", None, false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
 
         // Though sorting does not change the meaning of the file, the order of the items in the output is different.
         // That means the files are not directly equal.

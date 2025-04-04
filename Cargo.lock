@@ -4,11 +4,10 @@ version = 4
 
 [[package]]
 name = "a2lfile"
-version = "2.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45fb357f33dc6476d6f7bccd66c58615a75c960ef65d0184546431fe2ec52fc9"
+version = "2.4.0"
 dependencies = [
  "a2lmacros",
+ "fnv",
  "num-traits",
  "thiserror",
 ]
@@ -205,6 +204,12 @@ name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+
+[[package]]
+name = "fnv"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "fs-err"

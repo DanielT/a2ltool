@@ -3,7 +3,7 @@ use crate::datatype::get_a2l_datatype;
 use crate::debuginfo::DbgDataType;
 use crate::debuginfo::{DebugData, TypeInfo};
 use crate::symbol::SymbolInfo;
-use a2lfile::{A2lObject, AxisPts, Module};
+use a2lfile::{A2lObject, A2lObjectName, AxisPts, ItemList, Module};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::vec;
@@ -24,7 +24,7 @@ pub(crate) fn update_all_module_axis_pts(
 ) -> Vec<UpdateResult> {
     let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
     let mut removed_items = HashSet::<String>::new();
-    let mut axis_pts_list = Vec::new();
+    let mut axis_pts_list = ItemList::new();
     let mut results = vec![];
 
     std::mem::swap(&mut data.module.axis_pts, &mut axis_pts_list);
@@ -36,7 +36,7 @@ pub(crate) fn update_all_module_axis_pts(
                 zero_if_data(&mut axis_pts.if_data);
                 data.module.axis_pts.push(axis_pts);
             } else {
-                removed_items.insert(axis_pts.name.clone());
+                removed_items.insert(axis_pts.get_name().to_string());
             }
         } else {
             data.module.axis_pts.push(axis_pts);
@@ -58,7 +58,7 @@ fn update_module_axis_pts<'dbg>(
     enum_convlist: &mut HashMap<String, &'dbg TypeInfo>,
 ) -> UpdateResult {
     match get_symbol_info(
-        &axis_pts.name,
+        axis_pts.get_name(),
         &axis_pts.symbol_link,
         &axis_pts.if_data,
         info.debug_data,
@@ -71,12 +71,12 @@ fn update_module_axis_pts<'dbg>(
             if info.full_update {
                 // update the data type of the AXIS_PTS object
                 update_ifdata_type(&mut axis_pts.if_data, sym_info.typeinfo);
-                update_axis_pts_datatype(data, axis_pts, info, &sym_info, enum_convlist);
+                update_axis_pts_datatype(data, axis_pts, &sym_info, enum_convlist);
 
                 UpdateResult::Updated
             } else if info.strict_update {
                 // verify that the data type of the AXIS_PTS object is still correct
-                verify_axis_pts_datatype(data, info, axis_pts, sym_info)
+                verify_axis_pts_datatype(data, axis_pts, sym_info)
             } else {
                 // The address of the AXIS_PTS object has been updated, and no update of the data type was requested
                 UpdateResult::Updated
@@ -84,7 +84,7 @@ fn update_module_axis_pts<'dbg>(
         }
         Err(errmsgs) => UpdateResult::SymbolNotFound {
             blocktype: "AXIS_PTS",
-            name: axis_pts.name.clone(),
+            name: axis_pts.get_name().to_string(),
             line: axis_pts.get_line(),
             errors: errmsgs,
         },
@@ -117,14 +117,12 @@ pub(crate) fn update_axis_pts_address(
 fn update_axis_pts_datatype<'dbg>(
     data: &mut A2lUpdater,
     axis_pts: &mut AxisPts,
-    info: &A2lUpdateInfo<'dbg>,
     sym_info: &SymbolInfo<'dbg>,
     enum_convlist: &mut HashMap<String, &'dbg TypeInfo>,
 ) {
     // the variable used for the axis should be a 1-dimensional array, or a struct containing a 1-dimensional array
     // if the type is a struct, then the AXIS_PTS_X inside the referenced RECORD_LAYOUT tells us which member of the struct to use.
-    let member_id =
-        get_axis_pts_x_memberid(data.module, &data.reclayout_info, &axis_pts.deposit_record);
+    let member_id = get_axis_pts_x_memberid(data.module, &axis_pts.deposit_record);
     if let Some(inner_typeinfo) = get_inner_type(sym_info.typeinfo, member_id) {
         match &inner_typeinfo.datatype {
             DbgDataType::Array { dim, arraytype, .. } => {
@@ -147,10 +145,7 @@ fn update_axis_pts_datatype<'dbg>(
             }
         }
 
-        let opt_compu_method = info
-            .compu_method_index
-            .get(&axis_pts.conversion)
-            .and_then(|idx| data.module.compu_method.get(*idx));
+        let opt_compu_method = data.module.compu_method.get(&axis_pts.conversion);
         let (ll, ul) = adjust_limits(
             inner_typeinfo,
             axis_pts.lower_limit,
@@ -181,7 +176,7 @@ fn update_axis_pts_conversion<'dbg>(
             axis_pts.conversion = typeinfo
                 .name
                 .clone()
-                .unwrap_or_else(|| format!("{}_compu_method", axis_pts.name))
+                .unwrap_or_else(|| format!("{}_compu_method", axis_pts.get_name()))
                 .clone();
         }
         cond_create_enum_conversion(module, &axis_pts.conversion, enumerators);
@@ -192,22 +187,17 @@ fn update_axis_pts_conversion<'dbg>(
 
 fn verify_axis_pts_datatype(
     data: &mut A2lUpdater,
-    info: &A2lUpdateInfo<'_>,
     axis_pts: &AxisPts,
     sym_info: SymbolInfo<'_>,
 ) -> UpdateResult {
-    let member_id =
-        get_axis_pts_x_memberid(data.module, &data.reclayout_info, &axis_pts.deposit_record);
+    let member_id = get_axis_pts_x_memberid(data.module, &axis_pts.deposit_record);
     if let Some(inner_typeinfo) = get_inner_type(sym_info.typeinfo, member_id) {
         let max_axis_pts = if let DbgDataType::Array { dim, .. } = &inner_typeinfo.datatype {
             *dim.first().unwrap_or(&1) as u16
         } else {
             1
         };
-        let opt_compu_method = info
-            .compu_method_index
-            .get(&axis_pts.conversion)
-            .and_then(|idx| data.module.compu_method.get(*idx));
+        let opt_compu_method = data.module.compu_method.get(&axis_pts.conversion);
         let (ll, ul) = adjust_limits(
             inner_typeinfo,
             axis_pts.lower_limit,
@@ -217,10 +207,9 @@ fn verify_axis_pts_datatype(
 
         let mut bad_datatype = false;
         if let Some(axis_pts_x) = data
-            .reclayout_info
-            .idxmap
+            .module
+            .record_layout
             .get(&axis_pts.deposit_record)
-            .and_then(|rl_idx| data.module.record_layout.get(*rl_idx))
             .and_then(|rl| rl.axis_pts_x.as_ref())
         {
             let calc_datatype = get_a2l_datatype(inner_typeinfo);
@@ -236,7 +225,7 @@ fn verify_axis_pts_datatype(
         {
             UpdateResult::InvalidDataType {
                 blocktype: "AXIS_PTS",
-                name: axis_pts.name.clone(),
+                name: axis_pts.get_name().to_string(),
                 line: axis_pts.get_line(),
             }
         } else {
