@@ -10,13 +10,13 @@ use a2lfile::{
     IndexMode, ItemList, Module, Number, RecordLayout, StructureComponent, SymbolTypeLink,
     TypedefBlob, TypedefCharacteristic, TypedefMeasurement, TypedefStructure, itemlist,
 };
-use fxhash::FxBuildHasher;
+use fnv::FnvBuildHasher;
 use indexmap::{IndexMap, IndexSet};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 
-type FxIndexMap<K, V> = IndexMap<K, V, FxBuildHasher>;
+type FnvIndexMap<K, V> = IndexMap<K, V, FnvBuildHasher>;
 
 /// `TypeQuality` is used to identify how precise the information in `typedef_map` is.
 ///
@@ -47,18 +47,18 @@ struct TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
 
     // --- computed data ---
     /// all TYPEDEF_STRUCTURES, extracted from the module during the update for access by name
-    typedef_structs: FxIndexMap<String, TypedefStructure>,
+    typedef_structs: FnvIndexMap<String, TypedefStructure>,
     /// is_calib_struct indicates for each TYPEDEF_STRUCTURE whether it contains calibration or measurement items
     is_calib_struct: HashMap<String, bool>,
     /// mapping: debug typeinfo -> Set of TYPEDEFs using that typeinfo
     /// multiple TYPEDEFs might use the same type - e.g. the type "float32" might be used by a
     /// TYPEDEF_MEASUREMENT and a TYPEDEF_CHARACTERISTIC
-    type_map: FxIndexMap<usize, IndexSet<String>>,
+    type_map: FnvIndexMap<usize, IndexSet<String>>,
     /// mapping: TYPEDEF name to (data type, type quality)
     /// during the start of the update, some type information might be present but imprecise
-    typedef_map: FxIndexMap<String, (&'dbg TypeInfo, TypeQuality)>,
+    typedef_map: FnvIndexMap<String, (&'dbg TypeInfo, TypeQuality)>,
     /// TYPEDEF_STRUCTURES that aren't referenced, have bad type information and can't be updated
-    preserved_structs: FxIndexMap<String, TypedefStructure>,
+    preserved_structs: FnvIndexMap<String, TypedefStructure>,
     /// AXIS_PTS information. It is derived from the module and used while creating or
     /// updating TYPEDEF_CHARACTERISTICs
     axis_pts_dim: HashMap<String, u16>,
@@ -135,16 +135,16 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
 
         Self {
             is_calib_struct: HashMap::with_capacity(module.typedef_structure.len()),
-            type_map: FxIndexMap::default(),
-            typedef_map: FxIndexMap::default(),
-            typedef_structs: FxIndexMap::<String, TypedefStructure>::default(),
+            type_map: FnvIndexMap::default(),
+            typedef_map: FnvIndexMap::default(),
+            typedef_structs: FnvIndexMap::<String, TypedefStructure>::default(),
             module,
             debug_data,
             log_msgs,
             typedef_names,
             recordlayout_info,
             typedef_ref_info,
-            preserved_structs: FxIndexMap::default(),
+            preserved_structs: FnvIndexMap::default(),
             axis_pts_dim,
         }
     }
@@ -1186,7 +1186,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
     /// update all `TYPEDEF_STRUCTUREs`
     fn update_all_typedef_structure(&mut self) {
         let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
-        let mut typedef_structs = FxIndexMap::default();
+        let mut typedef_structs = FnvIndexMap::default();
         std::mem::swap(&mut typedef_structs, &mut self.typedef_structs);
 
         for (_, td_struct) in &mut typedef_structs {
@@ -1208,7 +1208,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
         // updating the structs may have caused new structs to be created.
         // These will have been added to the empty self.typedef_structs
         // Build a new IndexMap of old + new
-        let mut typedef_structs2 = FxIndexMap::default();
+        let mut typedef_structs2 = FnvIndexMap::default();
         std::mem::swap(&mut typedef_structs2, &mut self.typedef_structs);
         typedef_structs.extend(typedef_structs2);
         self.typedef_structs = typedef_structs;
