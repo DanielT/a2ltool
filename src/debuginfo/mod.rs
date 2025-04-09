@@ -111,29 +111,6 @@ pub(crate) fn make_simple_unit_name(debug_data: &DebugData, unit_idx: usize) -> 
     Some(file_name.replace('.', "_"))
 }
 
-// pub(crate) fn demangle_cpp_varnames(input: &[&String]) -> HashMap<String, String> {
-//     let mut demangled_symbols = HashMap::<String, String>::new();
-//     let demangle_opts = cpp_demangle::DemangleOptions::new()
-//         .no_params()
-//         .no_return_type();
-//     for varname in input {
-//         // some really simple strings can be processed by the demangler, e.g "c" -> "const", which is wrong here.
-//         // by only processing symbols that start with _Z (variables in classes/namespaces) this problem is avoided
-//         if varname.starts_with("_Z") {
-//             if let Ok(sym) = cpp_demangle::Symbol::new(*varname) {
-//                 // exclude useless demangled names like "typeinfo for std::type_info" or "{vtable(std::type_info)}"
-//                 if let Ok(demangled) = sym.demangle(&demangle_opts) {
-//                     if !demangled.contains(' ') && !demangled.starts_with("{vtable") {
-//                         demangled_symbols.insert(demangled, (*varname).clone());
-//                     }
-//                 }
-//             }
-//         }
-//     }
-
-//     demangled_symbols
-// }
-
 impl TypeInfo {
     const MAX_RECURSION_DEPTH: usize = 5;
 
