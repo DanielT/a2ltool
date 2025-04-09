@@ -428,13 +428,23 @@ pub(crate) fn set_bitmask(opt_bitmask: &mut Option<BitMask>, typeinfo: &TypeInfo
         ..
     } = &typeinfo.datatype
     {
-        // make sure we don't panic for bit_size >= 64
-        let mask: u64 = if *bit_size >= 64 {
-            // this is a bitfield with more than 64 bits, so we need to use the full 64 bits
-            u64::MAX
+        // make sure we don't panic for bit_size >= 64, etc
+        let mask = if *bit_offset >= 64 {
+            // all bits got "shifted out", so the resulting mask is 0
+            0
         } else {
-            ((1 << bit_size) - 1) << bit_offset
+            // to avoid overflow while shifiting, the mask size is limited to (64 - bit_offset)
+            let effective_mask_size = (*bit_size).min(64 - *bit_offset);
+
+            let unshifted_mask = if effective_mask_size == 64 {
+                // this is a bitfield with more than 64 bits, so we need to use the full 64 bits
+                u64::MAX
+            } else {
+                (1 << effective_mask_size) - 1
+            };
+            unshifted_mask << bit_offset
         };
+
         if let Some(bit_mask) = opt_bitmask {
             bit_mask.mask = mask;
         } else {
@@ -1167,5 +1177,58 @@ mod test {
         let symbol_link_elem = a2lfile::SymbolLink::new("Blob_1".to_string(), -1);
         let sym_info_result = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data);
         assert!(sym_info_result.is_err());
+    }
+
+    fn make_bitfield_type(offset: u16, mask: u16) -> TypeInfo {
+        TypeInfo {
+            name: None,
+            unit_idx: 0,
+            datatype: DbgDataType::Bitfield {
+                basetype: Box::new(TypeInfo {
+                    name: None,
+                    unit_idx: 0,
+                    datatype: DbgDataType::Uint64,
+                    dbginfo_offset: 0,
+                }),
+                bit_offset: offset,
+                bit_size: mask,
+            },
+            dbginfo_offset: 0,
+        }
+    }
+
+    #[test]
+    fn test_bitmask() {
+        // offset too big - all bits are shifted out, so the mask is 0
+        let typeinfo = make_bitfield_type(64, 1);
+        let mut opt_bm = Some(BitMask::new(0));
+        set_bitmask(&mut opt_bm, &typeinfo);
+        assert_eq!(opt_bm.unwrap().mask, 0);
+
+        // mask too big, it is clipped to 64 bits
+        let typeinfo = make_bitfield_type(0, 65);
+        let mut opt_bm = Some(BitMask::new(0));
+        set_bitmask(&mut opt_bm, &typeinfo);
+        assert_eq!(opt_bm.unwrap().mask, u64::MAX);
+
+        // offset + mask too big - some upper bits are lost
+        let typeinfo = make_bitfield_type(33, 33);
+        let mut opt_bm = Some(BitMask::new(0));
+        set_bitmask(&mut opt_bm, &typeinfo);
+        assert_eq!(
+            opt_bm.unwrap().mask,
+            0b1111_1111_1111_1111_1111_1111_1111_1110_0000_0000_0000_0000_0000_0000_0000_0000
+        );
+
+        // normal values, should succeed without errors or clipping
+        let typeinfo = make_bitfield_type(2, 2);
+        let mut opt_bm = Some(BitMask::new(0));
+        set_bitmask(&mut opt_bm, &typeinfo);
+        assert_eq!(opt_bm.unwrap().mask, 0b1100);
+
+        let typeinfo = make_bitfield_type(5, 3);
+        let mut opt_bm = Some(BitMask::new(0));
+        set_bitmask(&mut opt_bm, &typeinfo);
+        assert_eq!(opt_bm.unwrap().mask, 0b11100000);
     }
 }
