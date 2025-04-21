@@ -140,7 +140,9 @@ impl DebugDataReader<'_> {
                 let (datatype, name) = get_base_type(entry, &self.units[current_unit].0);
                 (datatype, Some(name))
             }
-            gimli::constants::DW_TAG_pointer_type => {
+            gimli::constants::DW_TAG_pointer_type
+            | gimli::constants::DW_TAG_reference_type
+            | gimli::constants::DW_TAG_rvalue_reference_type => {
                 let (unit, _) = &self.units[current_unit];
                 if let Ok((new_cur_unit, ptype_offset)) =
                     get_type_attribute(entry, &self.units, current_unit)
