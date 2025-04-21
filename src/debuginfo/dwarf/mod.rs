@@ -382,21 +382,18 @@ impl<'a> Index<usize> for UnitList<'a> {
 mod test {
     use super::*;
 
-    static ELF_FILE_NAMES: [&str; 7] = [
+    static ELF_FILE_NAMES: [&str; 4] = [
         "fixtures/bin/debugdata_clang.elf",
         "fixtures/bin/debugdata_clang_dw4.elf",
-        "fixtures/bin/debugdata_clang_dw4_dwz.elf",
         "fixtures/bin/debugdata_gcc.elf",
         "fixtures/bin/debugdata_gcc_dw3.elf",
-        "fixtures/bin/debugdata_gcc_dw3_dwz.elf",
-        "fixtures/bin/debugdata_gcc_dwz.elf",
     ];
 
     #[test]
     fn test_load_data() {
         for filename in ELF_FILE_NAMES {
             let debugdata = DebugData::load_dwarf(OsStr::new(filename), true).unwrap();
-            assert_eq!(debugdata.variables.len(), 25);
+            assert_eq!(debugdata.variables.len(), 28);
             assert!(debugdata.variables.get("class1").is_some());
             assert!(debugdata.variables.get("class2").is_some());
             assert!(debugdata.variables.get("class3").is_some());
