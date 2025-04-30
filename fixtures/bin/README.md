@@ -63,3 +63,11 @@ update_test.exe
 ## update_typedef_test
 
 This is used for the test cases that are specific to the code creating and updating TYPEDEF_STRUCTUREs and INSTANCEs
+
+## software_a.elf and software_b.elf
+
+These are obfuscated embedded applications.
+All code and data sections have been removed from each of these files, so they are no longer executable.
+They only contain debug section, in which all strings have been randomized.
+
+These files are used by the release pipeline to perform a PGO build.
