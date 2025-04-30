@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 2.7.0
+
+- support C++ references in the DWARF debug data reader
+- update to a2lfile 3.0.0
+  - Comments are now preserved in some cases. Specifically, any comment that occurs in a position where a block is permitted
+    can be can be represented in the data, and is written to the output file. Sorting a2l files erases comments.
+  - The values of BIT_MASK and error mask are u64 instead of u32, and parsing no longer fails for values that don't fit in u32.
+  - Allow multiple CALIBRATION_HANDLEs inside of CALIBRATION_METHOD (by Rainer Zaiser)
+
 ## Version 2.6.0
 
 - handle offset values other than zero in SYMBOL_LINK
@@ -9,7 +18,7 @@
     - TYPEDEF_CHARACTERISTIC may reference a MEASUREMENT, but this reference was not updated during merges
     - USER_RIGHTS can no longer get duplicate user entries as a result of the merge
     - all items are merged in the order in which they appear in the merge file. Previously they were merged in reverse order
-  - During checking, accept referneces from an AXIS_PRS_REF or CURVE_AXIS_REF of a TYPEDEF_CHARACTERISTIC
+  - During checking, accept references from an AXIS_PRS_REF or CURVE_AXIS_REF of a TYPEDEF_CHARACTERISTIC
     to a structure component of the containing structure using the notation THIS.component_name.
 
 ## Version 2.5.0
