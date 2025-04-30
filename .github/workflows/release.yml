@@ -25,7 +25,13 @@ jobs:
       ZIP_NAME: a2ltool-${{ matrix.os }}-${{ github.ref_name }}.zip
           
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+
+      - name: Set up Git LFS
+        run: git lfs install --system --skip-repo
+
+      - name: Checkout LFS objects
+        run: git lfs pull
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -33,15 +39,54 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
+          components: llvm-tools-preview
           target: ${{ matrix.target }}
-  
+
       - name: Cache Rust artifacts
         # cache all dependencies to speed up the workflow
         uses: Swatinem/rust-cache@v2
 
-      - name: Build
+      - name: Install cargo-pgo
+        run: cargo install cargo-pgo
+
+      - name: Build instrumented binary
         run: |
-          cargo build --release --target ${{ matrix.target }}
+          cargo pgo build -- --target ${{ matrix.target }}
+
+      - name: debug-ls-linux
+        # On linux, list the content of target to make sure cargo pgo is build for the correct target triple
+        if: matrix.os == 'linux'
+        run: |
+          cd target
+          ls
+
+      - name: gather PGO profiles
+        run: |
+          target/${{ matrix.target }}/release/${{ matrix.binary }} fixtures/a2l/software_a.a2l --elffile fixtures/bin/software_a.elf --update FULL --sort --cleanup --merge-includes --ifdata-cleanup --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --a2lversion 1.7.1 --elffile fixtures/bin/software_a.elf --measurement-regex ".*" --update FULL --sort --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --a2lversion 1.7.1 --elffile fixtures/bin/software_a.elf --enable-structures --measurement-regex ".*" --update FULL --sort --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --a2lversion 1.7.1 --elffile fixtures/bin/software_a.elf --characteristic-regex ".*" --update FULL --sort --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --a2lversion 1.7.1 --elffile fixtures/bin/software_a.elf --enable-structures --characteristic-regex ".*" --update FULL --sort --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} fixtures/out.a2l
+
+          target/${{ matrix.target }}/release/${{ matrix.binary }} fixtures/a2l/software_b.a2l --elffile fixtures/bin/software_b.elf --update FULL --sort --cleanup --merge-includes --ifdata-cleanup --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --a2lversion 1.7.1 --elffile fixtures/bin/software_b.elf --measurement-regex ".*" --update FULL --sort --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --a2lversion 1.7.1 --elffile fixtures/bin/software_b.elf --enable-structures --measurement-regex ".*" --update FULL --sort --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --a2lversion 1.7.1 --elffile fixtures/bin/software_b.elf --characteristic-regex ".*" --update FULL --sort --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --a2lversion 1.7.1 --elffile fixtures/bin/software_b.elf --enable-structures --characteristic-regex ".*" --update FULL --sort --output fixtures/out.a2l
+          target/${{ matrix.target }}/release/${{ matrix.binary }} fixtures/out.a2l
+
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --elffile fixtures/bin/debugdata_clang.elf --measurement-regex staticvar.* --characteristic-regex structvar.*
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --elffile fixtures/bin/debugdata_gcc.elf --measurement-regex staticvar.* --characteristic-regex structvar.*
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --elffile fixtures/bin/debugdata_gcc.exe --measurement-regex staticvar.* --characteristic-regex structvar.*
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --pdbfile fixtures/bin/debugdata_cl.pdb --measurement-regex staticvar.* --characteristic-regex structvar.*
+          target/${{ matrix.target }}/release/${{ matrix.binary }} --create --pdbfile fixtures/bin/debugdata_clang.pdb --measurement-regex staticvar.* --characteristic-regex structvar.*
+
+      - name: Build optimized binary
+        run: |
+          cargo pgo optimize build -- --target ${{ matrix.target }}
 
       - name: zip-linux
         # On linux we use the zip command to create the archive
@@ -51,7 +96,7 @@ jobs:
           zip ${{ env.ZIP_NAME }} ${{ matrix.binary }}
   
       - name: zip-windows
-        # windows doesn't have the zip copmmand so we use the compress-archive powershell command
+        # windows doesn't have the zip command so we use the compress-archive powershell command
         if: matrix.os == 'windows'
         run: |
           cd target/${{ matrix.target }}/release/

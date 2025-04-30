@@ -15,8 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+
+    - name: Set up Git LFS
+      run: git lfs install --system --skip-repo
+
+    - name: Checkout LFS objects
+      run: git lfs pull
+
     - name: Build
       run: cargo build --release
+
     - name: Run tests
       env:
         RUST_BACKTRACE: 1
