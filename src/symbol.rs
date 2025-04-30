@@ -316,10 +316,7 @@ fn get_index(idxstr: &str) -> Option<usize> {
         || (idxstr.starts_with('[') && idxstr.ends_with(']'))
     {
         let idxstrlen = idxstr.len();
-        match idxstr[1..(idxstrlen - 1)].parse() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        idxstr[1..(idxstrlen - 1)].parse().ok()
     } else {
         None
     }

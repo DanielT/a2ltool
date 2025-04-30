@@ -293,13 +293,7 @@ pub(crate) fn get_specification_attribute<'data, 'abbrev, 'unit>(
 ) -> Option<DebuggingInformationEntry<'abbrev, 'unit, EndianSlice<'data, RunTimeEndian>, usize>> {
     let specification_attr = get_attr_value(entry, gimli::constants::DW_AT_specification)?;
     match specification_attr {
-        gimli::AttributeValue::UnitRef(unitoffset) => {
-            if let Ok(specification_entry) = unit.entry(abbrev, unitoffset) {
-                Some(specification_entry)
-            } else {
-                None
-            }
-        }
+        gimli::AttributeValue::UnitRef(unitoffset) => unit.entry(abbrev, unitoffset).ok(),
         gimli::AttributeValue::DebugInfoRef(_) => {
             // presumably, a debugger could also generate a DebugInfo ref instead on a UnitRef
             // parsing this would take info that we don't have here, e.g. the unit headers and abbreviations of all units
@@ -317,13 +311,7 @@ pub(crate) fn get_abstract_origin_attribute<'data, 'abbrev, 'unit>(
 ) -> Option<DebuggingInformationEntry<'abbrev, 'unit, EndianSlice<'data, RunTimeEndian>, usize>> {
     let origin_attr = get_attr_value(entry, gimli::constants::DW_AT_abstract_origin)?;
     match origin_attr {
-        gimli::AttributeValue::UnitRef(unitoffset) => {
-            if let Ok(origin_entry) = unit.entry(abbrev, unitoffset) {
-                Some(origin_entry)
-            } else {
-                None
-            }
-        }
+        gimli::AttributeValue::UnitRef(unitoffset) => unit.entry(abbrev, unitoffset).ok(),
         _ => None,
     }
 }
