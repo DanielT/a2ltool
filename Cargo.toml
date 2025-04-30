@@ -8,8 +8,7 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# a2lfile = "2.5.0"
-a2lfile = {path="../a2lfile/a2lfile"}
+a2lfile = "3.0.0"
 object = { version = "0.36", default-features = false, features = ["read"] }
 gimli = { version = "0.31", default-features = false, features = ["read"] }
 memmap2 = "0.9"

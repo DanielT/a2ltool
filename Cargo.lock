@@ -4,7 +4,9 @@ version = 4
 
 [[package]]
 name = "a2lfile"
-version = "2.4.0"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "805ad163682db9dd77cdf2d84a5f600d427d9cabe229a42f87f47777c7a78fdb"
 dependencies = [
  "a2lmacros",
  "fnv",
@@ -14,9 +16,9 @@ dependencies = [
 
 [[package]]
 name = "a2lmacros"
-version = "2.3.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e03aa1093bc8f41dbb95f13d6011d388bdb33fef86c4ed3fc92b5a67e8c7930"
+checksum = "3a9f83440ed63ac7c39e04f39d904a8c70d7ec180ddd294c5a40748d2c4819f0"
 dependencies = [
  "proc-macro2",
  "quote",
