@@ -137,8 +137,7 @@ pub(crate) fn read_all_types(
                 Ok(_) => {}
                 Err(err) => {
                     println!(
-                        "for variable {varname}: Error reading type 0x{:X}: {:?}",
-                        type_index, err
+                        "for variable {varname}: Error reading type 0x{type_index:X}: {err:?}"
                     );
                 }
             }

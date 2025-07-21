@@ -28,6 +28,8 @@ pub(crate) fn find_symbol<'a>(
     // The varname in a symbol link might contain additional information
     // var{Function:FuncName}{CompileUnit:UnitName_c}{Namespace:Global}"
     // This allows variables that occur in multiple files / functions / namespaces to be identified correctly
+    //
+    // Another system with a similar intention is to use "UnitName_c.varname" as the symbol name; this is handled later.
     let (plain_symbol, additional_spec) = get_additional_spec(varname);
 
     // split the a2l symbol name: e.g. "motortune.param._0_" -> ["motortune", "param", "_0_"]
@@ -53,6 +55,42 @@ pub(crate) fn find_symbol<'a>(
                         name: mangled_varname,
                         ..sym_info
                     });
+                }
+            } else if components.len() > 1 {
+                // if the symbol is not found, then it might be a global variable that is defined in a specific compile unit
+                // e.g. "UnitName_c.varname" -> "varname" in compile unit "UnitName_c"
+                // This is a non-standard extension, which is supported for compatibility with other tools.
+                //
+                // Try to use the second component of the symbol string as the symbol name, assuming that the first component is the compile unit name.
+                let additional_spec = AdditionalSpec {
+                    function_name: None,
+                    simple_unit_name: Some(components[0].to_string()),
+                    namespaces: vec![],
+                };
+                if let Ok(sym_info) = find_symbol_from_components(
+                    &components[1..],
+                    &Some(additional_spec),
+                    debug_data,
+                ) {
+                    if let Some(unit_name) = make_simple_unit_name(debug_data, sym_info.unit_idx) {
+                        // Explicitly check if the compile unit name matches the first component of the symbol name:
+                        // If the compile unit name is not found, then find_symbol_from_components
+                        // ignores the compile unit name and returns the first match
+                        if unit_name == components[0] {
+                            // the first component of the symbol name is the compile unit name, but we'll keep it
+                            return Ok(SymbolInfo {
+                                name: plain_symbol.to_owned(),
+                                ..sym_info
+                            });
+                        } else {
+                            // the compile unit name does not match, so this is not a valid symbol
+                            return Err(format!(
+                                "Symbol \"{}\" does not exist in compile unit \"{}\"",
+                                components.join("."),
+                                unit_name
+                            ));
+                        }
+                    }
                 }
             }
 
@@ -592,5 +630,56 @@ mod test {
         assert_eq!(add_spec.function_name, Some("func".to_string()));
         assert_eq!(add_spec.namespaces, vec!["Foo", "Bar"]);
         assert_eq!(add_spec.simple_unit_name, Some("file_c".to_string()));
+    }
+
+    #[test]
+    fn find_symbol_nonstandard_notation() {
+        // find a symbol using the non-standard notation "UnitName_c.varname"
+        let sym_name = "UnitName_c.varname";
+        let mut debug_data = DebugData {
+            types: HashMap::new(),
+            typenames: HashMap::new(),
+            variables: IndexMap::new(),
+            demangled_names: HashMap::new(),
+            unit_names: vec![Some("UnitName.c".to_string())],
+            sections: HashMap::new(),
+        };
+        debug_data.types.insert(
+            0,
+            TypeInfo {
+                datatype: DbgDataType::Uint32,
+                name: None,
+                unit_idx: usize::MAX,
+                dbginfo_offset: 0,
+            },
+        );
+        debug_data.variables.insert(
+            "varname".to_string(),
+            vec![VarInfo {
+                address: 0x1234,
+                typeref: 0,  // type is uint32_t
+                unit_idx: 0, // unit index for "UnitName.c"
+                function: None,
+                namespaces: vec![],
+            }],
+        );
+
+        let result = find_symbol(sym_name, &debug_data);
+        assert!(result.is_ok());
+
+        // find a nonexistent symbol - the new code path should not impact this
+        let result = find_symbol("UnitName_c.nonexistent", &debug_data);
+        assert!(result.is_err());
+
+        let result = find_symbol("bad", &debug_data);
+        assert!(result.is_err());
+
+        // find the symbol with an incorrect compile unit name
+        let result = find_symbol("WrongUnitName_c.varname", &debug_data);
+        assert!(result.is_err());
+
+        // find thge symbol without the compile unit name; this should work as well
+        let result = find_symbol("varname", &debug_data);
+        assert!(result.is_ok());
     }
 }
