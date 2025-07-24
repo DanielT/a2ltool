@@ -17,6 +17,7 @@ mod instance;
 mod measurement;
 mod record_layout;
 pub(crate) mod typedef;
+mod variant_coding;
 
 use crate::datatype::{get_a2l_datatype, get_type_limits};
 use crate::debuginfo::DbgDataType;
@@ -27,6 +28,7 @@ use characteristic::*;
 use measurement::*;
 use record_layout::*;
 use typedef::update_module_typedefs;
+use variant_coding::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UpdateType {
@@ -53,6 +55,8 @@ pub(crate) struct UpdateSumary {
     pub(crate) blob_not_updated: u32,
     pub(crate) instance_updated: u32,
     pub(crate) instance_not_updated: u32,
+    pub(crate) var_characteristic_updated: u32,
+    pub(crate) var_characteristic_not_updated: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -220,6 +224,12 @@ fn run_update(
             &mut data.reclayout_info,
         );
     }
+
+    // update VAR_CHARACTERISTICs inside a VARIANT_CODING block
+    let results = update_variant_coding(data, info);
+    let (updated, not_updated) = log_update_results(log_msgs, &results);
+    summary.var_characteristic_updated += updated;
+    summary.var_characteristic_not_updated += not_updated;
 
     (summary, strict_error)
 }
@@ -611,6 +621,8 @@ impl UpdateSumary {
             measurement_updated: 0,
             instance_not_updated: 0,
             instance_updated: 0,
+            var_characteristic_not_updated: 0,
+            var_characteristic_updated: 0,
         }
     }
 }
