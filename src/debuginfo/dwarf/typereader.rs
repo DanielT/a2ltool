@@ -4,6 +4,7 @@ use gimli::{DebugInfoOffset, DwTag, EndianSlice, EntriesTreeNode, RunTimeEndian,
 use indexmap::IndexMap;
 use object::Endianness;
 use std::collections::HashMap;
+use std::num::Wrapping;
 
 #[derive(Debug)]
 struct WipItemInfo {
@@ -517,7 +518,10 @@ impl DebugDataReader<'_> {
                             // Dwarf 2 / 3
                             let type_size = membertype.get_size();
                             let type_size_bits = type_size * 8;
-                            let bit_offset_le = type_size_bits - bit_offset - bit_size;
+                            let bit_offset_le = (Wrapping(type_size_bits)
+                                - Wrapping(bit_offset)
+                                - Wrapping(bit_size))
+                            .0;
                             membertype = TypeInfo {
                                 name: membertype.name.clone(),
                                 unit_idx: membertype.unit_idx,
