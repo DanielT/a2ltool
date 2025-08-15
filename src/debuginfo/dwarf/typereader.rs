@@ -512,57 +512,13 @@ impl DebugDataReader<'_> {
                 {
                     // wrap bitfield members in a TypeInfo::Bitfield to store bit_size and bit_offset
                     if let Some(bit_size) = get_bit_size_attribute(child_entry) {
-                        let dbginfo_offset =
-                            child_entry.offset().to_debug_info_offset(unit).unwrap().0;
-                        if let Some(bit_offset) = get_bit_offset_attribute(child_entry) {
-                            // Dwarf 2 / 3
-                            let type_size = membertype.get_size();
-                            let type_size_bits = type_size * 8;
-                            let bit_offset_le = (Wrapping(type_size_bits)
-                                - Wrapping(bit_offset)
-                                - Wrapping(bit_size))
-                            .0;
-                            membertype = TypeInfo {
-                                name: membertype.name.clone(),
-                                unit_idx: membertype.unit_idx,
-                                dbginfo_offset,
-                                datatype: DbgDataType::Bitfield {
-                                    basetype: Box::new(membertype),
-                                    bit_size: bit_size as u16,
-                                    bit_offset: bit_offset_le as u16,
-                                },
-                            };
-                        } else if let Some(mut data_bit_offset) =
-                            get_data_bit_offset_attribute(child_entry)
-                        {
-                            // Dwarf 4 / 5:
-                            // The data bit offset attribute is the offset in bits from the beginning of the containing storage to the beginning of the value
-                            // this means the bitfield member may have type uint32, but have an offset > 32 bits
-                            let type_size = membertype.get_size();
-                            let type_size_bits = type_size * 8;
-                            if data_bit_offset >= type_size_bits {
-                                // Dwarf 4 / 5: re-calculate offset
-                                offset += (data_bit_offset / type_size_bits) * type_size;
-                                data_bit_offset %= type_size_bits;
-                            }
-                            if self.endian == Endianness::Big {
-                                // reverse the mask for big endian. Example
-                                // In: type_size 32, offset: 5, size 4 -> 0000_0000_0000_0000_0000_0001_1110_0000
-                                // Out: offset = 32 - 5 - 4 = 23       -> 0000_0111_1000_0000_0000_0000_0000_0000
-                                data_bit_offset = type_size_bits - data_bit_offset - bit_size;
-                            }
-                            // these values should be independent of Endianness
-                            membertype = TypeInfo {
-                                name: membertype.name.clone(),
-                                unit_idx: membertype.unit_idx,
-                                dbginfo_offset,
-                                datatype: DbgDataType::Bitfield {
-                                    basetype: Box::new(membertype),
-                                    bit_size: bit_size as u16,
-                                    bit_offset: data_bit_offset as u16,
-                                },
-                            };
-                        }
+                        membertype = self.get_bitfield_entry(
+                            unit,
+                            child_entry,
+                            &mut offset,
+                            bit_size,
+                            membertype,
+                        );
                     }
                     if let Ok(name) = opt_name {
                         // in bitfields it's actually possible for the name to be empty!
@@ -609,6 +565,69 @@ impl DebugDataReader<'_> {
         Ok(members)
     }
 
+    fn get_bitfield_entry(
+        &self,
+        unit: &gimli::UnitHeader<EndianSlice<RunTimeEndian>, usize>,
+        child_entry: &gimli::DebuggingInformationEntry<EndianSlice<RunTimeEndian>, usize>,
+        offset: &mut u64,
+        bit_size: u64,
+        mut membertype: TypeInfo,
+    ) -> TypeInfo {
+        let dbginfo_offset = child_entry.offset().to_debug_info_offset(unit).unwrap().0;
+        if let Some(bit_offset) = get_bit_offset_attribute(child_entry) {
+            // Dwarf 2 / 3
+            let type_size = membertype.get_size();
+            let type_size_bits = type_size * 8;
+            let bit_offset_le =
+                (Wrapping(type_size_bits) - Wrapping(bit_offset) - Wrapping(bit_size)).0;
+
+            // bit_offset can be negative(!) so it is not guaranteed that the bitfield is fully inside the containing type
+            // in this case we'll try to increase the containing type's size
+            fix_bitfield_container_type(&mut membertype, *offset, bit_size, bit_offset_le);
+
+            TypeInfo {
+                name: membertype.name.clone(),
+                unit_idx: membertype.unit_idx,
+                dbginfo_offset,
+                datatype: DbgDataType::Bitfield {
+                    basetype: Box::new(membertype),
+                    bit_size: bit_size as u16,
+                    bit_offset: bit_offset_le as u16,
+                },
+            }
+        } else if let Some(mut data_bit_offset) = get_data_bit_offset_attribute(child_entry) {
+            // Dwarf 4 / 5:
+            // The data bit offset attribute is the offset in bits from the beginning of the containing storage to the beginning of the value
+            // this means the bitfield member may have type uint32, but have an offset > 32 bits
+            let type_size = membertype.get_size();
+            let type_size_bits = type_size * 8;
+            if data_bit_offset >= type_size_bits {
+                // Dwarf 4 / 5: re-calculate offset
+                *offset += (data_bit_offset / type_size_bits) * type_size;
+                data_bit_offset %= type_size_bits;
+            }
+            if self.endian == Endianness::Big {
+                // reverse the mask for big endian. Example
+                // In: type_size 32, offset: 5, size 4 -> 0000_0000_0000_0000_0000_0001_1110_0000
+                // Out: offset = 32 - 5 - 4 = 23       -> 0000_0111_1000_0000_0000_0000_0000_0000
+                data_bit_offset = type_size_bits - data_bit_offset - bit_size;
+            }
+            // these values should be independent of Endianness
+            TypeInfo {
+                name: membertype.name.clone(),
+                unit_idx: membertype.unit_idx,
+                dbginfo_offset,
+                datatype: DbgDataType::Bitfield {
+                    basetype: Box::new(membertype),
+                    bit_size: bit_size as u16,
+                    bit_offset: data_bit_offset as u16,
+                },
+            }
+        } else {
+            membertype
+        }
+    }
+
     // get all the members of a struct or union or class
     fn get_class_inheritance(
         &self,
@@ -648,6 +667,39 @@ impl DebugDataReader<'_> {
             }
         }
         Ok(inheritance)
+    }
+}
+
+fn fix_bitfield_container_type(
+    membertype: &mut TypeInfo,
+    offset: u64,
+    bit_size: u64,
+    bit_offset: u64,
+) {
+    let type_size = membertype.get_size();
+    if bit_offset + bit_size > type_size * 8 {
+        let adjusted_type_size = type_size * 2;
+
+        let unaligned_bytes = offset % adjusted_type_size;
+        // changing the containing data type won't work if that creates unaligned access
+        if unaligned_bytes == 0 {
+            // increase any integer datatype by one step
+            match membertype.datatype {
+                DbgDataType::Uint8 => membertype.datatype = DbgDataType::Uint16,
+                DbgDataType::Uint16 => membertype.datatype = DbgDataType::Uint32,
+                DbgDataType::Uint32 => membertype.datatype = DbgDataType::Uint64,
+                DbgDataType::Sint8 => membertype.datatype = DbgDataType::Sint16,
+                DbgDataType::Sint16 => membertype.datatype = DbgDataType::Sint32,
+                DbgDataType::Sint32 => membertype.datatype = DbgDataType::Sint64,
+                _ => {
+                    // unsupported type - this case probably can't happen
+                }
+            }
+        }
+        // Theoretically we could also try to handle cases where the containing data type becomes unaligned.
+        // In this case it would be required to increase the bit size of the
+        // containing type by several steps, extending both forward and backward.
+        // It's not clear that any compiler would generate such code, though.
     }
 }
 
