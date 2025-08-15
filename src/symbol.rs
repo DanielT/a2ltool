@@ -71,25 +71,24 @@ pub(crate) fn find_symbol<'a>(
                     &components[1..],
                     &Some(additional_spec),
                     debug_data,
-                ) {
-                    if let Some(unit_name) = make_simple_unit_name(debug_data, sym_info.unit_idx) {
-                        // Explicitly check if the compile unit name matches the first component of the symbol name:
-                        // If the compile unit name is not found, then find_symbol_from_components
-                        // ignores the compile unit name and returns the first match
-                        if unit_name == components[0] {
-                            // the first component of the symbol name is the compile unit name, but we'll keep it
-                            return Ok(SymbolInfo {
-                                name: plain_symbol.to_owned(),
-                                ..sym_info
-                            });
-                        } else {
-                            // the compile unit name does not match, so this is not a valid symbol
-                            return Err(format!(
-                                "Symbol \"{}\" does not exist in compile unit \"{}\"",
-                                components.join("."),
-                                unit_name
-                            ));
-                        }
+                ) && let Some(unit_name) = make_simple_unit_name(debug_data, sym_info.unit_idx)
+                {
+                    // Explicitly check if the compile unit name matches the first component of the symbol name:
+                    // If the compile unit name is not found, then find_symbol_from_components
+                    // ignores the compile unit name and returns the first match
+                    if unit_name == components[0] {
+                        // the first component of the symbol name is the compile unit name, but we'll keep it
+                        return Ok(SymbolInfo {
+                            name: plain_symbol.to_owned(),
+                            ..sym_info
+                        });
+                    } else {
+                        // the compile unit name does not match, so this is not a valid symbol
+                        return Err(format!(
+                            "Symbol \"{}\" does not exist in compile unit \"{}\"",
+                            components.join("."),
+                            unit_name
+                        ));
                     }
                 }
             }

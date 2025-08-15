@@ -190,14 +190,12 @@ fn read_type(
         };
 
         typereader_data.types.insert(type_index as usize, typeinfo);
-        if !is_ref {
-            if let Some(typename) = typename {
-                typereader_data
-                    .typenames
-                    .entry(typename)
-                    .or_default()
-                    .push(type_index as usize);
-            }
+        if !is_ref && let Some(typename) = typename {
+            typereader_data
+                .typenames
+                .entry(typename)
+                .or_default()
+                .push(type_index as usize);
         }
     }
     typereader_data.wip_items.pop();

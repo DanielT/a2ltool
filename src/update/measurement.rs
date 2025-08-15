@@ -188,11 +188,11 @@ fn verify_measurement_datatype<'enumlist, 'typeinfo: 'enumlist>(
     let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
 
     let mut bad_conversion = false;
-    if let DbgDataType::Enum { .. } = &typeinfo.datatype {
-        if measurement.conversion == "NO_COMPU_METHOD" {
-            // the type is enum, so there should be a conversion method, but there is none
-            bad_conversion = true;
-        }
+    if let DbgDataType::Enum { .. } = &typeinfo.datatype
+        && measurement.conversion == "NO_COMPU_METHOD"
+    {
+        // the type is enum, so there should be a conversion method, but there is none
+        bad_conversion = true;
     }
 
     let opt_compu_method = module.compu_method.get(&measurement.conversion);
@@ -270,10 +270,10 @@ pub(crate) fn cleanup_removed_measurements(module: &mut Module, removed_items: &
             }
         }
 
-        if let Some(comparison_quantity) = &characteristic.comparison_quantity {
-            if removed_items.get(&comparison_quantity.name).is_some() {
-                characteristic.comparison_quantity = None;
-            }
+        if let Some(comparison_quantity) = &characteristic.comparison_quantity
+            && removed_items.get(&comparison_quantity.name).is_some()
+        {
+            characteristic.comparison_quantity = None;
         }
     }
 

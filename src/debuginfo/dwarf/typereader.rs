@@ -34,20 +34,20 @@ impl DebugDataReader<'_> {
         for (name, var_list) in variables {
             for VarInfo { typeref, .. } in var_list {
                 // check if the type was already loaded
-                if !typereader_data.types.contains_key(typeref) {
-                    if let Some(unit_idx) = self.units.get_unit(*typeref) {
-                        // create an entries_tree iterator that makes it possible to read the DIEs of this type
-                        let dbginfo_offset = gimli::DebugInfoOffset(*typeref);
+                if !typereader_data.types.contains_key(typeref)
+                    && let Some(unit_idx) = self.units.get_unit(*typeref)
+                {
+                    // create an entries_tree iterator that makes it possible to read the DIEs of this type
+                    let dbginfo_offset = gimli::DebugInfoOffset(*typeref);
 
-                        // load one type and add it to the collection (always succeeds for correctly structured DWARF debug info)
-                        let result = self.get_type(unit_idx, dbginfo_offset, &mut typereader_data);
-                        if let Err(errmsg) = result {
-                            if self.verbose {
-                                println!("Error loading type info for variable {name}: {errmsg}");
-                            }
-                        }
-                        typereader_data.wip_items.clear();
+                    // load one type and add it to the collection (always succeeds for correctly structured DWARF debug info)
+                    let result = self.get_type(unit_idx, dbginfo_offset, &mut typereader_data);
+                    if let Err(errmsg) = result
+                        && self.verbose
+                    {
+                        println!("Error loading type info for variable {name}: {errmsg}");
                     }
+                    typereader_data.wip_items.clear();
                 }
             }
         }
@@ -356,10 +356,12 @@ impl DebugDataReader<'_> {
         }
 
         // try to fix the dimension of the array, if the DW_TAG_subrange_type didn't contain enough info
-        if dim.len() == 1 && dim[0] == 0 && stride != 0 {
-            if let Some(count) = maybe_size.map(|s: u64| s / stride) {
-                dim[0] = count;
-            }
+        if dim.len() == 1
+            && dim[0] == 0
+            && stride != 0
+            && let Some(count) = maybe_size.map(|s: u64| s / stride)
+        {
+            dim[0] = count;
         }
         let size = maybe_size.unwrap_or_else(|| dim.iter().fold(stride, |acc, num| acc * num));
         Ok((

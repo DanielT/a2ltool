@@ -289,14 +289,13 @@ pub(crate) fn update_characteristic_axis(
             }
         } else if idx <= 5 {
             // an internal axis, using info from the typeinfo and the record layout
-            if let Some(&Some(position)) = axis_positions.get(idx) {
-                if let Some(TypeInfo {
+            if let Some(&Some(position)) = axis_positions.get(idx)
+                && let Some(TypeInfo {
                     datatype: DbgDataType::Array { dim, .. },
                     ..
                 }) = get_inner_type(typeinfo, position)
-                {
-                    axis_descr.max_axis_points = dim[0] as u16;
-                }
+            {
+                axis_descr.max_axis_points = dim[0] as u16;
             }
         }
     }
@@ -311,10 +310,10 @@ fn verify_characteristic_datatype(
     let mut bad_characteristic = false;
     let member_id = get_fnc_values_memberid(data.module, &characteristic.deposit);
     if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
-        if let DbgDataType::Enum { .. } = &inner_typeinfo.datatype {
-            if characteristic.conversion == "NO_COMPU_METHOD" {
-                bad_characteristic = true;
-            }
+        if let DbgDataType::Enum { .. } = &inner_typeinfo.datatype
+            && characteristic.conversion == "NO_COMPU_METHOD"
+        {
+            bad_characteristic = true;
         }
 
         let opt_compu_method = data.module.compu_method.get(&characteristic.conversion);

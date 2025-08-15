@@ -61,10 +61,10 @@ pub(crate) fn update_enum_compu_methods(
     // follow the chain of objects and build a list of COMPU_TAB_REF references with their associated enum types
     let mut enum_compu_tab = HashMap::new();
     for compu_method in &module.compu_method {
-        if let Some(typeinfo) = enum_convlist.get(compu_method.get_name()) {
-            if let Some(compu_tab) = &compu_method.compu_tab_ref {
-                enum_compu_tab.insert(compu_tab.conversion_table.clone(), *typeinfo);
-            }
+        if let Some(typeinfo) = enum_convlist.get(compu_method.get_name())
+            && let Some(compu_tab) = &compu_method.compu_tab_ref
+        {
+            enum_compu_tab.insert(compu_tab.conversion_table.clone(), *typeinfo);
         }
     }
 

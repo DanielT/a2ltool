@@ -9,20 +9,20 @@ pub(crate) struct RecordLayoutInfo {
 
 pub(crate) fn get_axis_pts_x_memberid(module: &Module, recordlayout_name: &str) -> u16 {
     let mut memberid = 1;
-    if let Some(rl_idx) = module.record_layout.index(recordlayout_name) {
-        if let Some(axis_pts_x) = &module.record_layout[rl_idx].axis_pts_x {
-            memberid = axis_pts_x.position;
-        }
+    if let Some(rl_idx) = module.record_layout.index(recordlayout_name)
+        && let Some(axis_pts_x) = &module.record_layout[rl_idx].axis_pts_x
+    {
+        memberid = axis_pts_x.position;
     }
     memberid
 }
 
 pub(crate) fn get_fnc_values_memberid(module: &Module, recordlayout_name: &str) -> u16 {
     let mut memberid = 1;
-    if let Some(rl_idx) = module.record_layout.index(recordlayout_name) {
-        if let Some(fnc_values) = &module.record_layout[rl_idx].fnc_values {
-            memberid = fnc_values.position;
-        }
+    if let Some(rl_idx) = module.record_layout.index(recordlayout_name)
+        && let Some(fnc_values) = &module.record_layout[rl_idx].fnc_values
+    {
+        memberid = fnc_values.position;
     }
     memberid
 }
@@ -64,18 +64,18 @@ pub(crate) fn update_record_layout(
         let mut new_name = None;
 
         // FNC_VALUES - required in record layouts used by a CHARACTERISTIC
-        if let Some(fnc_values) = &mut new_reclayout.fnc_values {
-            if let Some(itemtype) = get_inner_type(typeinfo, fnc_values.position) {
-                let new_datatype = get_a2l_datatype(itemtype);
-                if new_datatype != fnc_values.datatype {
-                    // try to update the name based on the datatype, e.g. __UBYTE_S to __ULONG_S
-                    new_name = Some(module.record_layout[idx].get_name().replacen(
-                        &fnc_values.datatype.to_string(),
-                        &new_datatype.to_string(),
-                        1,
-                    ));
-                    fnc_values.datatype = new_datatype;
-                }
+        if let Some(fnc_values) = &mut new_reclayout.fnc_values
+            && let Some(itemtype) = get_inner_type(typeinfo, fnc_values.position)
+        {
+            let new_datatype = get_a2l_datatype(itemtype);
+            if new_datatype != fnc_values.datatype {
+                // try to update the name based on the datatype, e.g. __UBYTE_S to __ULONG_S
+                new_name = Some(module.record_layout[idx].get_name().replacen(
+                    &fnc_values.datatype.to_string(),
+                    &new_datatype.to_string(),
+                    1,
+                ));
+                fnc_values.datatype = new_datatype;
             }
         }
         if let Some(new_name) = new_name {
@@ -83,98 +83,98 @@ pub(crate) fn update_record_layout(
         }
 
         // AXIS_PTS_X - required in record layouts used by an AXIS_PTS, optional for CHARACTERISTIC
-        if let Some(axis_pts_x) = &mut new_reclayout.axis_pts_x {
-            if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_x.position) {
-                axis_pts_x.datatype = get_a2l_datatype(itemtype);
-                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
-                    // FIX_NO_AXIS_PTS_X
-                    if let Some(fix_no_axis_pts_x) = &mut new_reclayout.fix_no_axis_pts_x {
-                        fix_no_axis_pts_x.number_of_axis_points = dim[0] as u16;
-                    }
+        if let Some(axis_pts_x) = &mut new_reclayout.axis_pts_x
+            && let Some(itemtype) = get_inner_type(typeinfo, axis_pts_x.position)
+        {
+            axis_pts_x.datatype = get_a2l_datatype(itemtype);
+            if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
+                // FIX_NO_AXIS_PTS_X
+                if let Some(fix_no_axis_pts_x) = &mut new_reclayout.fix_no_axis_pts_x {
+                    fix_no_axis_pts_x.number_of_axis_points = dim[0] as u16;
                 }
             }
         }
         // NO_AXIS_PTS_X
-        if let Some(no_axis_pts_x) = &mut new_reclayout.no_axis_pts_x {
-            if let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_x.position) {
-                no_axis_pts_x.datatype = get_a2l_datatype(itemtype);
-            }
+        if let Some(no_axis_pts_x) = &mut new_reclayout.no_axis_pts_x
+            && let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_x.position)
+        {
+            no_axis_pts_x.datatype = get_a2l_datatype(itemtype);
         }
 
         // AXIS_PTS_Y
-        if let Some(axis_pts_y) = &mut new_reclayout.axis_pts_y {
-            if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_y.position) {
-                axis_pts_y.datatype = get_a2l_datatype(itemtype);
-                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
-                    // FIX_NO_AXIS_PTS_Y
-                    if let Some(fix_no_axis_pts_y) = &mut new_reclayout.fix_no_axis_pts_y {
-                        fix_no_axis_pts_y.number_of_axis_points = dim[0] as u16;
-                    }
+        if let Some(axis_pts_y) = &mut new_reclayout.axis_pts_y
+            && let Some(itemtype) = get_inner_type(typeinfo, axis_pts_y.position)
+        {
+            axis_pts_y.datatype = get_a2l_datatype(itemtype);
+            if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
+                // FIX_NO_AXIS_PTS_Y
+                if let Some(fix_no_axis_pts_y) = &mut new_reclayout.fix_no_axis_pts_y {
+                    fix_no_axis_pts_y.number_of_axis_points = dim[0] as u16;
                 }
             }
         }
         // NO_AXIS_PTS_Y
-        if let Some(no_axis_pts_y) = &mut new_reclayout.no_axis_pts_y {
-            if let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_y.position) {
-                no_axis_pts_y.datatype = get_a2l_datatype(itemtype);
-            }
+        if let Some(no_axis_pts_y) = &mut new_reclayout.no_axis_pts_y
+            && let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_y.position)
+        {
+            no_axis_pts_y.datatype = get_a2l_datatype(itemtype);
         }
 
         // AXIS_PTS_Z
-        if let Some(axis_pts_z) = &mut new_reclayout.axis_pts_z {
-            if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_z.position) {
-                axis_pts_z.datatype = get_a2l_datatype(itemtype);
-                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
-                    // FIX_NO_AXIS_PTS_Z
-                    if let Some(fix_no_axis_pts_z) = &mut new_reclayout.fix_no_axis_pts_z {
-                        fix_no_axis_pts_z.number_of_axis_points = dim[0] as u16;
-                    }
+        if let Some(axis_pts_z) = &mut new_reclayout.axis_pts_z
+            && let Some(itemtype) = get_inner_type(typeinfo, axis_pts_z.position)
+        {
+            axis_pts_z.datatype = get_a2l_datatype(itemtype);
+            if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
+                // FIX_NO_AXIS_PTS_Z
+                if let Some(fix_no_axis_pts_z) = &mut new_reclayout.fix_no_axis_pts_z {
+                    fix_no_axis_pts_z.number_of_axis_points = dim[0] as u16;
                 }
             }
         }
         // NO_AXIS_PTS_Z
-        if let Some(no_axis_pts_z) = &mut new_reclayout.no_axis_pts_z {
-            if let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_z.position) {
-                no_axis_pts_z.datatype = get_a2l_datatype(itemtype);
-            }
+        if let Some(no_axis_pts_z) = &mut new_reclayout.no_axis_pts_z
+            && let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_z.position)
+        {
+            no_axis_pts_z.datatype = get_a2l_datatype(itemtype);
         }
 
         // AXIS_PTS_4
-        if let Some(axis_pts_4) = &mut new_reclayout.axis_pts_4 {
-            if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_4.position) {
-                axis_pts_4.datatype = get_a2l_datatype(itemtype);
-                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
-                    // FIX_NO_AXIS_PTS_4
-                    if let Some(fix_no_axis_pts_4) = &mut new_reclayout.fix_no_axis_pts_4 {
-                        fix_no_axis_pts_4.number_of_axis_points = dim[0] as u16;
-                    }
+        if let Some(axis_pts_4) = &mut new_reclayout.axis_pts_4
+            && let Some(itemtype) = get_inner_type(typeinfo, axis_pts_4.position)
+        {
+            axis_pts_4.datatype = get_a2l_datatype(itemtype);
+            if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
+                // FIX_NO_AXIS_PTS_4
+                if let Some(fix_no_axis_pts_4) = &mut new_reclayout.fix_no_axis_pts_4 {
+                    fix_no_axis_pts_4.number_of_axis_points = dim[0] as u16;
                 }
             }
         }
         // NO_AXIS_PTS_4
-        if let Some(no_axis_pts_4) = &mut new_reclayout.no_axis_pts_4 {
-            if let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_4.position) {
-                no_axis_pts_4.datatype = get_a2l_datatype(itemtype);
-            }
+        if let Some(no_axis_pts_4) = &mut new_reclayout.no_axis_pts_4
+            && let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_4.position)
+        {
+            no_axis_pts_4.datatype = get_a2l_datatype(itemtype);
         }
 
         // AXIS_PTS_5
-        if let Some(axis_pts_5) = &mut new_reclayout.axis_pts_5 {
-            if let Some(itemtype) = get_inner_type(typeinfo, axis_pts_5.position) {
-                axis_pts_5.datatype = get_a2l_datatype(itemtype);
-                if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
-                    // FIX_NO_AXIS_PTS_5
-                    if let Some(fix_no_axis_pts_5) = &mut new_reclayout.fix_no_axis_pts_5 {
-                        fix_no_axis_pts_5.number_of_axis_points = dim[0] as u16;
-                    }
+        if let Some(axis_pts_5) = &mut new_reclayout.axis_pts_5
+            && let Some(itemtype) = get_inner_type(typeinfo, axis_pts_5.position)
+        {
+            axis_pts_5.datatype = get_a2l_datatype(itemtype);
+            if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
+                // FIX_NO_AXIS_PTS_5
+                if let Some(fix_no_axis_pts_5) = &mut new_reclayout.fix_no_axis_pts_5 {
+                    fix_no_axis_pts_5.number_of_axis_points = dim[0] as u16;
                 }
             }
         }
         // NO_AXIS_PTS_5
-        if let Some(no_axis_pts_5) = &mut new_reclayout.no_axis_pts_5 {
-            if let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_5.position) {
-                no_axis_pts_5.datatype = get_a2l_datatype(itemtype);
-            }
+        if let Some(no_axis_pts_5) = &mut new_reclayout.no_axis_pts_5
+            && let Some(itemtype) = get_inner_type(typeinfo, no_axis_pts_5.position)
+        {
+            no_axis_pts_5.datatype = get_a2l_datatype(itemtype);
         }
 
         if module.record_layout[idx] == new_reclayout {

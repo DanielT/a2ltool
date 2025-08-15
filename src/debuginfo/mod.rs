@@ -91,7 +91,7 @@ impl DebugData {
         pdb::load_pdb(filename, verbose)
     }
 
-    pub(crate) fn iter(&self, use_new_arrays: bool) -> iter::VariablesIterator {
+    pub(crate) fn iter<'dbg>(&'dbg self, use_new_arrays: bool) -> iter::VariablesIterator<'dbg> {
         iter::VariablesIterator::new(self, use_new_arrays)
     }
 }

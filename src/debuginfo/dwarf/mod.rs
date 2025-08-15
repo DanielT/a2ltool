@@ -106,10 +106,11 @@ fn get_elf_sections(elffile: &object::read::File) -> HashMap<String, (u64, u64)>
     for section in elffile.sections() {
         let addr = section.address();
         let size = section.size();
-        if addr != 0 && size != 0 {
-            if let Ok(name) = section.name() {
-                map.insert(name.to_string(), (addr, addr + size));
-            }
+        if addr != 0
+            && size != 0
+            && let Ok(name) = section.name()
+        {
+            map.insert(name.to_string(), (addr, addr + size));
         }
     }
 
@@ -198,13 +199,12 @@ impl DebugDataReader<'_> {
             // in functions are declared inside of DW_TAG_subprogram[/DW_TAG_lexical_block]*.
             // We can easily find all of them by using depth-first traversal of the tree
             let mut entries_cursor = unit.entries(abbreviations);
-            if let Ok(Some((_, entry))) = entries_cursor.next_dfs() {
-                if entry.tag() == gimli::constants::DW_TAG_compile_unit
-                    || entry.tag() == gimli::constants::DW_TAG_partial_unit
-                {
-                    self.unit_names
-                        .push(get_name_attribute(entry, &self.dwarf, unit).ok());
-                }
+            if let Ok(Some((_, entry))) = entries_cursor.next_dfs()
+                && (entry.tag() == gimli::constants::DW_TAG_compile_unit
+                    || entry.tag() == gimli::constants::DW_TAG_partial_unit)
+            {
+                self.unit_names
+                    .push(get_name_attribute(entry, &self.dwarf, unit).ok());
             }
 
             let mut depth = 0;
@@ -333,14 +333,15 @@ fn demangle_cpp_varnames(input: &[&String]) -> HashMap<String, String> {
     for varname in input {
         // some really simple strings can be processed by the demangler, e.g "c" -> "const", which is wrong here.
         // by only processing symbols that start with _Z (variables in classes/namespaces) this problem is avoided
-        if varname.starts_with("_Z") {
-            if let Ok(sym) = cpp_demangle::Symbol::new(*varname) {
-                // exclude useless demangled names like "typeinfo for std::type_info" or "{vtable(std::type_info)}"
-                if let Ok(demangled) = sym.demangle(&demangle_opts) {
-                    if !demangled.contains(' ') && !demangled.starts_with("{vtable") {
-                        demangled_symbols.insert(demangled, (*varname).clone());
-                    }
-                }
+        if varname.starts_with("_Z")
+            && let Ok(sym) = cpp_demangle::Symbol::new(*varname)
+        {
+            // exclude useless demangled names like "typeinfo for std::type_info" or "{vtable(std::type_info)}"
+            if let Ok(demangled) = sym.demangle(&demangle_opts)
+                && !demangled.contains(' ')
+                && !demangled.starts_with("{vtable")
+            {
+                demangled_symbols.insert(demangled, (*varname).clone());
             }
         }
     }

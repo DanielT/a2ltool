@@ -938,12 +938,11 @@ impl clap::builder::TypedValueParser for AddressValueParser {
         arg: Option<&clap::Arg>,
         value: &std::ffi::OsStr,
     ) -> Result<Self::Value, clap::Error> {
-        if let Some(txt) = value.to_str() {
-            if let Some(hexval) = txt.strip_prefix("0x") {
-                if let Ok(value) = u64::from_str_radix(hexval, 16) {
-                    return Ok(value);
-                }
-            }
+        if let Some(txt) = value.to_str()
+            && let Some(hexval) = txt.strip_prefix("0x")
+            && let Ok(value) = u64::from_str_radix(hexval, 16)
+        {
+            return Ok(value);
         }
 
         let mut err = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);

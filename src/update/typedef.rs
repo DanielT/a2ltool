@@ -426,12 +426,11 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                     // the structure must have a member for each STRUCTURE_COMPONENT
                     if let Some(component_typeinfo) =
                         get_structure_component_typeinfo(self.debug_data, &sc, members)
+                        && (self
+                            .is_valid_structure_component(&sc.component_type, component_typeinfo)
+                            || create_only)
                     {
-                        if self.is_valid_structure_component(&sc.component_type, component_typeinfo)
-                            || create_only
-                        {
-                            self.store_structure_component(idx, sc, component_typeinfo);
-                        }
+                        self.store_structure_component(idx, sc, component_typeinfo);
                     }
                 }
             } else if let Some(component_typeinfo) = typeinfo.get_arraytype().or_else(|| {
@@ -442,12 +441,11 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 // rare: typeinfo is a pointer or array. In this case a TYPEDEF_STRUCTURE is used as a layer of indirection.
                 // This structure can only have a single structure component
                 self.typedef_structs[idx].structure_component.truncate(1);
-                if let Some(sc) = self.typedef_structs[idx].structure_component.pop() {
-                    if self.is_valid_structure_component(&sc.component_type, component_typeinfo)
-                        || create_only
-                    {
-                        self.store_structure_component(idx, sc, component_typeinfo);
-                    }
+                if let Some(sc) = self.typedef_structs[idx].structure_component.pop()
+                    && (self.is_valid_structure_component(&sc.component_type, component_typeinfo)
+                        || create_only)
+                {
+                    self.store_structure_component(idx, sc, component_typeinfo);
                 }
             }
             idx += 1;
@@ -532,15 +530,13 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 ),
             ));
         if let Some((old_typeinfo, old_quality)) = self.typedef_map.swap_remove(&sc.component_type)
+            && !old_typeinfo.compare(component_typeinfo, &self.debug_data.types)
+            && old_quality == TypeQuality::SymTypeLinkOnly
         {
-            if !old_typeinfo.compare(component_typeinfo, &self.debug_data.types)
-                && old_quality == TypeQuality::SymTypeLinkOnly
-            {
-                self.type_map
-                    .get_mut(&old_typeinfo.dbginfo_offset)
-                    .unwrap()
-                    .swap_remove(&sc.component_type);
-            }
+            self.type_map
+                .get_mut(&old_typeinfo.dbginfo_offset)
+                .unwrap()
+                .swap_remove(&sc.component_type);
         }
         self.type_map
             .entry(component_typeinfo.dbginfo_offset)
@@ -593,11 +589,11 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             let mut dtypes = calc_distinct_types(&update_info, self.debug_data);
             // try to ensure the distinct type whose name matches the typedef name is first in the list
             for idx in 1..dtypes.len() {
-                if let Some(name) = dtypes[0].name.as_deref() {
-                    if name == refname {
-                        dtypes.swap(0, idx);
-                        break;
-                    }
+                if let Some(name) = dtypes[0].name.as_deref()
+                    && name == refname
+                {
+                    dtypes.swap(0, idx);
+                    break;
                 }
             }
 
@@ -625,14 +621,13 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 } else {
                     // If no TYPEDEF can be found or created for an INSTANCE, then deleting it is the best option
                     for (opt_typeinfo, referrer) in &update_info {
-                        if let TypedefReferrer::Instance(idx) = referrer {
-                            if let Some(ref_typeinfo) = opt_typeinfo {
-                                if ref_typeinfo.compare(typeinfo, &self.debug_data.types) {
-                                    // delay the deletion of the INSTANCE until all TYPEDEF_* have been processed
-                                    // otherwise the stored indexes would be invalid
-                                    delete_instances[*idx] = true;
-                                }
-                            }
+                        if let TypedefReferrer::Instance(idx) = referrer
+                            && let Some(ref_typeinfo) = opt_typeinfo
+                            && ref_typeinfo.compare(typeinfo, &self.debug_data.types)
+                        {
+                            // delay the deletion of the INSTANCE until all TYPEDEF_* have been processed
+                            // otherwise the stored indexes would be invalid
+                            delete_instances[*idx] = true;
                         }
                     }
                 }
@@ -948,14 +943,13 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                         self.module.instance[*instance_idx].type_ref = newname.to_string();
                     }
                     TypedefReferrer::StructureComponent(st_name, cmp_name) => {
-                        if let Some(td_struct) = self.typedef_structs.get_mut(st_name) {
-                            if let Some(component) = td_struct
+                        if let Some(td_struct) = self.typedef_structs.get_mut(st_name)
+                            && let Some(component) = td_struct
                                 .structure_component
                                 .iter_mut()
                                 .find(|cmp| cmp.get_name() == cmp_name)
-                            {
-                                component.component_type = newname.to_string();
-                            }
+                        {
+                            component.component_type = newname.to_string();
                         }
                     }
                 }
@@ -1519,10 +1513,10 @@ fn get_typeinfo_from_symbol_link<'dbg>(
     let symbol_type = symbol_type_parts.next().unwrap();
     let mut required_compile_unit = None;
     for additional_info in symbol_type_parts {
-        if let Some(comp_unit) = additional_info.strip_prefix("CompileUnit:") {
-            if let Some(comp_unit) = comp_unit.strip_suffix('}') {
-                required_compile_unit = Some(comp_unit);
-            }
+        if let Some(comp_unit) = additional_info.strip_prefix("CompileUnit:")
+            && let Some(comp_unit) = comp_unit.strip_suffix('}')
+        {
+            required_compile_unit = Some(comp_unit);
         }
     }
 
@@ -1535,14 +1529,12 @@ fn get_typeinfo_from_symbol_link<'dbg>(
             if let Some(req_compile_unit) = required_compile_unit {
                 // try to find the correct type by comparing the compile unit name
                 for typinfo_idx in typeinfo_list {
-                    if let Some(typeinfo) = debug_data.types.get(typinfo_idx) {
-                        if let Some(simple_name) =
+                    if let Some(typeinfo) = debug_data.types.get(typinfo_idx)
+                        && let Some(simple_name) =
                             make_simple_unit_name(debug_data, typeinfo.unit_idx)
-                        {
-                            if simple_name == req_compile_unit {
-                                return Some(typeinfo);
-                            }
-                        }
+                        && simple_name == req_compile_unit
+                    {
+                        return Some(typeinfo);
                     }
                 }
                 // type was not identified by matching the compile unit name
@@ -1683,13 +1675,12 @@ fn calc_distinct_types<'a>(
 ) -> Vec<&'a TypeInfo> {
     let mut distinct_types: Vec<&TypeInfo> = vec![];
     for (typeinfo_opt, _) in ref_info {
-        if let Some(typeinfo) = typeinfo_opt {
-            if !distinct_types
+        if let Some(typeinfo) = typeinfo_opt
+            && !distinct_types
                 .iter()
                 .any(|typeinfo2| typeinfo.compare(typeinfo2, &debug_data.types))
-            {
-                distinct_types.push(typeinfo);
-            }
+        {
+            distinct_types.push(typeinfo);
         }
     }
     distinct_types

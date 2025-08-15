@@ -247,20 +247,20 @@ pub(crate) fn cleanup_removed_axis_pts(module: &mut Module, removed_items: &Hash
 
     for characteristic in &mut module.characteristic {
         for axis_descr in &mut characteristic.axis_descr {
-            if let Some(axis_pts_ref) = &axis_descr.axis_pts_ref {
-                if removed_items.get(&axis_pts_ref.axis_points).is_some() {
-                    axis_descr.axis_pts_ref = None;
-                }
+            if let Some(axis_pts_ref) = &axis_descr.axis_pts_ref
+                && removed_items.get(&axis_pts_ref.axis_points).is_some()
+            {
+                axis_descr.axis_pts_ref = None;
             }
         }
     }
 
     for typedef_characteristic in &mut module.typedef_characteristic {
         for axis_descr in &mut typedef_characteristic.axis_descr {
-            if let Some(axis_pts_ref) = &axis_descr.axis_pts_ref {
-                if removed_items.get(&axis_pts_ref.axis_points).is_some() {
-                    axis_descr.axis_pts_ref = None;
-                }
+            if let Some(axis_pts_ref) = &axis_descr.axis_pts_ref
+                && removed_items.get(&axis_pts_ref.axis_points).is_some()
+            {
+                axis_descr.axis_pts_ref = None;
             }
         }
     }

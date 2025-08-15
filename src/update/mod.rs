@@ -491,12 +491,11 @@ pub(crate) fn set_address_type(address_type_opt: &mut Option<AddressType>, newty
 // specifically the pseudo-standard CANAPE_EXT could be present and contain symbol information
 fn get_symbol_name_from_ifdata(ifdata_vec: &[IfData]) -> Option<String> {
     for ifdata in ifdata_vec {
-        if let Some(decoded) = ifdata::A2mlVector::load_from_ifdata(ifdata) {
-            if let Some(canape_ext) = decoded.canape_ext {
-                if let Some(link_map) = canape_ext.link_map {
-                    return Some(link_map.symbol_name);
-                }
-            }
+        if let Some(decoded) = ifdata::A2mlVector::load_from_ifdata(ifdata)
+            && let Some(canape_ext) = decoded.canape_ext
+            && let Some(link_map) = canape_ext.link_map
+        {
+            return Some(link_map.symbol_name);
         }
     }
     None

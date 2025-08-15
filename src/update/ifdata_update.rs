@@ -191,11 +191,11 @@ pub(crate) fn zero_if_data(ifdata_vec: &mut Vec<IfData>) {
                     link_map.bit_offset = 0;
                     link_map.datatype_valid = 0;
                 }
-            } else if let Some(asap1b_ccp) = &mut decoded_ifdata.asap1b_ccp {
-                if let Some(dp_blob) = &mut asap1b_ccp.dp_blob {
-                    dp_blob.address_extension = 0;
-                    dp_blob.base_address = 0;
-                }
+            } else if let Some(asap1b_ccp) = &mut decoded_ifdata.asap1b_ccp
+                && let Some(dp_blob) = &mut asap1b_ccp.dp_blob
+            {
+                dp_blob.address_extension = 0;
+                dp_blob.base_address = 0;
             }
             decoded_ifdata.store_to_ifdata(ifdata);
         }
