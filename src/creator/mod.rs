@@ -401,26 +401,53 @@ static COMMENT_PREFIX: &[u8] = b"@@";
 
 pub(crate) fn create_items_from_sources<'a>(
     a2l_file: &mut A2lFile,
-    source_files: impl Iterator<Item = &'a OsString>,
+    source_file_patterns: impl Iterator<Item = &'a OsString>,
     target_group: Option<String>,
 ) -> Vec<String> {
     // This function will handle the creation of items from the source file
     // and return the count of inserted items along with any log messages.
     let mut creator = Creator::new(a2l_file, target_group);
 
-    for source_file in source_files {
-        let data = match std::fs::read(source_file) {
-            Ok(data) => data,
-            Err(error) => {
-                creator.messages.push(format!(
-                    "Error reading source file '{}': {error}",
-                    source_file.to_string_lossy(),
-                ));
-                continue;
+    for source_file_pattern in source_file_patterns {
+        // try to expand the pattern using glob, if the input is valid unicode, and if glob understands the pattern
+        let expanded_filenames = if let Some(source_str) = source_file_pattern.to_str() {
+            match glob::glob(source_str) {
+                Ok(glob_iter) => glob_iter
+                    .filter_map(Result::ok)
+                    .map(OsString::from)
+                    .collect::<Vec<_>>(),
+                Err(pattern_error) => {
+                    // glob pattern is invalid: log the error, and then try to proceed with the input as a single filename
+                    creator.messages.push(format!(
+                        "Error expanding glob pattern '{source_str}': {pattern_error}"
+                    ));
+                    vec![source_file_pattern.clone()]
+                }
             }
+        } else {
+            // input is not valid unicode, so it can't be processed with glob: just use it as a single filename
+            vec![source_file_pattern.clone()]
         };
 
-        creator.process_file(&data);
+        // for each expanded filename, try to read and process the file
+        for source_file in expanded_filenames {
+            let data = match std::fs::read(&source_file) {
+                Ok(data) => data,
+                Err(error) => {
+                    creator.messages.push(format!(
+                        "Error reading source file '{}': {error}",
+                        source_file.to_string_lossy(),
+                    ));
+                    continue;
+                }
+            };
+
+            creator.messages.push(format!(
+                "Processing source file '{}'",
+                source_file.to_string_lossy()
+            ));
+            creator.process_file(&data);
+        }
     }
 
     creator.messages

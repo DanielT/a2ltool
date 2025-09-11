@@ -298,10 +298,10 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
 
     // create items based on comments in source files
     // We're supporting  the same syntax as the Vector ASAP2 creator.
-    if let Some(source_files) = arg_matches.get_many::<OsString>("FROM_SOURCE") {
+    if let Some(source_file_patterns) = arg_matches.get_many::<OsString>("FROM_SOURCE") {
         let target_group = arg_matches.get_one::<String>("TARGET_GROUP").cloned();
         let log_msgs =
-            creator::create_items_from_sources(&mut a2l_file, source_files, target_group);
+            creator::create_items_from_sources(&mut a2l_file, source_file_patterns, target_group);
         for msg in log_msgs {
             cond_print!(verbose, now, msg);
         }
@@ -776,7 +776,7 @@ The arg --update must be present.")
         .action(clap::ArgAction::SetTrue)
     )
     .arg(Arg::new("FROM_SOURCE")
-        .help("Create elements in the a2l file based on special comments in a source file.")
+        .help("Create elements in the a2l file based on special comments in a source file. Argument can be a filename or pattern (e.g. *.c).")
         .long("from-source")
         .number_of_values(1)
         .value_parser(ValueParser::os_string())
