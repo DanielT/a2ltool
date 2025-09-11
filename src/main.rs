@@ -9,6 +9,7 @@ use std::{
 };
 use update::{UpdateMode, UpdateType};
 
+mod creator;
 mod datatype;
 mod debuginfo;
 mod ifdata;
@@ -73,17 +74,6 @@ fn main() {
 }
 
 // Implement all the operations supported by a2ltool
-// They will always be performed in this order:
-//  1) load input
-//  2) additional consistency checks
-//  3) load elf
-//  4) merge at the module level
-//  5) merge at the project level
-//  6) merge includes (flatten)
-//  7) update addresses
-//  8) clean up ifdata
-//  9) sort the file
-// 10) output
 fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     let arg_matches = parse_args(args);
 
@@ -304,6 +294,17 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
             cond_print!(verbose, now, msg);
         }
         cond_print!(verbose, now, format!("Removed {} items", removed_count));
+    }
+
+    // create items based on comments in source files
+    // We're supporting  the same syntax as the Vector ASAP2 creator.
+    if let Some(source_files) = arg_matches.get_many::<OsString>("FROM_SOURCE") {
+        let target_group = arg_matches.get_one::<String>("TARGET_GROUP").cloned();
+        let log_msgs =
+            creator::create_items_from_sources(&mut a2l_file, source_files, target_group);
+        for msg in log_msgs {
+            cond_print!(verbose, now, msg);
+        }
     }
 
     if let Some(debugdata) = &debuginfo {
@@ -773,6 +774,14 @@ The arg --update must be present.")
         .long("show-xcp")
         .number_of_values(0)
         .action(clap::ArgAction::SetTrue)
+    )
+    .arg(Arg::new("FROM_SOURCE")
+        .help("Create elements in the a2l file based on special comments in a source file.")
+        .long("from-source")
+        .number_of_values(1)
+        .value_parser(ValueParser::os_string())
+        .value_name("SOURCE_FILE")
+        .action(clap::ArgAction::Append)
     )
     .arg(Arg::new("INSERT_CHARACTERISTIC")
         .help("Insert a CHARACTERISTIC based on a variable in the elf file. The variable name can be complex, e.g. var.element[0].subelement")

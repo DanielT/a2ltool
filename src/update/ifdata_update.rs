@@ -33,6 +33,7 @@ fn update_ifdata_address_canape_ext(
         link_map.datatype = 0;
         link_map.bit_offset = 0;
         link_map.datatype_valid = 0;
+        link_map.segment_offset = 0; // this is used as the address offset
     }
 }
 
