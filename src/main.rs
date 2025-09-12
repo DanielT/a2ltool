@@ -699,7 +699,6 @@ fn parse_args(args: impl Iterator<Item = OsString>) -> ArgMatches {
     )
     .arg(Arg::new("MERGEPROJECT")
         .help("Merge another a2l file on the PROJECT level.\nIf the input file contains m MODULES and the merge file contains n MODULES, then there will be m + n MODULEs in the output.")
-        .short('p')
         .long("merge-project")
         .number_of_values(1)
         .value_name("A2LFILE")
