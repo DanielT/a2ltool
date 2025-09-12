@@ -302,19 +302,33 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
         cond_print!(verbose, now, "Include directives have been merged\n");
     }
 
-    // remove items if --remove was given
-    if arg_matches.contains_id("REMOVE_REGEX") {
+    // remove items if --remove or --remove-range was given
+    if arg_matches.contains_id("REMOVE_RANGE") || arg_matches.contains_id("REMOVE_REGEX") {
+        let mut total_removed = 0;
+        let ranges: Vec<(u64, u64)> =
+            range_args_to_ranges(arg_matches.get_many::<u64>("REMOVE_RANGE"));
+
+        if !ranges.is_empty() {
+            let (log_msgs, removed_count) = remove::remove_address_ranges(&mut a2l_file, &ranges);
+            for msg in log_msgs {
+                cond_print!(verbose, now, msg);
+            }
+            total_removed += removed_count;
+        }
+
         let regexes: Vec<&str> = match arg_matches.get_many::<String>("REMOVE_REGEX") {
             Some(values) => values.map(|x| &**x).collect(),
             None => Vec::new(),
         };
 
-        let mut log_msgs: Vec<String> = Vec::new();
-        let removed_count = remove::remove_items(&mut a2l_file, &regexes, &mut log_msgs);
-        for msg in log_msgs {
-            cond_print!(verbose, now, msg);
+        if !regexes.is_empty() {
+            let (log_msgs, removed_count) = remove::remove_items(&mut a2l_file, &regexes);
+            for msg in log_msgs {
+                cond_print!(verbose, now, msg);
+            }
+            total_removed += removed_count;
         }
-        cond_print!(verbose, now, format!("Removed {} items", removed_count));
+        cond_print!(verbose, now, format!("Removed {} items", total_removed));
     }
 
     // create items based on comments in source files
@@ -831,7 +845,7 @@ The arg --update must be present.")
         .aliases(["insert-characteristic-range"])
         .number_of_values(2)
         .requires("DEBUGINFO_ARGGROUP")
-        .value_name("RANGE")
+        .value_name("ADDR")
         .value_parser(AddressValueParser)
         .action(clap::ArgAction::Append)
     )
@@ -869,7 +883,7 @@ The arg --update must be present.")
         .aliases(["insert-measurement-range"])
         .number_of_values(2)
         .requires("DEBUGINFO_ARGGROUP")
-        .value_name("RANGE")
+        .value_name("ADDR")
         .value_parser(AddressValueParser)
         .action(clap::ArgAction::Append)
     )
@@ -899,11 +913,19 @@ The arg --update must be present.")
         .value_name("GROUP")
     )
     .arg(Arg::new("REMOVE_REGEX")
-        .help("Remove any CHARACTERISTICs, MEASUREMENTs and INSTANCEs whose name matches the given regex.")
+        .help("Remove any CHARACTERISTICs, MEASUREMENTs, AXIS_PTS and INSTANCEs whose name matches the given regex.")
         .short('R')
         .long("remove")
         .number_of_values(1)
         .value_name("REGEX")
+        .action(clap::ArgAction::Append)
+    )
+    .arg(Arg::new("REMOVE_RANGE")
+        .help("Remove any CHARACTERISTICs, MEASUREMENTs, AXIS_PTS and INSTANCEs whose address is inside the given range.")
+        .long("remove-range")
+        .number_of_values(2)
+        .value_name("ADDR")
+        .value_parser(AddressValueParser)
         .action(clap::ArgAction::Append)
     )
     .group(
