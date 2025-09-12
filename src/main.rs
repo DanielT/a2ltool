@@ -30,6 +30,13 @@ pub enum A2lVersion {
     V1_7_1,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MergePref {
+    Existing,
+    New,
+    Both,
+}
+
 macro_rules! cond_print {
     ($verbose:ident, $now:ident, $formatexp:expr) => {
         if $verbose == 1 {
@@ -210,6 +217,10 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
 
     // merge at the module level
     if let Some(merge_modules) = arg_matches.get_many::<OsString>("MERGEMODULE") {
+        let merge_pref = arg_matches
+            .get_one::<MergePref>("MERGEPREF")
+            .cloned()
+            .unwrap_or(MergePref::Both);
         for merge_module_path in merge_modules {
             let load_result = a2lfile::load(
                 merge_module_path,
@@ -223,7 +234,13 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
                     cond_print!(verbose, now, msg.to_string());
                 }
                 // merge the module
-                a2l_file.merge_modules(&mut merge_a2l);
+                let merge_module = &mut merge_a2l.project.module[0];
+                match merge_pref {
+                    MergePref::Existing => a2l_file.project.module[0].import_new(merge_module),
+                    MergePref::New => a2l_file.project.module[0].import_all(merge_module),
+                    MergePref::Both => a2l_file.project.module[0].merge(merge_module),
+                }
+                // merge_helper(merge_pref, &mut a2l_file, merge_module);
                 cond_print!(
                     verbose,
                     now,
@@ -237,7 +254,11 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
                 Some(ifdata::A2MLVECTOR_TEXT.to_string()),
             ) {
                 // failed to load the file as a full A2L file, but loaded it as a module fragment
-                a2l_file.project.module[0].merge(&mut other_module);
+                match merge_pref {
+                    MergePref::Existing => a2l_file.project.module[0].import_new(&mut other_module),
+                    MergePref::New => a2l_file.project.module[0].import_all(&mut other_module),
+                    MergePref::Both => a2l_file.project.module[0].merge(&mut other_module),
+                }
                 cond_print!(
                     verbose,
                     now,
@@ -663,6 +684,18 @@ fn parse_args(args: impl Iterator<Item = OsString>) -> ArgMatches {
         .number_of_values(1)
         .value_parser(ValueParser::os_string())
         .action(clap::ArgAction::Append)
+    )
+    .arg(Arg::new("MERGEPREF")
+        .help("Choose how to handle conflicts when merging MODULES. PREF can be one of:
+  EXISTING: Keep the existing item
+  NEW: Use the new item from the merge file.
+  BOTH: keep both items, renaming the new item if necessary (default)")
+        .long("merge-preference")
+        .number_of_values(1)
+        .value_name("PREF")
+        .value_parser(MergePrefParser)
+        .action(clap::ArgAction::Set)
+        .requires("MERGEMODULE")
     )
     .arg(Arg::new("MERGEPROJECT")
         .help("Merge another a2l file on the PROJECT level.\nIf the input file contains m MODULES and the merge file contains n MODULES, then there will be m + n MODULEs in the output.")
@@ -1091,6 +1124,43 @@ impl clap::builder::TypedValueParser for UpdateTypeParser {
         match value.to_string_lossy().as_ref() {
             "FULL" => Ok(UpdateType::Full),
             "ADDRESSES" => Ok(UpdateType::Addresses),
+            _ => {
+                let mut err =
+                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                if let Some(arg) = arg {
+                    err.insert(
+                        clap::error::ContextKind::InvalidArg,
+                        clap::error::ContextValue::String(arg.to_string()),
+                    );
+                }
+                let strval = value.to_string_lossy();
+                err.insert(
+                    clap::error::ContextKind::InvalidValue,
+                    clap::error::ContextValue::String(String::from(strval)),
+                );
+                Err(err)
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct MergePrefParser;
+
+impl clap::builder::TypedValueParser for MergePrefParser {
+    type Value = MergePref;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        match value.to_string_lossy().as_ref() {
+            "EXISTING" => Ok(MergePref::Existing),
+            "NEW" => Ok(MergePref::New),
+            "BOTH" => Ok(MergePref::Both),
+            "MERGE" => Ok(MergePref::Both), // alias for convenience
             _ => {
                 let mut err =
                     clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
