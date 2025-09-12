@@ -1189,8 +1189,8 @@ mod test {
 
     #[test]
     fn test_option_create_output() {
-        let tempdir = tempfile::tempdir().unwrap().into_path();
-        let outfile = tempdir.join("output.a2l");
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1256,8 +1256,8 @@ mod test {
 
     #[test]
     fn test_option_cleanup() {
-        let tempdir = tempfile::tempdir().unwrap().into_path();
-        let outfile = tempdir.join("output.a2l");
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1281,10 +1281,10 @@ mod test {
 
     #[test]
     fn test_option_update() {
-        let tempdir = tempfile::tempdir().unwrap().into_path();
+        let tempdir = tempfile::tempdir().unwrap();
 
         // 1. full update
-        let outfile = tempdir.join("output.a2l");
+        let outfile = tempdir.path().join("output.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1311,7 +1311,7 @@ mod test {
         );
 
         // 2. address update only in strict mode on valid input
-        let outfile = tempdir.join("output2.a2l");
+        let outfile = tempdir.path().join("output2.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1331,7 +1331,7 @@ mod test {
         assert!(a2l_output.project.module[0].characteristic[0].address != 0);
 
         // 3. address update only in strict mode on invalid input
-        let outfile = tempdir.join("output3.a2l");
+        let outfile = tempdir.path().join("output3.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1360,8 +1360,8 @@ mod test {
         // The option --target-group can be used to put the inserted items into a group, and is tested here too
 
         // 1. insert by name
-        let tempdir = tempfile::tempdir().unwrap().into_path();
-        let outfile = tempdir.join("output1.a2l");
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output1.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1396,7 +1396,7 @@ mod test {
         let characteristic_addr = a2l_output.project.module[0].characteristic[0].address;
 
         // 2. insert by address range
-        let outfile = tempdir.join("output2.a2l");
+        let outfile = tempdir.path().join("output2.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1419,7 +1419,7 @@ mod test {
         assert_eq!(a2l_output.project.module[0].group.len(), 0); // no --target-group used this time
 
         // 3. insert by regex
-        let outfile = tempdir.join("output3.a2l");
+        let outfile = tempdir.path().join("output3.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1439,7 +1439,7 @@ mod test {
         assert_eq!(a2l_output.project.module[0].characteristic.len(), 1);
 
         // 4. insert by section
-        let outfile = tempdir.join("output4.a2l");
+        let outfile = tempdir.path().join("output4.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1465,8 +1465,8 @@ mod test {
         // merging can be done on the MODULE level with --merge and on the PROJECT level with --merge-project
 
         // 1. merge on the MODULE level
-        let tempdir = tempfile::tempdir().unwrap().into_path();
-        let outfile = tempdir.join("output.a2l");
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1504,7 +1504,7 @@ mod test {
         );
 
         // 2. merge on the PROJECT level
-        let outfile = tempdir.join("output2.a2l");
+        let outfile = tempdir.path().join("output2.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1540,8 +1540,8 @@ mod test {
             .get_name()
             .to_string();
 
-        let tempdir = tempfile::tempdir().unwrap().into_path();
-        let outfile = tempdir.join("output.a2l");
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1569,8 +1569,8 @@ mod test {
     #[test]
     fn test_option_a2lversion() {
         // the a2l version can be set with --a2lversion
-        let tempdir = tempfile::tempdir().unwrap().into_path();
-        let outfile = tempdir.join("output.a2l");
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1586,7 +1586,7 @@ mod test {
         assert_eq!(a2l_output.asap2_version.as_ref().unwrap().upgrade_no, 60);
 
         // modify the a2l version of an existing file
-        let outfile2 = tempdir.join("output2.a2l");
+        let outfile2 = tempdir.path().join("output2.a2l");
         let args = vec![
             OsString::from("a2ltool"),
             OsString::from("fixtures/a2l/update_test1.a2l"),
@@ -1604,8 +1604,8 @@ mod test {
     #[test]
     fn test_option_merge_includes() {
         // the content of all included files can be merged with --merge-includes
-        let tempdir = tempfile::tempdir().unwrap().into_path();
-        let outfile = tempdir.join("output.a2l");
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
@@ -1623,8 +1623,8 @@ mod test {
     #[test]
     fn test_option_sort() {
         // all items in the file can be sorted with --sort
-        let tempdir = tempfile::tempdir().unwrap().into_path();
-        let outfile = tempdir.join("output.a2l");
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
         assert!(!outfile.exists());
         let args = vec![
             OsString::from("a2ltool"),
