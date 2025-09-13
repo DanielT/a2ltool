@@ -1087,9 +1087,18 @@ impl<'text> Parser<'_, 'text> {
             }
             b"TABLE" => {
                 let (rows, default_value) = self.parse_conversion_table()?;
+                let format_values = if self.check_next_token(b"FORMAT") {
+                    self.get_token("")?; // consume "FORMAT"
+                    let length = self.get_uint_value("TABLE conversion FORMAT length")?;
+                    let digits = self.get_uint_value("TABLE conversion FORMAT digits")?;
+                    Some((length, digits))
+                } else {
+                    None
+                };
                 let table_conversion = ConversionAttribute::Table {
                     rows,
                     default_value,
+                    format_values,
                 };
                 Ok(table_conversion)
             }
@@ -1701,7 +1710,7 @@ mod tests {
         @@   DATA_TYPE = SBYTE
         @@   DIMENSION = 10
         @@   INPUT = InputSignal
-        @@   CONVERSION = LINEAR 1 0 "unit" 8 4
+        @@   CONVERSION = TABLE 0 "zero" 1 "one" 2 "two" DEFAULT_VALUE "other" FORMAT 6 1
         @@ Y_AXIS = FIX [0...100] , 0.5
         @@   INPUT = InputSignal2
         @@   UNIT = "unit2" 2
@@ -1782,7 +1791,7 @@ mod tests {
         assert_eq!(input_is_instance, false);
         assert!(matches!(
             conversion,
-            Some(ConversionAttribute::Linear { .. })
+            Some(ConversionAttribute::Table { .. })
         ));
     }
 

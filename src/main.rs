@@ -1550,6 +1550,52 @@ mod test {
     }
 
     #[test]
+    fn test_option_merge_new() {
+        // when merging, the preference for existing or new items can be set with --merge-pref
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
+            OsString::from("--merge"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
+            OsString::from("--merge-preference"),
+            OsString::from("NEW"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let (a2l_input, _) = a2lfile::load("fixtures/a2l/update_test1.a2l", None, false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
+        // merging a file with itself with preference for new items should leave the file unchanged
+        assert_eq!(a2l_input, a2l_output);
+    }
+
+    #[test]
+    fn test_option_merge_existing() {
+        // when merging, the preference for existing or new items can be set with --merge-pref
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
+            OsString::from("--merge"),
+            OsString::from("fixtures/a2l/update_test1.a2l"),
+            OsString::from("--merge-preference"),
+            OsString::from("EXISTING"),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let (a2l_input, _) = a2lfile::load("fixtures/a2l/update_test1.a2l", None, false).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
+        // merging a file with itself with preference for existing items should leave the file unchanged
+        assert_eq!(a2l_input, a2l_output);
+    }
+
+    #[test]
     fn test_option_remove() {
         // items can be removed by name with --remove
         let (a2l_input, _) = a2lfile::load("fixtures/a2l/update_test1.a2l", None, false).unwrap();
@@ -1571,6 +1617,46 @@ mod test {
             OsString::from(characteristic_name),
             OsString::from("--remove"),
             OsString::from(measurement_name),
+            OsString::from("--output"),
+            OsString::from(outfile.clone()),
+        ];
+        core(args.into_iter()).unwrap();
+        let (a2l_output, _) = a2lfile::load(outfile, None, false).unwrap();
+        // the output should have one less characteristic and one less measurement than the input
+        assert_eq!(
+            a2l_input.project.module[0].characteristic.len(),
+            a2l_output.project.module[0].characteristic.len() + 1
+        );
+        assert_eq!(
+            a2l_input.project.module[0].measurement.len(),
+            a2l_output.project.module[0].measurement.len() + 1
+        );
+    }
+
+    #[test]
+    fn test_option_remove_range() {
+        // items can be removed by address range with --remove-range
+        let (a2l_input, _) = a2lfile::load("fixtures/a2l/remove_test.a2l", None, false).unwrap();
+        // get the address of the first characteristic and measurement, so they can be removed
+        let characteristic_addr = a2l_input.project.module[0].characteristic[0].address;
+        let measurement_addr = a2l_input.project.module[0].measurement[0]
+            .ecu_address
+            .as_ref()
+            .unwrap()
+            .address;
+
+        let tempdir = tempfile::tempdir().unwrap();
+        let outfile = tempdir.path().join("output.a2l");
+        assert!(!outfile.exists());
+        let args = vec![
+            OsString::from("a2ltool"),
+            OsString::from("fixtures/a2l/remove_test.a2l"),
+            OsString::from("--remove-range"),
+            OsString::from(format!("0x{:x}", characteristic_addr)),
+            OsString::from(format!("0x{:x}", characteristic_addr + 4)),
+            OsString::from("--remove-range"),
+            OsString::from(format!("0x{:x}", measurement_addr)),
+            OsString::from(format!("0x{:x}", measurement_addr + 4)),
             OsString::from("--output"),
             OsString::from(outfile.clone()),
         ];

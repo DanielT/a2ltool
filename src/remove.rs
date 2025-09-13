@@ -242,3 +242,108 @@ fn clean_up_groups(module: &mut a2lfile::Module, removed_items: &HashSet<String>
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static INPUT: &str = r#"
+    /begin PROJECT project ""
+      /begin MODULE module ""
+        /begin AXIS_PTS axis_abc_def_1 ""
+          0x1000 NO_INPUT_QUANTITY record 0 NO_COMPU_METHOD 5 0 4294967295
+        /end AXIS_PTS
+        /begin BLOB ghi_def_blob_1 ""
+          0x2000 128
+        /end BLOB
+        /begin CHARACTERISTIC abc_xyz_characteristic_1 ""
+          VALUE 0x3000 uint32_RecordLayout 0 NO_COMPU_METHOD 0 10000000
+        /end CHARACTERISTIC
+        /begin MEASUREMENT lmn_xyz_measurement_1 ""
+          UWORD NO_COMPU_METHOD 0 0 0 2
+          ECU_ADDRESS 0x4000
+        /end MEASUREMENT
+        /begin INSTANCE lmn_uvw_instance_1 ""
+          TypedefName 0x5000
+        /end INSTANCE
+        /begin GROUP group1 ""
+          /begin REF_CHARACTERISTIC
+            abc_xyz_characteristic_1 axis_abc_def_1 lmn_uvw_instance_1 ghi_def_blob_1
+          /end REF_CHARACTERISTIC
+          /begin REF_MEASUREMENT
+            lmn_xyz_measurement_1
+          /end REF_MEASUREMENT
+        /end GROUP
+      /end MODULE
+    /end PROJECT
+    "#;
+
+    #[test]
+    fn test_remove_items() {
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_items(&mut a2l_file, &[".*_xyz_.*"]);
+        assert_eq!(count, 2);
+        assert_eq!(a2l_file.project.module[0].characteristic.len(), 0);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 0);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 1);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 1);
+        assert_eq!(a2l_file.project.module[0].blob.len(), 1);
+
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_items(&mut a2l_file, &["lmn_.*"]);
+        assert_eq!(count, 2);
+        assert_eq!(a2l_file.project.module[0].characteristic.len(), 1);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 0);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 0);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 1);
+        assert_eq!(a2l_file.project.module[0].blob.len(), 1);
+
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_items(&mut a2l_file, &[".*_def_.*"]);
+        assert_eq!(count, 2);
+        assert_eq!(a2l_file.project.module[0].characteristic.len(), 1);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 1);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 1);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 0);
+        assert_eq!(a2l_file.project.module[0].blob.len(), 0);
+    }
+
+    #[test]
+    fn test_remove_address_ranges() {
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_address_ranges(&mut a2l_file, &[(0x3000, 0x3FFF)]);
+        assert_eq!(count, 1);
+        assert_eq!(a2l_file.project.module[0].characteristic.len(), 0);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 1);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 1);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 1);
+        assert_eq!(a2l_file.project.module[0].blob.len(), 1);
+
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_address_ranges(&mut a2l_file, &[(0x1000, 0x1FFF)]);
+        assert_eq!(count, 1);
+        assert_eq!(a2l_file.project.module[0].characteristic.len(), 1);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 1);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 1);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 0);
+        assert_eq!(a2l_file.project.module[0].blob.len(), 1);
+
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_address_ranges(&mut a2l_file, &[(0x2000, 0x2FFF)]);
+        assert_eq!(count, 1);
+        assert_eq!(a2l_file.project.module[0].characteristic.len(), 1);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 1);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 1);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 1);
+        assert_eq!(a2l_file.project.module[0].blob.len(), 0);
+
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_address_ranges(&mut a2l_file, &[(0x5000, 0x5FFF)]);
+        assert_eq!(count, 1);
+        assert_eq!(a2l_file.project.module[0].characteristic.len(), 1);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 1);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 0);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 1);
+        assert_eq!(a2l_file.project.module[0].blob.len(), 1);
+    }
+}

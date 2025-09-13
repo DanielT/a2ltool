@@ -283,6 +283,7 @@ enum ConversionAttribute {
     Table {
         rows: Vec<TableRow>,
         default_value: Option<String>,
+        format_values: Option<(u64, u64)>,
     },
     Reference {
         name: String,
@@ -1422,6 +1423,7 @@ impl<'a2l> Creator<'a2l> {
                 ConversionAttribute::Table {
                     rows,
                     default_value,
+                    format_values: format,
                 } => {
                     // Handle table conversion
                     let conv_name = format!("{parent}.Conversion");
@@ -1440,7 +1442,14 @@ impl<'a2l> Creator<'a2l> {
                     }
                     self.create_compu_method_table(&conv_name, rows, default_value);
 
-                    (conv_name, None, None)
+                    let format = if let Some((length, digits)) = format {
+                        let fmt = format!("%{length}.{digits}");
+                        Some(Format::new(fmt.clone()))
+                    } else {
+                        None
+                    };
+
+                    (conv_name, None, format)
                 }
                 ConversionAttribute::Reference {
                     name,
