@@ -1,0 +1,51 @@
+name: Build Docs
+
+on: 
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Install mdbook and plugins
+        run: |
+          cargo install mdbook
+          cargo install mdbook-pandoc
+
+      - name: Install Pandoc & LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc \
+            texlive-latex-base texlive-latex-extra \
+            texlive-fonts-recommended lmodern
+
+      - name: Build HTML docs
+        run: cd manual && mdbook build
+
+      - name: Upload HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-docs
+          path: manual/book/html
+
+      - name: Upload PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-docs
+          path: manual/book/pandoc/pdf/a2ltool_manual.pdf
+      
+      - name: Deploy Pages
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: html-docs
