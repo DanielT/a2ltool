@@ -138,43 +138,6 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
         xcp::show_settings(&a2l_file, input_filename);
     }
 
-    // additional consistency checks
-    if check {
-        cond_print!(
-            verbose,
-            now,
-            format!(
-                "Performing consistency check for {}.",
-                input_filename.to_string_lossy()
-            )
-        );
-        let log_msgs = a2l_file.check();
-        if log_msgs.is_empty() {
-            ext_println!(
-                verbose,
-                now,
-                "Consistency check complete. No problems found."
-            );
-        } else {
-            for msg in &log_msgs {
-                ext_println!(verbose, now, format!("    {}", msg));
-            }
-            ext_println!(
-                verbose,
-                now,
-                format!(
-                    "Consistency check complete. {} problems reported.",
-                    log_msgs.len()
-                )
-            );
-
-            // in strict mode, exit with error if there are any problems
-            if strict {
-                return Err("Exiting because strict mode is enabled.".to_string());
-            }
-        }
-    }
-
     // convert/downgrade the file to some version
     if let Some(new_a2l_version) = arg_matches.get_one::<A2lVersion>("A2LVERSION") {
         version::convert(&mut a2l_file, *new_a2l_version);
@@ -535,6 +498,43 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     if sort {
         a2l_file.sort();
         cond_print!(verbose, now, "All objects have been sorted");
+    }
+
+    // additional consistency checks
+    if check {
+        cond_print!(
+            verbose,
+            now,
+            format!(
+                "Performing consistency check for {}.",
+                input_filename.to_string_lossy()
+            )
+        );
+        let log_msgs = a2l_file.check();
+        if log_msgs.is_empty() {
+            ext_println!(
+                verbose,
+                now,
+                "Consistency check complete. No problems found."
+            );
+        } else {
+            for msg in &log_msgs {
+                ext_println!(verbose, now, format!("    {}", msg));
+            }
+            ext_println!(
+                verbose,
+                now,
+                format!(
+                    "Consistency check complete. {} problems reported.",
+                    log_msgs.len()
+                )
+            );
+
+            // in strict mode, exit with error if there are any problems
+            if strict {
+                return Err("Exiting because strict mode is enabled.".to_string());
+            }
+        }
     }
 
     // output
