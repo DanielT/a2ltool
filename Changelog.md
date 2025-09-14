@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 3.0.0
+
+- Implement compatibility with Vector's ASAP2 Creator and allow creation of a2l elements using the same special comment syntax
+- Implement additional modes for file merges.
+  The standard so far was to keep both conflicting elements. Not the `--merge-preference` option can be used to always use the existing version or the new version instead.
+- Add a manual for a2ltool.
+- Support non-standard `SYMBOL-LINK` notation, where the compile unit name is used as a prefix of the real symbol name
+- Implement the ability to update `VAR_ADDRESS` info of `VAR_CHARACTERISTIC`
+- Handle negative bit-offsets in DWARF2 debug info correctly instead of panicing
+- Increase the size of the containing type for bitfields that extend past the end of their nominal containig type.
+
 ## Version 2.7.0
 
 - support C++ references in the DWARF debug data reader
