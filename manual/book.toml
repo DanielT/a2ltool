@@ -1,0 +1,28 @@
+[book]
+authors = ["Daniel Thaler"]
+language = "en"
+src = "src"
+title = "a2ltool User Manual"
+
+[output.html]   # web docs
+
+[output.pandoc.profile.pdf]
+output-file = "a2ltool_manual.pdf"
+to = "latex"
+
+[output.pandoc.profile.pdf.variables] 
+documentclass = "report" 
+mainfont = "Noto Serif" 
+sansfont = "Noto Sans" 
+monofont = "Noto Sans Mono" 
+mainfontfallback = [ 
+    "NotoColorEmoji:mode=harf", 
+    "NotoSansMath:", 
+    "NotoSerifCJKSC:", 
+] 
+monofontfallback = [ 
+    "NotoColorEmoji:mode=harf", 
+    "NotoSansMath:", 
+    "NotoSansMonoCJKSC:", 
+] 
+geometry = ["margin=1.25in"] 
