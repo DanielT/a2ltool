@@ -1,4 +1,4 @@
-# Checking a2l File Consistency
+# Checking A2L File Consistency
 
 ## Motivation
 

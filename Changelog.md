@@ -10,6 +10,7 @@
 - Implement the ability to update `VAR_ADDRESS` info of `VAR_CHARACTERISTIC`
 - Handle negative bit-offsets in DWARF2 debug info correctly instead of panicing
 - Increase the size of the containing type for bitfields that extend past the end of their nominal containig type.
+- Add more plausibility checks to `--check`
 
 ## Version 2.7.0
 

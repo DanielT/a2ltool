@@ -2,13 +2,13 @@
 
 a2ltool is a command line utility that helps you work with a2l files.
 
-A2l files describe measurement variables and tunable parameters of an embedded device (typically: an automotive ECU).
+A2L files describe measurement variables and tunable parameters of an embedded device (typically: an automotive ECU).
 
 ## Features
 
 You can:
 
-- create a2l files from scatch
+- create A2L files from scratch
 - merge multiple a2l files
 - update the information in an a2l file based debug info of the software
 - delete existing elements
@@ -23,9 +23,9 @@ For any other platforms you can clone the git repository and compile it as ususa
 
 ## Quick start
 
-Every call of a2ltool needs either an input file name, or the parameter `--create` to start with an empty file.
-Any time you want to write some output to a file you need the parameter `--output`.
-As a result, a minimal call to a2ltool that doesn't do anything by itself looks like this:
+Every invocation of a2ltool requires either an input file name, or the parameter `--create` to start with an empty file.
+Whenever you want to write output to a file, you must use the `--output` parameter.
+A minimal call to a2ltool that does not perform any actions by itself looks like this:
 
     a2ltool input.a2l --output output.a2l
 
@@ -33,13 +33,13 @@ or
 
     a2ltool --create --output output.a2l
 
-You can add all other parameters you might need to this basic call.
+You can add any additional parameters you need to this basic command.
 
 ## Note
 
-a2ltool is silent by default. Only errors are printed to your console.
+By default, a2ltool is silent; only errors are printed to the console.
 
-While you are getting started with a2ltool you will find it useful to set the `--verbose` (or `-v`) option to enable additional output.
+While getting started with a2ltool, you may find it useful to use the `--verbose` (or `-v`) option to enable additional output.
 
 ## Basic examples
 
@@ -53,4 +53,4 @@ While you are getting started with a2ltool you will find it useful to set the `-
 
 ## Support
 
-If you encounter any bugs, you can report the bug in the [issue tracker](https://github.com/DanielT/a2ltool/issues) on Github.
+If you encounter any bugs, you can report them in the [issue tracker](https://github.com/DanielT/a2ltool/issues) on Github.

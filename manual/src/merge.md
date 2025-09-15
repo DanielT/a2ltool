@@ -1,48 +1,51 @@
-# Merging a2l Files
+# Merging A2L Files
 
 ## Motivation
 
-An embedded software project often generates multiple separate a2l files for different parts of the overall system.
-For example, there might be hand-crafted files as well as files generated for individual components by calibration data mangement tools, Autosar RTE generators, etc.
+An embedded software project often generates multiple separate A2L files for different parts of the overall system.
+For example, there might be hand-crafted files as well as files generated for individual components by calibration data management tools, AUTOSAR RTE generators, etc.
 
-They must all be merged into a single file so that a measurement/calibration tool can make use of the information.
+All these files must be merged into a single file so that measurement and calibration tools can utilize the information.
 
 ## Basic Example
 
-With a2ltool you can do it like this:
+You can use a2ltool as follows:
 
     a2ltool main.a2l --merge first.a2l --merge second.a2l --output out.a2l
 
-the option `--merge` can be repeated as often as necessary to merge multiple inputs in a single call.
+The `--merge` option can be repeated as many times as needed to merge multiple input files in a single command.
 
 ## Merge Modes
 
-Ideally, the information in your inputs should be fully disjoint. In other words, no two files should define an object with the same name.
+Ideally, the information in your input files should be completely disjoint. In other words, no two files should define an object with the same name.
 
-For example, if one file defines a measurment variable `speed` as integar, but another file defines `speed` as a floating point value, then it impossible to know which definition is correct.
-By default, the merge keeps both, renaming the second one to `speed.MERGE`. This allows the user to select the correct variant in the measurement tool.
+For example, if one file defines a measurement variable `speed` as an integer, but another file defines `speed` as a floating point value, then it is impossible to know which definition is correct.
+By default, the merge keeps both definitions, renaming the second one to `speed.MERGE`. This allows you to select the correct variant in the measurement tool.
 
-You can modify this behavior by setting a merge preference.
+You can change this behavior by setting a merge preference.
+
 
 a2ltool supports three different ways to handle merges:
 
-- `--merge-preference EXISTING`: Prefer existing items, discarding any items from the merge that have conflicting names
-- `--merge-preference NEW`: Prefer new items, overwriting any existing items have conflicting names
-- `--merge-preference BOTH` Keep both, renaing conflicts as described above. This is the default if no merge preference is set.
+- `--merge-preference EXISTING`: Prefer existing items, discarding any items from the merge that have conflicting names.
+- `--merge-preference NEW`: Prefer new items, overwriting any existing items with conflicting names.
+- `--merge-preference BOTH`: Keep both, renaming conflicts as described above. This is the default if no merge preference is set.
 
 The merge preference applies to all merge operations in the same a2ltool invocation.
-a2ltool should be called multiple times to use different preferences with different files.
+Call a2ltool multiple times if you want to use different preferences for different files.
+
 
 ### Example
 
-    a2ltool main.a2l --merge other.a2l --merge-preference NEW --output.a2l
+    a2ltool main.a2l --merge other.a2l --merge-preference NEW --output out.a2l
 
 ## Merging includes
 
-A2l files can include other a2l files using the directive `/include "file.a2l"`.
-This form is not widely supported in measurement/calibration tools, and is usually merged into a single file.
 
-a2ltool can handle this merging step with the `--merge-includes` command line option.
+A2L files can include other A2L files using the directive `/include "file.a2l"`.
+This form is not widely supported by measurement and calibration tools, so included files are usually merged into a single file.
+
+a2ltool can perform this merging step using the `--merge-includes` command-line option.
 
 ### Example
 

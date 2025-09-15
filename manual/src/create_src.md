@@ -1,27 +1,27 @@
-## Creating items based on comments in source files
+# Creating items based on comments in source files
 
-This mode provides compatibility with "Vector ASAP2 Creator".
+This mode is compatible with "Vector ASAP2 Creator".
 
-Here special comments inside the source code of the software define a2l elements for the variables and structures in the code.
+Special comments within the source code define A2L elements for variables and structures.
 
-The command line option `--from-source` can be given zero or more times to specify a list of file names or file name patterns.
-All file name patterns are fully expanded, and then the resulting list of files is read, in order to process special comments.
+The command-line option `--from-source` can be specified multiple times to provide a list of file names or file name patterns.
+All patterns are fully expanded, and the resulting files are processed to extract special comments.
 
-### File name patterns
+## File name patterns
 
 File name patterns are an easy way to specify multiple file names.
 
-A simple example is `*.c` - a list of every .c file in the current directory.
-A more complex example is `src/**/*.h` - a list of all .h files located at any depth below the src directory.
+For example, `*.c` matches all `.c` files in the current directory.
+A more complex pattern, `src/**/*.h`, matches all `.h` files at any depth within the `src` directory.
 
-### File types
+## File types
 
-a2ltool doesn't care about the type of the files that are processed, as long as they contain text. The syntax of the code inside the files is not evaluated at all, and C-style preprocessor directives are also ignored.
-a2ltool only looks for strings that look like comments - blocks enclosed in `/* */` or lines starting with `//`.
+a2ltool processes any text file, regardless of its type. The syntax of the code is not evaluated, and C-style preprocessor directives are ignored.
+a2ltool only searches for comments—either blocks enclosed in `/* */` or lines starting with `//`.
 
-### Example
+## Example
 
-#### Input
+#### Example Input
 
 src/input_1.c
 
@@ -156,7 +156,7 @@ src/input_5.c
 
     a2ltool --create --from-source "src/*.c" --output out.a2l
 
-### Syntax
+## Syntax
 
 Within the special comments each line must begin with the marker `@@`.
 
@@ -417,8 +417,8 @@ After stripping the `@@` marker, the remaining text is parsed as a `<definition>
 
 ### Notes
 
-a2ltool only performs minimal consistency checks automatically while creating items from source comments.
+a2ltool performs only minimal consistency checks when creating items from source comments.
 
-For example, the added items might reference COMPU_METHODs or RECORD_LAYOUTs by name, and these are not guaranteed to exist.
+For example, added items may reference COMPU_METHODs or RECORD_LAYOUTs by name, which are not guaranteed to exist.
 
-A full sanity check of the file can be performed using the option `--check`, which can be passed together with `--from-source`.
+To perform a full sanity check, use the `--check` option together with `--from-source`.
