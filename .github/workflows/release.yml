@@ -108,9 +108,46 @@ jobs:
           name: ${{ matrix.os }}-zip
           path: target/${{ matrix.target }}/release/${{ env.ZIP_NAME }}
 
+  manual:
+    name: Build User Manual
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install mdbook and plugins
+        run: |
+          cargo install mdbook
+          cargo install mdbook-pandoc
+
+      - name: Install Pandoc & LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc \
+            texlive-latex-base texlive-latex-extra \
+            texlive-fonts-recommended lmodern
+
+      - name: Build docs
+        run: cd manual && mdbook build
+
+      - name: Upload PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-docs
+          path: manual/book/pandoc/pdf/a2ltool_manual.pdf
+
   release:
     name: Create Release
-    needs: build
+    needs: [build, manual]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -133,5 +170,5 @@ jobs:
           body: ${{ github.event.head_commit.message }}
           draft: true
           prerelease: false
-          artifacts: "*.zip"
+          artifacts: "*.zip,*.pdf"
 
