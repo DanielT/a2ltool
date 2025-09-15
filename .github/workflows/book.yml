@@ -1,12 +1,17 @@
-name: Build Docs
+name: Build User Manual
 
-on: 
+on:
   push:
-    branches:
-      - main
+    branches: [ master ]
+
+permissions:
+  contents: read
+  id-token: write
+  pages: write
 
 jobs:
   build:
+    name: Build User Manual
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,6 +22,14 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
+
+      - name: Cache Rust artifacts
+        # cache all dependencies to speed up the workflow
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
 
       - name: Install mdbook and plugins
         run: |
@@ -34,9 +47,8 @@ jobs:
         run: cd manual && mdbook build
 
       - name: Upload HTML
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: html-docs
           path: manual/book/html
 
       - name: Upload PDF
@@ -45,7 +57,14 @@ jobs:
           name: pdf-docs
           path: manual/book/pandoc/pdf/a2ltool_manual.pdf
       
-      - name: Deploy Pages
+  # Deployment job
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          artifact_name: html-docs
