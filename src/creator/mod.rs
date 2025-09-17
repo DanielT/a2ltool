@@ -371,6 +371,7 @@ struct Creator<'a2l> {
     version: A2lVersion,
     deferred_var_characteristic: Vec<(String, u32)>,
     var_criterion: HashMap<String, VarCriterionDefinition>,
+    new_arrays: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -404,10 +405,11 @@ pub(crate) fn create_items_from_sources<'a>(
     a2l_file: &mut A2lFile,
     source_file_patterns: impl Iterator<Item = &'a OsString>,
     target_group: Option<String>,
+    force_old_arrays: bool,
 ) -> Vec<String> {
     // This function will handle the creation of items from the source file
     // and return the count of inserted items along with any log messages.
-    let mut creator = Creator::new(a2l_file, target_group);
+    let mut creator = Creator::new(a2l_file, target_group, force_old_arrays);
 
     for source_file_pattern in source_file_patterns {
         // try to expand the pattern using glob, if the input is valid unicode, and if glob understands the pattern
@@ -463,7 +465,11 @@ fn deftokens_to_string(definition_tokens: &[&[u8]]) -> String {
 }
 
 impl<'a2l> Creator<'a2l> {
-    fn new(a2l_file: &'a2l mut A2lFile, target_group: Option<String>) -> Self {
+    fn new(
+        a2l_file: &'a2l mut A2lFile,
+        target_group: Option<String>,
+        force_old_arrays: bool,
+    ) -> Self {
         let main_group = target_group.unwrap_or_else(|| "CREATED".to_string());
 
         let version = A2lVersion::from(&*a2l_file);
@@ -486,6 +492,7 @@ impl<'a2l> Creator<'a2l> {
             version,
             deferred_var_characteristic: Vec::new(),
             var_criterion: HashMap::new(),
+            new_arrays: !force_old_arrays && version >= A2lVersion::V1_7_0,
         }
     }
 
@@ -623,7 +630,7 @@ impl<'a2l> Creator<'a2l> {
                 split,
                 &a2l_name,
                 &symbol_name,
-                self.version >= A2lVersion::V1_6_0,
+                self.new_arrays,
             ) {
                 if self.check_a2l_name(&split_a2l_name).is_ok() {
                     self.create_measure_object(
@@ -768,7 +775,7 @@ impl<'a2l> Creator<'a2l> {
                 split,
                 &a2l_name,
                 &symbol_name,
-                self.version >= A2lVersion::V1_6_0,
+                self.new_arrays,
             ) {
                 if self.check_a2l_name(&split_a2l_name).is_ok() {
                     self.create_parameter_object(
@@ -1115,7 +1122,7 @@ impl<'a2l> Creator<'a2l> {
                 split,
                 &a2l_name,
                 &symbol_name,
-                self.version >= A2lVersion::V1_6_0,
+                self.new_arrays,
             ) {
                 if self.check_a2l_name(&split_a2l_name).is_ok() {
                     self.create_string_object(
@@ -1235,7 +1242,7 @@ impl<'a2l> Creator<'a2l> {
                 split,
                 &a2l_name,
                 &symbol_name,
-                self.version >= A2lVersion::V1_6_0,
+                self.new_arrays,
             ) {
                 instance_element.instance_name = split_a2l_name.clone();
                 if self.check_a2l_name(&split_a2l_name).is_ok() {
@@ -1280,7 +1287,7 @@ impl<'a2l> Creator<'a2l> {
                 split,
                 &a2l_name,
                 &symbol_name,
-                self.version >= A2lVersion::V1_6_0,
+                self.new_arrays,
             ) {
                 if self.check_a2l_name(&split_a2l_name).is_ok() {
                     let result = self.create_sub_structure_items(
@@ -2423,7 +2430,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
         let module = &a2l_file.project.module[0];
         let measurement = module.measurement.get("OtherMeasurementName").unwrap();
@@ -2461,7 +2468,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
         let module = &a2l_file.project.module[0];
         assert_eq!(module.measurement.len(), 12);
@@ -2492,7 +2499,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
         println!("{:#?}", creator.messages);
         let module = &a2l_file.project.module[0];
@@ -2521,7 +2528,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
         println!("{:#?}", creator.messages);
         let module = &a2l_file.project.module[0];
@@ -2561,7 +2568,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         let module = &a2l_file.project.module[0];
@@ -2618,7 +2625,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
         println!("{:#?}", creator.messages);
 
@@ -2660,7 +2667,7 @@ mod tests {
         @@ END
         */"#;
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         let module = creator.module;
@@ -2691,7 +2698,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         let module = creator.module;
@@ -2713,7 +2720,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         let module = &a2l_file.project.module[0];
@@ -2751,7 +2758,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         let module = &a2l_file.project.module[0];
@@ -2791,7 +2798,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         let module = creator.module;
@@ -2830,7 +2837,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         let module = creator.module;
@@ -2904,7 +2911,7 @@ mod tests {
         "#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         let module = creator.module;
@@ -2927,7 +2934,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         // the main group is only created once an item is created that belongs to it
@@ -2951,7 +2958,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         // the sub group is only created once an item is created that belongs to it
@@ -2987,7 +2994,7 @@ mod tests {
         */"#;
 
         let mut a2l_file = a2lfile::new();
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
 
         let module = creator.module;
@@ -3028,7 +3035,7 @@ mod tests {
             ver.upgrade_no = 50;
         }
 
-        let mut creator = Creator::new(&mut a2l_file, None);
+        let mut creator = Creator::new(&mut a2l_file, None, false);
         creator.process_file(input);
         let module = &a2l_file.project.module[0];
         let measurement = module.measurement.get("MeasurementName").unwrap();

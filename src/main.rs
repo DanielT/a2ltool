@@ -99,6 +99,9 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     let enable_structures = *arg_matches
         .get_one::<bool>("ENABLE_STRUCTURES")
         .expect("option enable-structures must always exist");
+    let force_old_arrays = *arg_matches
+        .get_one::<bool>("OLD_ARRAYS")
+        .expect("option old-arrays must always exist");
     let cleanup = *arg_matches
         .get_one::<bool>("CLEANUP")
         .expect("option cleanup must always exist");
@@ -298,8 +301,12 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     // We're supporting  the same syntax as the Vector ASAP2 creator.
     if let Some(source_file_patterns) = arg_matches.get_many::<OsString>("FROM_SOURCE") {
         let target_group = arg_matches.get_one::<String>("TARGET_GROUP").cloned();
-        let log_msgs =
-            creator::create_items_from_sources(&mut a2l_file, source_file_patterns, target_group);
+        let log_msgs = creator::create_items_from_sources(
+            &mut a2l_file,
+            source_file_patterns,
+            target_group,
+            force_old_arrays,
+        );
         for msg in log_msgs {
             cond_print!(verbose, now, msg);
         }
@@ -471,6 +478,7 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
                 target_group,
                 &mut log_msgs,
                 enable_structures,
+                force_old_arrays,
             );
             for msg in log_msgs {
                 cond_print!(verbose, now, msg);
@@ -767,6 +775,12 @@ The arg --update must be present.")
         .number_of_values(0)
         .action(clap::ArgAction::SetTrue)
         .requires("DEBUGINFO_ARGGROUP")
+    )
+    .arg(Arg::new("OLD_ARRAYS")
+        .help("Force the use of old array notation (e.g. ._2_) even when the a2l version allows the use of new array notation (e.g. [2]).")
+        .long("old-arrays")
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
     )
     .arg(Arg::new("A2LVERSION")
         .help("Convert the input file to the given version (e.g. \"1.5.1\", \"1.6.0\", etc.). This is a lossy operation, which deletes incompatible information.")

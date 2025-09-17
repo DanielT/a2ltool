@@ -486,9 +486,10 @@ pub(crate) fn insert_many<'param>(
     target_group: Option<&str>,
     log_msgs: &mut Vec<String>,
     enable_structures: bool,
+    force_old_arrays: bool,
 ) {
     let file_version = crate::A2lVersion::from(&*a2l_file);
-    let use_new_arrays = file_version >= A2lVersion::V1_7_0;
+    let use_new_arrays = !force_old_arrays && file_version >= A2lVersion::V1_7_0;
     let module = &mut a2l_file.project.module[0];
     let (name_map, sym_map) = build_maps(module);
     let mut isupp = InsertSupport {
@@ -1172,6 +1173,7 @@ mod test {
             target_group,
             &mut log_msgs,
             false,
+            false,
         );
         // ^Measurement_.*$ expands to:
         //   Measurement_Matrix, Measurement_Value, Measurement_Bitfield.bits_1, Measurement_Bitfield.bits_2, Measurement_Bitfield.bits_3
@@ -1198,6 +1200,7 @@ mod test {
             characteristic_regexes,
             target_group,
             &mut log_msgs,
+            false,
             false,
         );
         assert!(a2l.project.module[0].measurement.len() > 8);
@@ -1240,6 +1243,7 @@ mod test {
             target_group,
             &mut log_msgs,
             true,
+            false,
         );
         // of the items matched by the measurement regex, only Measurement_Matrix, Measurement_Value are basic types
         assert_eq!(a2l.project.module[0].measurement.len(), 2);
@@ -1289,6 +1293,7 @@ mod test {
             target_group,
             &mut log_msgs,
             true,
+            false,
         );
         assert_eq!(a2l.project.module[0].instance.len(), 5);
         assert_eq!(

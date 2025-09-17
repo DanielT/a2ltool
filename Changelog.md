@@ -1,10 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Add the `--old-arrays` option. It allows the use of old array notation (e.g. ".\_3\_") to be forced,
+  even if the file version is 1.7.0 or 1.7.1 where new array notation (e.g. [2]) is possible.
+
 ## Version 3.0.0
 
 - Implement compatibility with Vector's ASAP2 Creator and allow creation of a2l elements using the same special comment syntax
 - Implement additional modes for file merges.
-  The standard so far was to keep both conflicting elements. Not the `--merge-preference` option can be used to always use the existing version or the new version instead.
+  The standard so far was to keep both conflicting elements. Now the `--merge-preference` option can be used to always use the existing version or the new version instead.
 - Add a manual for a2ltool.
 - Support non-standard `SYMBOL-LINK` notation, where the compile unit name is used as a prefix of the real symbol name
 - Implement the ability to update `VAR_ADDRESS` info of `VAR_CHARACTERISTIC`

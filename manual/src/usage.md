@@ -135,6 +135,10 @@ Create elements in the a2l file based on special comments in a source file. Argu
 Enable the the use of INSTANCE, TYPEDEF_STRUCTURE & co. for all operations. Requires a2l version 1.7.1
 The use of structurs is not supported in many other tools. You should check if the consumer of your a2l files can handle such data before using this option.
 
+#### `--old-arrays`
+
+Force the use of old array notation (e.g. .\_2\_) even when the a2l version allows the use of new array notation (e.g. [2]).
+
 #### `-R <REGEX>`, `--remove <REGEX>`
 
 Remove any CHARACTERISTICs, MEASUREMENTs, AXIS_PTS and INSTANCEs whose name matches the given regex.
