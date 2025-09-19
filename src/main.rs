@@ -1120,7 +1120,7 @@ impl clap::builder::TypedValueParser for UpdateModeParser {
         arg: Option<&clap::Arg>,
         value: &std::ffi::OsStr,
     ) -> Result<Self::Value, clap::Error> {
-        match value.to_string_lossy().as_ref() {
+        match value.to_string_lossy().to_uppercase().as_ref() {
             "DEFAULT" => Ok(UpdateMode::Default),
             "STRICT" => Ok(UpdateMode::Strict),
             "PRESERVE" => Ok(UpdateMode::Preserve),
@@ -1156,7 +1156,7 @@ impl clap::builder::TypedValueParser for UpdateTypeParser {
         arg: Option<&clap::Arg>,
         value: &std::ffi::OsStr,
     ) -> Result<Self::Value, clap::Error> {
-        match value.to_string_lossy().as_ref() {
+        match value.to_string_lossy().to_uppercase().as_ref() {
             "FULL" => Ok(UpdateType::Full),
             "ADDRESSES" => Ok(UpdateType::Addresses),
             _ => {
@@ -1191,7 +1191,7 @@ impl clap::builder::TypedValueParser for MergePrefParser {
         arg: Option<&clap::Arg>,
         value: &std::ffi::OsStr,
     ) -> Result<Self::Value, clap::Error> {
-        match value.to_string_lossy().as_ref() {
+        match value.to_string_lossy().to_uppercase().as_ref() {
             "EXISTING" => Ok(MergePref::Existing),
             "NEW" => Ok(MergePref::New),
             "BOTH" => Ok(MergePref::Both),

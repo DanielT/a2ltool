@@ -73,7 +73,7 @@ Update the A2L file based on the elf file. The update type can omitted to perfor
 
 The arg --elffile must be present in order to perform an update.
 
-#### ´--update-mode [<UPDATE_MODE>]`
+#### `--update-mode [<UPDATE_MODE>]`
 
 Update the A2L file based on the elf file. Action can be one of:
 
