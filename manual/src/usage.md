@@ -139,6 +139,8 @@ The use of structurs is not supported in many other tools. You should check if t
 
 Force the use of old array notation (e.g. .\_2\_) even when the a2l version allows the use of new array notation (e.g. [2]).
 
+This flag affects all commands that insert data (`--characteristic`, `--measurement` and their variants as well as `--from-source`)
+
 #### `-R <REGEX>`, `--remove <REGEX>`
 
 Remove any CHARACTERISTICs, MEASUREMENTs, AXIS_PTS and INSTANCEs whose name matches the given regex.

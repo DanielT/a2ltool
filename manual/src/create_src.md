@@ -19,6 +19,45 @@ A more complex pattern, `src/**/*.h`, matches all `.h` files at any depth within
 a2ltool processes any text file, regardless of its type. The syntax of the code is not evaluated, and C-style preprocessor directives are ignored.
 a2ltool only searches for comments—either blocks enclosed in `/* */` or lines starting with `//`.
 
+## Notes
+
+### Input Processing
+
+a2ltool does not parse C or C++ code. The operation of a2lfile is also completely unaffected by the preprocessor directives `#if` and `#ifdef`; a2ltool does not interpret these conditional statements.
+It only scans the text of the source file for comments and processes these.
+
+For example, if you place a definition inside an `#ifdef` block:
+
+    #ifdef SOME_CONDITION
+    /*
+    @@ SYMBOL = example
+    @@ A2L_TYPE = MEASURE
+    @@ DATA_TYPE = UBYTE
+    @@ END
+    */
+    uint8 example;
+    #endif
+
+The output will _always_ contain the measurement variable `example`, regardless of whether `SOME_CONDITION` was true during compilation.
+
+If your input files use such constructs, run a2ltool with the `--update FULL` option to remove any invalid items during the update step.
+
+### Addresses
+
+If an input definition specifies an address, a2ltool inserts this address into the output without modification. These addresses are not automatically validated against the program’s debug information, since it is valid to run `--from-source` without providing an ELF or PDB file.
+
+When a2ltool creates objects for array elements or structure instances (defined using `ELEMENT`s and an `INSTANCE`), it does not calculate address offsets.
+
+Therefore, addresses in objects created from source comment definitions should be considered potentially incorrect. Always update them using a2ltool’s `--update` or `--update ADDRESSES` options.
+
+### Output Validation
+
+a2ltool performs only minimal consistency checks when creating items from source comments.
+
+For example, added items may reference COMPU_METHODs or RECORD_LAYOUTs by name, which are not guaranteed to exist.
+
+To perform a full sanity check, use the `--check` option together with `--from-source`.
+
 ## Example
 
 #### Example Input
@@ -154,7 +193,7 @@ src/input_5.c
 
 #### Command
 
-    a2ltool --create --from-source "src/*.c" --output out.a2l
+    a2ltool --create --from-source "src/*.c" --update --check --output out.a2l
 
 ## Syntax
 
@@ -414,11 +453,3 @@ After stripping the `@@` marker, the remaining text is parsed as a `<definition>
                             "END"
 
     <variant> ::= "VARIANT" "=" <identifier> <value> <value>
-
-### Notes
-
-a2ltool performs only minimal consistency checks when creating items from source comments.
-
-For example, added items may reference COMPU_METHODs or RECORD_LAYOUTs by name, which are not guaranteed to exist.
-
-To perform a full sanity check, use the `--check` option together with `--from-source`.
