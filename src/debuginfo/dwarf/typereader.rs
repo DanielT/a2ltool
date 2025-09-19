@@ -394,7 +394,7 @@ impl DebugDataReader<'_> {
 
         // The enumeration type entry may have a DW_AT_type attribute which refers to the underlying
         // data type used to implement the enumeration
-        let (signed, opt_ut_size) = if let Ok(utype) =
+        let (mut signed, opt_ut_size) = if let Ok(utype) =
             get_type_attribute(entry, &self.units, current_unit).and_then(
                 |(utype_unit, utype_dbginfo_offset)| {
                     self.get_type(utype_unit, utype_dbginfo_offset, typereader_data)
@@ -428,6 +428,16 @@ impl DebugDataReader<'_> {
                 enumerators.push((name, value));
             }
         }
+
+        // some compilers will claim that an enum is unsigned, but then have negative values in it
+        let min_val = enumerators.iter().map(|(_, val)| *val).min().unwrap_or(0);
+        let max_val = enumerators.iter().map(|(_, val)| *val).max().unwrap_or(0);
+        let signed_limit = 1i64.checked_shl(size as u32 * 8 - 1).unwrap_or(i64::MAX);
+        // if there is a negative value and the largest value is still valid in a signed type of this size, treat the enum as signed
+        if !signed && min_val < 0 && max_val < signed_limit {
+            signed = true;
+        }
+
         Ok(DbgDataType::Enum {
             size,
             signed,
