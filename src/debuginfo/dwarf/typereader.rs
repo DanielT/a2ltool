@@ -575,11 +575,17 @@ impl DebugDataReader<'_> {
         bit_size: u64,
         mut membertype: TypeInfo,
     ) -> TypeInfo {
+        let type_size = membertype.get_size();
+        let type_size_bits = type_size * 8;
         let dbginfo_offset = child_entry.offset().to_debug_info_offset(unit).unwrap().0;
-        if let Some(bit_offset) = get_bit_offset_attribute(child_entry) {
+
+        // only treat those types as bitfields that have a bit size attribute with a size that is different from the default, or a non-zero offset
+        // e.g. base: uint16, with bit-size 16 and offset 0 should not be a bitfield
+        // but base: uint16, with bit-size 4 and offset 0 should be a bitfield
+        if let Some(bit_offset) = get_bit_offset_attribute(child_entry)
+            && (bit_offset != 0 || type_size_bits != bit_size)
+        {
             // Dwarf 2 / 3
-            let type_size = membertype.get_size();
-            let type_size_bits = type_size * 8;
             let bit_offset_le =
                 (Wrapping(type_size_bits) - Wrapping(bit_offset) - Wrapping(bit_size)).0;
 
@@ -597,12 +603,12 @@ impl DebugDataReader<'_> {
                     bit_offset: bit_offset_le as u16,
                 },
             }
-        } else if let Some(mut data_bit_offset) = get_data_bit_offset_attribute(child_entry) {
+        } else if let Some(mut data_bit_offset) = get_data_bit_offset_attribute(child_entry)
+            && (data_bit_offset != 0 || type_size_bits != bit_size)
+        {
             // Dwarf 4 / 5:
             // The data bit offset attribute is the offset in bits from the beginning of the containing storage to the beginning of the value
             // this means the bitfield member may have type uint32, but have an offset > 32 bits
-            let type_size = membertype.get_size();
-            let type_size_bits = type_size * 8;
             if data_bit_offset >= type_size_bits {
                 // Dwarf 4 / 5: re-calculate offset
                 *offset += (data_bit_offset / type_size_bits) * type_size;
