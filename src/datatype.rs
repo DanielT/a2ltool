@@ -74,7 +74,7 @@ pub(crate) fn get_type_limits(
                     let upper = (raw_range / 2) as f64;
                     (lower, upper)
                 }
-                _ => (0f64, raw_range as f64),
+                _ => (0f64, (raw_range - 1) as f64),
             }
         }
         DbgDataType::Double => (f64::MIN, f64::MAX),
@@ -95,4 +95,52 @@ pub(crate) fn get_type_limits(
         _ => (default_lower, default_upper),
     };
     (new_lower_limit, new_upper_limit)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_a2l_datatype() {
+        let ti = TypeInfo {
+            name: Some("uint8".to_string()),
+            datatype: DbgDataType::Uint8,
+            unit_idx: 0,
+            dbginfo_offset: 0,
+        };
+        assert_eq!(get_a2l_datatype(&ti), DataType::Ubyte);
+    }
+
+    #[test]
+    fn test_get_type_limits() {
+        let ti = TypeInfo {
+            name: None,
+            datatype: DbgDataType::Uint16,
+            unit_idx: 0,
+            dbginfo_offset: 0,
+        };
+        let (lower, upper) = get_type_limits(&ti, -1.0, 1.0);
+        assert_eq!(lower, 0.0);
+        assert_eq!(upper, 65535.0);
+
+        let ti2 = TypeInfo {
+            name: None,
+            datatype: DbgDataType::Bitfield {
+                basetype: Box::new(TypeInfo {
+                    name: None,
+                    unit_idx: 0,
+                    datatype: DbgDataType::Uint16,
+                    dbginfo_offset: 0,
+                }),
+                bit_offset: 0,
+                bit_size: 4,
+            },
+            unit_idx: 0,
+            dbginfo_offset: 0,
+        };
+        let (lower, upper) = get_type_limits(&ti2, -1.0, 1.0);
+        assert_eq!(lower, 0.0);
+        assert_eq!(upper, 15.0);
+    }
 }
