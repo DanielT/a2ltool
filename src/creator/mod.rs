@@ -1794,7 +1794,7 @@ impl<'a2l> Creator<'a2l> {
                     // otherwise we need to use FixAxisParList
                     let mut list = a2lfile::FixAxisParList::new();
                     list.axis_pts_value_list = (0..num_axis_points)
-                        .map(|i| (*range_min + (i as f64 * range_step)))
+                        .map(|i| *range_min + (i as f64 * range_step))
                         .collect();
                     axis_descr.fix_axis_par_list = Some(list);
                 }
