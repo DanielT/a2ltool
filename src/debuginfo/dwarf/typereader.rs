@@ -108,7 +108,12 @@ impl DebugDataReader<'_> {
         }
 
         let (unit, abbrev) = &self.units[current_unit];
-        let offset = dbginfo_offset.to_unit_offset(unit).unwrap();
+        let offset = dbginfo_offset.to_unit_offset(unit).ok_or_else(|| {
+            format!(
+                "invalid type offset 0x{:X} for unit {}",
+                dbginfo_offset.0, current_unit
+            )
+        })?;
         let mut entries_tree = unit
             .entries_tree(abbrev, Some(offset))
             .map_err(|err| err.to_string())?;
@@ -417,6 +422,10 @@ impl DebugDataReader<'_> {
             .or(opt_ut_size)
             .ok_or_else(|| "missing enum byte size attribute".to_string())?;
 
+        if size == 0 || size > 8 {
+            return Err(format!("invalid enum size {size}"));
+        }
+
         let mut iter = entries_tree_node.children();
         while let Ok(Some(child_node)) = iter.next() {
             let child_entry = child_node.entry();
@@ -589,6 +598,12 @@ impl DebugDataReader<'_> {
         let type_size_bits = type_size * 8;
         let dbginfo_offset = child_entry.offset().to_debug_info_offset(unit).unwrap().0;
 
+        if type_size == 0 || bit_size == 0 || bit_size > type_size_bits {
+            // invalid bitfield size - return the member type as-is
+            // this case doesn't happen with sane input, but is easily triggered by fuzzing
+            return membertype;
+        }
+
         // only treat those types as bitfields that have a bit size attribute with a size that is different from the default, or a non-zero offset
         // e.g. base: uint16, with bit-size 16 and offset 0 should not be a bitfield
         // but base: uint16, with bit-size 4 and offset 0 should be a bitfield
@@ -670,7 +685,12 @@ impl DebugDataReader<'_> {
                     get_type_attribute(child_entry, &self.units, current_unit)?;
 
                 let (unit, abbrev) = &self.units[new_cur_unit];
-                let new_unit_offset = new_dbginfo_offset.to_unit_offset(unit).unwrap();
+                let new_unit_offset = new_dbginfo_offset.to_unit_offset(unit).ok_or_else(|| {
+                    format!(
+                        "invalid type offset 0x{:X} for unit {}",
+                        new_dbginfo_offset.0, new_cur_unit
+                    )
+                })?;
                 let mut baseclass_tree = unit
                     .entries_tree(abbrev, Some(new_unit_offset))
                     .map_err(|err| err.to_string())?;

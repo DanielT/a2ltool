@@ -189,7 +189,17 @@ impl DebugDataReader<'_> {
 
         let mut iter = self.dwarf.debug_info.units();
         while let Ok(Some(unit)) = iter.next() {
-            let abbreviations = unit.abbreviations(&self.dwarf.debug_abbrev).unwrap();
+            let Ok(abbreviations) = unit.abbreviations(&self.dwarf.debug_abbrev) else {
+                if self.verbose {
+                    let offset = unit
+                        .offset()
+                        .as_debug_info_offset()
+                        .unwrap_or(gimli::DebugInfoOffset(0))
+                        .0;
+                    println!("Error: Failed to get abbreviations for unit @{offset:x}");
+                }
+                continue;
+            };
             self.units.add(unit, abbreviations);
             let unit_idx = self.units.list.len() - 1;
             let (unit, abbreviations) = &self.units[unit_idx];

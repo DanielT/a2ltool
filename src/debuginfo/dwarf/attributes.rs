@@ -41,11 +41,15 @@ pub(crate) fn get_name_attribute(
             }
         }
         gimli::AttributeValue::DebugStrOffsetsIndex(index) => {
-            let unit = dwarf.unit(*unit_header).unwrap();
+            let unit = dwarf
+                .unit(*unit_header)
+                .map_err(|_| "failed to get name attribute (invalid unit header)".to_string())?;
             let offset = dwarf
                 .debug_str_offsets
                 .get_str_offset(unit.encoding().format, unit.str_offsets_base, index)
-                .unwrap();
+                .map_err(|_| {
+                    "failed to get name attribute (invalid debug_str_offsets index)".to_string()
+                })?;
             match dwarf.debug_str.get_str(offset) {
                 Ok(slice) => {
                     if let Ok(utf8string) = slice.to_string() {
@@ -337,13 +341,13 @@ fn evaluate_exprloc(
     evaluation.set_object_address(0);
     evaluation.set_initial_value(0);
     evaluation.set_max_iterations(100);
-    let mut eval_result = evaluation.evaluate().unwrap();
+    let mut eval_result = evaluation.evaluate().ok()?;
     while eval_result != gimli::EvaluationResult::Complete {
         match eval_result {
             gimli::EvaluationResult::RequiresRelocatedAddress(address) => {
                 // assume that there is no relocation
                 // this would be a bad bet on PC, but on embedded controllers where A2l files are used this is the standard
-                eval_result = evaluation.resume_with_relocated_address(address).unwrap();
+                eval_result = evaluation.resume_with_relocated_address(address).ok()?;
             }
             gimli::EvaluationResult::RequiresFrameBase => {
                 // a variable in the stack frame of a function. Not useful in the conext of A2l files, where we only care about global values
@@ -365,7 +369,7 @@ fn evaluate_exprloc(
                     .debug_addr
                     .get_address(address_size, base, index)
                     .ok()?;
-                eval_result = evaluation.resume_with_indexed_address(addr).unwrap();
+                eval_result = evaluation.resume_with_indexed_address(addr).ok()?;
             }
             _other => {
                 // there are a lot of other types of address expressions that can only be evaluated by a debugger while a program is running
