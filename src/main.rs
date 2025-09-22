@@ -1,6 +1,6 @@
 use clap::{Arg, ArgGroup, ArgMatches, Command, builder::ValueParser, parser::ValuesRef};
 
-use a2lfile::{A2lError, A2lFile, A2lObject, itemlist};
+use a2lfile::{A2lError, A2lFile, A2lObject, A2ml, itemlist};
 use debuginfo::DebugData;
 use std::{
     ffi::{OsStr, OsString},
@@ -114,6 +114,9 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     let merge_includes = *arg_matches
         .get_one::<bool>("MERGEINCLUDES")
         .expect("option merge-includes must always exist");
+    let insert_a2ml = *arg_matches
+        .get_one::<bool>("INSERT_A2ML")
+        .expect("option insert-a2ml must always exist");
     let verbose = arg_matches.get_count("VERBOSE");
     let opt_update_type = arg_matches.get_one::<UpdateType>("UPDATE_TYPE");
 
@@ -496,6 +499,21 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
         );
     }
 
+    if insert_a2ml {
+        if a2l_file.project.module[0].a2ml.is_none() {
+            // insert the built-in A2ML definition. An extra newline at the start makes it look better
+            let a2ml_string = format!("\n{}", ifdata::A2MLVECTOR_TEXT);
+            a2l_file.project.module[0].a2ml = Some(A2ml::new(a2ml_string));
+            cond_print!(verbose, now, "Inserted A2ML definition");
+        } else {
+            cond_print!(
+                verbose,
+                now,
+                "A2ML definition already exists, not inserting"
+            );
+        }
+    }
+
     // remove unknown IF_DATA
     if ifdata_cleanup {
         a2l_file.ifdata_cleanup();
@@ -832,6 +850,12 @@ The arg --update must be present.")
     .arg(Arg::new("SHOW_XCP")
         .help("Display the XCP settings in the a2l file, if they exist")
         .long("show-xcp")
+        .number_of_values(0)
+        .action(clap::ArgAction::SetTrue)
+    )
+    .arg(Arg::new("INSERT_A2ML")
+        .help("Insert an A2ML definition into the a2l file, if it does not already exist.")
+        .long("insert-a2ml")
         .number_of_values(0)
         .action(clap::ArgAction::SetTrue)
     )

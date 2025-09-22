@@ -15,10 +15,11 @@ When combining options, it is useful to understand the overall order of operatio
 7. Update addresses and other settings (`--update`)
 8. Insert items based on debug data (e.g., `--characteristic`, `--measurement`, etc.)
 9. Clean-up (`--cleanup`)
-10. If-data clean-up (`--ifdata-cleanup`)
-11. Sort all elements (`--sort`)
-12. Check consistency (`--check`)
-13. Write the output file (`--output`)
+10. Insert an A2ML definition if none exists yet (`--insert-a2ml`)
+11. If-data clean-up (`--ifdata-cleanup`)
+12. Sort all elements (`--sort`)
+13. Check consistency (`--check`)
+14. Write the output file (`--output`)
 
 ## Response files
 

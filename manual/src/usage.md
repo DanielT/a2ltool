@@ -71,17 +71,17 @@ Update the A2L file based on the elf file. The update type can omitted to perfor
 - `FULL`: Update the address and type info of all items. This is the default.
 - `ADDRESSES`: Update only the addresses.
 
-The arg --elffile must be present in order to perform an update.
+The arg `--elffile` must be present in order to perform an update.
 
 #### `--update-mode [<UPDATE_MODE>]`
 
-Update the A2L file based on the elf file. Action can be one of:
+Update the A2L file based on the elf file. The mode can be one of:
 
 - `DEFAULT`: Unknown objects are removed, invalid settings are updated.
 - `STRICT`: Unknown objects or invalid settings trigger an error.
 - `PRESERVE`: Unknown objects are preserved, with the address set to zero.
 
-The arg --update must be present.
+The arg `--update` must be present.
 
 
 ## Creating and Removing Items
@@ -152,6 +152,10 @@ Remove any CHARACTERISTICs, MEASUREMENTs, AXIS_PTS and INSTANCEs whose address i
 #### `-c`, `--cleanup`
 
 Remove empty or unreferenced items.
+
+#### `--insert-a2ml`
+
+Insert a2ltool's built-in A2ML definition into the file, if it doesn't already contain an A2ML definition.
 
 #### `--ifdata-cleanup`
 
