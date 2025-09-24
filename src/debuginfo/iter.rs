@@ -117,6 +117,9 @@ impl<'dbg> TypeInfoIter<'dbg> {
                     // advance to next member
                     self.position_stack[depth] += 1;
 
+                    // follow the type reference to get the actual type of the array elements
+                    let arraytype = &arraytype.get_reference(self.types);
+
                     // prepare to return the children of the current member
                     self.type_stack.push(arraytype);
                     self.position_stack.push(0);

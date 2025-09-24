@@ -317,7 +317,20 @@ impl DebugDataReader<'_> {
         let maybe_size = get_byte_size_attribute(entry);
         let (new_cur_unit, arraytype_offset) =
             get_type_attribute(entry, &self.units, current_unit)?;
-        let arraytype = self.get_type(new_cur_unit, arraytype_offset, typereader_data)?;
+
+        let arraytype = if typereader_data
+            .wip_items
+            .iter()
+            .any(|item| item.offset == arraytype_offset.0)
+        {
+            // exceptional case: the array and its element type are recursive
+            // it seems it is possible to construct declarations where the element type is the array itself?!
+            self.make_arraytype_ref(new_cur_unit, arraytype_offset)?
+        } else {
+            // this is the standard case, where the element type does not contain the array type
+            self.get_type(new_cur_unit, arraytype_offset, typereader_data)?
+        };
+
         let arraytype_name = arraytype.name.clone();
         let stride = if let Some(stride) = get_byte_stride_attribute(entry) {
             stride
@@ -378,6 +391,35 @@ impl DebugDataReader<'_> {
             },
             arraytype_name,
         ))
+    }
+
+    /// create a type reference for the element type of an array
+    /// this is (very rarely) needed to break a circular dependency while loading array types
+    fn make_arraytype_ref(
+        &self,
+        at_unit_idx: usize,
+        arraytype_offset: DebugInfoOffset,
+    ) -> Result<TypeInfo, String> {
+        let (at_unit, at_abbrev) = &self.units[at_unit_idx];
+        let at_offset = arraytype_offset.to_unit_offset(at_unit).ok_or_else(|| {
+            format!(
+                "invalid type offset 0x{:X} for unit {}",
+                arraytype_offset.0, at_unit_idx
+            )
+        })?;
+        let mut at_entries_tree = at_unit
+            .entries_tree(at_abbrev, Some(at_offset))
+            .map_err(|err| err.to_string())?;
+        let at_entries_tree_node = at_entries_tree.root().map_err(|err| err.to_string())?;
+        let at_entry = at_entries_tree_node.entry();
+        let arraytype_size = get_byte_size_attribute(at_entry).unwrap_or(0);
+        let arraytype_name = get_name_attribute(at_entry, &self.dwarf, at_unit).ok();
+        Ok(TypeInfo {
+            name: arraytype_name,
+            unit_idx: at_unit_idx,
+            dbginfo_offset: arraytype_offset.0,
+            datatype: DbgDataType::TypeRef(arraytype_offset.0, arraytype_size),
+        })
     }
 
     fn get_enumeration_type(
