@@ -1781,14 +1781,12 @@ impl<'a2l> Creator<'a2l> {
                 axis_descr.format = format;
 
                 // if the float values of range_min and range_step are actually integers, then we can use FixAxisParDist
+                // note: the restriction to integers was fixed in a2l version 1.7, but we'll keep it for compatibility with older versions
                 if *range_min == (*range_min as i16) as f64
                     && range_step == (range_step as i16) as f64
                 {
-                    let fix_axis_par_dist = a2lfile::FixAxisParDist::new(
-                        *range_min as i16,
-                        range_step as i16,
-                        num_axis_points,
-                    );
+                    let fix_axis_par_dist =
+                        a2lfile::FixAxisParDist::new(*range_min, range_step, num_axis_points);
                     axis_descr.fix_axis_par_dist = Some(fix_axis_par_dist);
                 } else {
                     // otherwise we need to use FixAxisParList
