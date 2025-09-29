@@ -308,6 +308,7 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
             &mut a2l_file,
             source_file_patterns,
             target_group,
+            enable_structures,
             force_old_arrays,
         );
         for msg in log_msgs {
@@ -792,7 +793,6 @@ The arg --update must be present.")
         .long("enable-structures")
         .number_of_values(0)
         .action(clap::ArgAction::SetTrue)
-        .requires("DEBUGINFO_ARGGROUP")
     )
     .arg(Arg::new("OLD_ARRAYS")
         .help("Force the use of old array notation (e.g. ._2_) even when the a2l version allows the use of new array notation (e.g. [2]).")

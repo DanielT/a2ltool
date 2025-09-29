@@ -493,7 +493,7 @@ impl<'text> Parser<'_, 'text> {
             name,
             a2l_name,
             structure_name,
-            _address: address,
+            address,
             dimension,
             split,
             _size: size,
@@ -1401,7 +1401,7 @@ impl<'text> Parser<'_, 'text> {
                 }
                 b"ALIAS" => {
                     self.require_token("OVERWRITE", b"=")?;
-                    let alias = self.get_string("OVERWRITE ALIAS")?;
+                    let alias = self.get_identifier("OVERWRITE ALIAS")?;
                     OverwriteSpec::Alias(alias)
                 }
                 b"COLOR" => {
@@ -1409,7 +1409,7 @@ impl<'text> Parser<'_, 'text> {
                     let color = self.get_uint_value("OVERWRITE COLOR")?;
                     OverwriteSpec::Color(color)
                 }
-                b"GROUP_ASSIGNMENT" => {
+                b"GROUP" => {
                     let group = self.parse_group_attribute()?;
                     OverwriteSpec::GroupAssignment(group)
                 }
@@ -1420,7 +1420,12 @@ impl<'text> Parser<'_, 'text> {
                     };
                     OverwriteSpec::Range(range_start, range_end)
                 }
-                _ => return Err(format!("Unexpected token {:?} in OVERWRITE", type_token)),
+                _ => {
+                    return Err(format!(
+                        "Unexpected token {} in OVERWRITE",
+                        String::from_utf8_lossy(type_token)
+                    ));
+                }
             };
 
             Some(Overwrite {
@@ -2181,7 +2186,7 @@ mod tests {
         };
         assert_eq!(instance_def.name, "InstanceName");
         assert_eq!(instance_def.structure_name, "abc");
-        assert_eq!(instance_def._address, Some(0x1234));
+        assert_eq!(instance_def.address, Some(0x1234));
         assert_eq!(instance_def.dimension, vec![3, 4]);
         assert_eq!(instance_def._size, Some(9000));
         assert_eq!(instance_def.overwrites.len(), 2);

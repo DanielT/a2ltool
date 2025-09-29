@@ -1,0 +1,201 @@
+/* a2ltool 3.0.0 */
+ASAP2_VERSION 1 71
+/begin PROJECT new_project ""
+  /begin MODULE fragment ""
+    /begin TYPEDEF_STRUCTURE Thing ""
+      0xA
+      /begin STRUCTURE_COMPONENT
+        it Thing.it
+        0
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        part Thing.part
+        0
+      /end STRUCTURE_COMPONENT
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_CHARACTERISTIC Thing.it ""
+      ASCII __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 10
+    /end TYPEDEF_CHARACTERISTIC
+
+    /begin TYPEDEF_CHARACTERISTIC Thing.part ""
+      VALUE __FLOAT32_IEEE_Z 0 NO_COMPU_METHOD -3.40282346639e38 3.40282346639e38
+    /end TYPEDEF_CHARACTERISTIC
+
+    /begin TYPEDEF_STRUCTURE measurements ""
+      0x0
+      /begin STRUCTURE_COMPONENT
+        alternative_a2l_name measurements.Circle
+        0
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        Square measurements.Square
+        0
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        Triangle measurements.Triangle
+        0
+        MATRIX_DIM 2
+      /end STRUCTURE_COMPONENT
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_STRUCTURE measurements.Circle ""
+      0x4
+      /begin STRUCTURE_COMPONENT
+        x_a2l measurements.Circle.x_a2l
+        0
+      /end STRUCTURE_COMPONENT
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_MEASUREMENT measurements.Circle.x_a2l ""
+      ULONG NO_COMPU_METHOD 0 0 0 4294967295
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_STRUCTURE measurements.Square ""
+      0x2
+      /begin STRUCTURE_COMPONENT
+        it measurements.Square.it
+        0
+      /end STRUCTURE_COMPONENT
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_MEASUREMENT measurements.Square.it ""
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_STRUCTURE measurements.Triangle ""
+      0x1C
+      /begin STRUCTURE_COMPONENT
+        subelem measurements.Triangle.subelem
+        0
+      /end STRUCTURE_COMPONENT
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_MEASUREMENT measurements.Triangle.subelem ""
+      FLOAT32_IEEE NO_COMPU_METHOD 0 0 -3.40282346639e38 3.40282346639e38
+      MATRIX_DIM 7
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_STRUCTURE parameters ""
+      0x0
+      /begin STRUCTURE_COMPONENT
+        Spoon parameters.Spoon
+        0
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        Fork parameters.Fork
+        0
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        Knife parameters.Knife
+        0
+        MATRIX_DIM 2
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        something Thing
+        0
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        other_thing Thing
+        0
+      /end STRUCTURE_COMPONENT
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_STRUCTURE parameters.Fork ""
+      0x30
+      /begin STRUCTURE_COMPONENT
+        x parameters.Fork.x
+        0
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        y parameters.Fork.y
+        0
+      /end STRUCTURE_COMPONENT
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_AXIS parameters.Fork.x ""
+      NO_INPUT_QUANTITY AxisLayout 0 NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+    /end TYPEDEF_AXIS
+
+    /begin TYPEDEF_CHARACTERISTIC parameters.Fork.y ""
+      CURVE CurveLayout 0 NO_COMPU_METHOD 0 65535
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+        AXIS_PTS_REF THIS.x
+      /end AXIS_DESCR
+    /end TYPEDEF_CHARACTERISTIC
+
+    /begin TYPEDEF_STRUCTURE parameters.Knife ""
+      0xD
+      /begin STRUCTURE_COMPONENT
+        x parameters.Knife.x
+        0
+      /end STRUCTURE_COMPONENT
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_CHARACTERISTIC parameters.Knife.x ""
+      ASCII __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 13
+    /end TYPEDEF_CHARACTERISTIC
+
+    /begin TYPEDEF_STRUCTURE parameters.Spoon ""
+      0x5
+      /begin STRUCTURE_COMPONENT
+        x parameters.Spoon.x
+        0
+      /end STRUCTURE_COMPONENT
+    /end TYPEDEF_STRUCTURE
+
+    /begin TYPEDEF_CHARACTERISTIC parameters.Spoon.x ""
+      VAL_BLK __SBYTE_Z 0 NO_COMPU_METHOD -128 127
+      MATRIX_DIM 5
+    /end TYPEDEF_CHARACTERISTIC
+
+    /begin INSTANCE parameter_instance ""
+      parameters 0x0
+      MATRIX_DIM 4
+      SYMBOL_LINK "parameter_instance" 0
+    /end INSTANCE
+
+    /begin INSTANCE shapes_a2l ""
+      measurements 0x0
+      MATRIX_DIM 10
+      /begin OVERWRITE Circle.x 0
+        CONVERSION shapes_a2l.Conversion_Copy1
+        LIMITS -50 50
+      /end OVERWRITE
+      /begin OVERWRITE Triangle.subelem 0
+        CONVERSION shapes_a2l.Conversion
+      /end OVERWRITE
+      SYMBOL_LINK "shapes" 0
+    /end INSTANCE
+
+    /begin COMPU_METHOD shapes_a2l.Conversion ""
+      LINEAR "%.3" "mm"
+      COEFFS_LINEAR 2 0
+    /end COMPU_METHOD
+
+    /begin COMPU_METHOD shapes_a2l.Conversion_Copy1 ""
+      LINEAR "%.3" "mm"
+      COEFFS_LINEAR 4 1
+    /end COMPU_METHOD
+
+    /begin GROUP output ""
+      ROOT
+      /begin REF_CHARACTERISTIC
+        parameter_instance
+      /end REF_CHARACTERISTIC
+      /begin REF_MEASUREMENT
+        shapes_a2l
+      /end REF_MEASUREMENT
+      /begin SUB_GROUP
+        overwrite_group
+      /end SUB_GROUP
+    /end GROUP
+
+    /begin GROUP overwrite_group ""
+    /end GROUP
+
+  /end MODULE
+/end PROJECT

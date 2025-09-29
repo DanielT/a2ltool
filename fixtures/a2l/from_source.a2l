@@ -1,0 +1,529 @@
+/* a2ltool 3.0.0 */
+ASAP2_VERSION 1 71
+/begin PROJECT new_project ""
+  /begin MODULE fragment ""
+    /begin AXIS_PTS parameter_instance[0].Fork.x ""
+      0x0 NO_INPUT_QUANTITY AxisLayout 0 NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[0].Fork.x" 0
+    /end AXIS_PTS
+
+    /begin CHARACTERISTIC parameter_instance[0].Fork.y ""
+      CURVE 0x0 CurveLayout 0 NO_COMPU_METHOD 0 65535
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+        AXIS_PTS_REF parameter_instance[0].Fork.x
+      /end AXIS_DESCR
+      SYMBOL_LINK "parameter_instance[0].Fork.y" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[0].Knife[0].x ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 13
+      SYMBOL_LINK "parameter_instance[0].Knife[0].x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[0].Knife[1].x ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 13
+      SYMBOL_LINK "parameter_instance[0].Knife[1].x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[0].Spoon.x ""
+      VAL_BLK 0x0 __SBYTE_Z 0 NO_COMPU_METHOD -128 127
+      MATRIX_DIM 5
+      SYMBOL_LINK "parameter_instance[0].Spoon.x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[0].other_thing.it ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 10
+      SYMBOL_LINK "parameter_instance[0].other_thing.it" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[0].other_thing.part ""
+      VALUE 0x0 __FLOAT32_IEEE_Z 0 NO_COMPU_METHOD -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[0].other_thing.part" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[0].something.it ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 10
+      SYMBOL_LINK "parameter_instance[0].something.it" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[0].something.part ""
+      VALUE 0x0 __FLOAT32_IEEE_Z 0 NO_COMPU_METHOD -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[0].something.part" 0
+    /end CHARACTERISTIC
+
+    /begin AXIS_PTS parameter_instance[1].Fork.x ""
+      0x0 NO_INPUT_QUANTITY AxisLayout 0 NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[1].Fork.x" 0
+    /end AXIS_PTS
+
+    /begin CHARACTERISTIC parameter_instance[1].Fork.y ""
+      CURVE 0x0 CurveLayout 0 NO_COMPU_METHOD 0 65535
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+        AXIS_PTS_REF parameter_instance[1].Fork.x
+      /end AXIS_DESCR
+      SYMBOL_LINK "parameter_instance[1].Fork.y" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[1].Knife[0].x ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 13
+      SYMBOL_LINK "parameter_instance[1].Knife[0].x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[1].Knife[1].x ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 13
+      SYMBOL_LINK "parameter_instance[1].Knife[1].x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[1].Spoon.x ""
+      VAL_BLK 0x0 __SBYTE_Z 0 NO_COMPU_METHOD -128 127
+      MATRIX_DIM 5
+      SYMBOL_LINK "parameter_instance[1].Spoon.x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[1].other_thing.it ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 10
+      SYMBOL_LINK "parameter_instance[1].other_thing.it" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[1].other_thing.part ""
+      VALUE 0x0 __FLOAT32_IEEE_Z 0 NO_COMPU_METHOD -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[1].other_thing.part" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[1].something.it ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 10
+      SYMBOL_LINK "parameter_instance[1].something.it" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[1].something.part ""
+      VALUE 0x0 __FLOAT32_IEEE_Z 0 NO_COMPU_METHOD -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[1].something.part" 0
+    /end CHARACTERISTIC
+
+    /begin AXIS_PTS parameter_instance[2].Fork.x ""
+      0x0 NO_INPUT_QUANTITY AxisLayout 0 NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[2].Fork.x" 0
+    /end AXIS_PTS
+
+    /begin CHARACTERISTIC parameter_instance[2].Fork.y ""
+      CURVE 0x0 CurveLayout 0 NO_COMPU_METHOD 0 65535
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+        AXIS_PTS_REF parameter_instance[2].Fork.x
+      /end AXIS_DESCR
+      SYMBOL_LINK "parameter_instance[2].Fork.y" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[2].Knife[0].x ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 13
+      SYMBOL_LINK "parameter_instance[2].Knife[0].x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[2].Knife[1].x ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 13
+      SYMBOL_LINK "parameter_instance[2].Knife[1].x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[2].Spoon.x ""
+      VAL_BLK 0x0 __SBYTE_Z 0 NO_COMPU_METHOD -128 127
+      MATRIX_DIM 5
+      SYMBOL_LINK "parameter_instance[2].Spoon.x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[2].other_thing.it ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 10
+      SYMBOL_LINK "parameter_instance[2].other_thing.it" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[2].other_thing.part ""
+      VALUE 0x0 __FLOAT32_IEEE_Z 0 NO_COMPU_METHOD -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[2].other_thing.part" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[2].something.it ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 10
+      SYMBOL_LINK "parameter_instance[2].something.it" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[2].something.part ""
+      VALUE 0x0 __FLOAT32_IEEE_Z 0 NO_COMPU_METHOD -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[2].something.part" 0
+    /end CHARACTERISTIC
+
+    /begin AXIS_PTS parameter_instance[3].Fork.x ""
+      0x0 NO_INPUT_QUANTITY AxisLayout 0 NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[3].Fork.x" 0
+    /end AXIS_PTS
+
+    /begin CHARACTERISTIC parameter_instance[3].Fork.y ""
+      CURVE 0x0 CurveLayout 0 NO_COMPU_METHOD 0 65535
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY NO_COMPU_METHOD 12 -3.40282346639e38 3.40282346639e38
+        AXIS_PTS_REF parameter_instance[3].Fork.x
+      /end AXIS_DESCR
+      SYMBOL_LINK "parameter_instance[3].Fork.y" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[3].Knife[0].x ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 13
+      SYMBOL_LINK "parameter_instance[3].Knife[0].x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[3].Knife[1].x ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 13
+      SYMBOL_LINK "parameter_instance[3].Knife[1].x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[3].Spoon.x ""
+      VAL_BLK 0x0 __SBYTE_Z 0 NO_COMPU_METHOD -128 127
+      MATRIX_DIM 5
+      SYMBOL_LINK "parameter_instance[3].Spoon.x" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[3].other_thing.it ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 10
+      SYMBOL_LINK "parameter_instance[3].other_thing.it" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[3].other_thing.part ""
+      VALUE 0x0 __FLOAT32_IEEE_Z 0 NO_COMPU_METHOD -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[3].other_thing.part" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[3].something.it ""
+      ASCII 0x0 __UBYTE_Z 0 NO_COMPU_METHOD 0 255
+      NUMBER 10
+      SYMBOL_LINK "parameter_instance[3].something.it" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC parameter_instance[3].something.part ""
+      VALUE 0x0 __FLOAT32_IEEE_Z 0 NO_COMPU_METHOD -3.40282346639e38 3.40282346639e38
+      SYMBOL_LINK "parameter_instance[3].something.part" 0
+    /end CHARACTERISTIC
+
+    /begin MEASUREMENT shapes_a2l[0].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[0].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[0].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[0].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[0].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[0].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[0].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[0].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[1].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[1].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[1].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[1].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[1].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[1].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[1].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[1].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[2].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[2].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[2].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[2].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[2].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[2].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[2].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[2].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[3].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[3].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[3].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[3].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[3].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[3].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[3].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[3].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[4].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[4].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[4].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[4].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[4].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[4].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[4].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[4].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[5].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[5].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[5].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[5].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[5].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[5].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[5].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[5].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[6].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[6].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[6].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[6].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[6].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[6].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[6].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[6].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[7].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[7].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[7].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[7].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[7].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[7].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[7].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[7].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[8].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[8].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[8].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[8].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[8].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[8].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[8].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[8].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[9].Square.it "ein anderer Kommentar"
+      SWORD NO_COMPU_METHOD 0 0 -32768 32767
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[9].Square.it" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[9].Triangle[0].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[9].Triangle[0].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[9].Triangle[1].subelem ""
+      FLOAT32_IEEE subelem.Conversion 0 0 -6.80564693277e38 6.80564693277e38
+      ECU_ADDRESS 0x0
+      MATRIX_DIM 7
+      SYMBOL_LINK "shapes[9].Triangle[1].subelem" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT shapes_a2l[9].alternative_a2l_name.x_a2l ""
+      ULONG x_a2l.Conversion 0 0 -50 50
+      DISPLAY_IDENTIFIER alias
+      ECU_ADDRESS 0x0
+      SYMBOL_LINK "shapes[9].Circle.x" 0
+    /end MEASUREMENT
+
+    /begin COMPU_METHOD subelem.Conversion ""
+      LINEAR "%.3" "mm"
+      COEFFS_LINEAR 2 0
+    /end COMPU_METHOD
+
+    /begin COMPU_METHOD x_a2l.Conversion ""
+      LINEAR "%.3" "mm"
+      COEFFS_LINEAR 4 1
+    /end COMPU_METHOD
+
+    /begin GROUP output2 ""
+      ROOT
+      /begin REF_CHARACTERISTIC
+        parameter_instance[0].Fork.x parameter_instance[0].Fork.y parameter_instance[0].Knife[0].x parameter_instance[0].Knife[1].x parameter_instance[0].Spoon.x parameter_instance[0].other_thing.it parameter_instance[0].other_thing.part
+        parameter_instance[0].something.it parameter_instance[0].something.part parameter_instance[1].Fork.x parameter_instance[1].Fork.y parameter_instance[1].Knife[0].x parameter_instance[1].Knife[1].x parameter_instance[1].Spoon.x parameter_instance[1].other_thing.it
+        parameter_instance[1].other_thing.part parameter_instance[1].something.it parameter_instance[1].something.part parameter_instance[2].Fork.x parameter_instance[2].Fork.y parameter_instance[2].Knife[0].x parameter_instance[2].Knife[1].x parameter_instance[2].Spoon.x
+        parameter_instance[2].other_thing.it parameter_instance[2].other_thing.part parameter_instance[2].something.it parameter_instance[2].something.part parameter_instance[3].Fork.x parameter_instance[3].Fork.y parameter_instance[3].Knife[0].x parameter_instance[3].Knife[1].x
+        parameter_instance[3].Spoon.x parameter_instance[3].other_thing.it parameter_instance[3].other_thing.part parameter_instance[3].something.it parameter_instance[3].something.part
+      /end REF_CHARACTERISTIC
+      /begin REF_MEASUREMENT
+        shapes_a2l[0].Square.it shapes_a2l[0].Triangle[0].subelem shapes_a2l[0].Triangle[1].subelem shapes_a2l[1].Square.it shapes_a2l[1].Triangle[0].subelem shapes_a2l[1].Triangle[1].subelem shapes_a2l[2].Square.it
+        shapes_a2l[2].Triangle[0].subelem shapes_a2l[2].Triangle[1].subelem shapes_a2l[3].Square.it shapes_a2l[3].Triangle[0].subelem shapes_a2l[3].Triangle[1].subelem shapes_a2l[4].Square.it shapes_a2l[4].Triangle[0].subelem shapes_a2l[4].Triangle[1].subelem
+        shapes_a2l[5].Square.it shapes_a2l[5].Triangle[0].subelem shapes_a2l[5].Triangle[1].subelem shapes_a2l[6].Square.it shapes_a2l[6].Triangle[0].subelem shapes_a2l[6].Triangle[1].subelem shapes_a2l[7].Square.it shapes_a2l[7].Triangle[0].subelem
+        shapes_a2l[7].Triangle[1].subelem shapes_a2l[8].Square.it shapes_a2l[8].Triangle[0].subelem shapes_a2l[8].Triangle[1].subelem shapes_a2l[9].Square.it shapes_a2l[9].Triangle[0].subelem shapes_a2l[9].Triangle[1].subelem
+      /end REF_MEASUREMENT
+      /begin SUB_GROUP
+        overwrite_group
+      /end SUB_GROUP
+    /end GROUP
+
+    /begin GROUP overwrite_group ""
+      /begin REF_MEASUREMENT
+        shapes_a2l[0].alternative_a2l_name.x_a2l shapes_a2l[1].alternative_a2l_name.x_a2l shapes_a2l[2].alternative_a2l_name.x_a2l shapes_a2l[3].alternative_a2l_name.x_a2l shapes_a2l[4].alternative_a2l_name.x_a2l shapes_a2l[5].alternative_a2l_name.x_a2l shapes_a2l[6].alternative_a2l_name.x_a2l
+        shapes_a2l[7].alternative_a2l_name.x_a2l shapes_a2l[8].alternative_a2l_name.x_a2l shapes_a2l[9].alternative_a2l_name.x_a2l
+      /end REF_MEASUREMENT
+    /end GROUP
+
+  /end MODULE
+/end PROJECT

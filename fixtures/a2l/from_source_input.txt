@@ -1,0 +1,146 @@
+
+---
+
+/*
+@@ SUB_STRUCTURE = Circle
+@@ alternative_a2l_name
+@@ STRUCTURE = measurements
+@@ END
+*/
+
+/*
+@@ ELEMENT = x
+@@ STRUCTURE = measurements | Circle
+@@ A2L_TYPE = MEASURE
+@@ x_a2l
+@@ DATA_TYPE = ULONG
+@@ END
+*/
+/*
+@@ SUB_STRUCTURE = Square
+@@ STRUCTURE = measurements
+@@ END
+*/
+/*
+@@ ELEMENT = it
+@@ STRUCTURE = measurements | Square
+@@ A2L_TYPE = MEASURE
+@@ DATA_TYPE = SWORD
+@@ END
+*/
+/*
+@@ SUB_STRUCTURE = Triangle
+@@ STRUCTURE = measurements
+@@ DIMENSION = 2 SPLIT
+@@ END
+*/
+/*
+@@ ELEMENT = subelem
+@@ STRUCTURE = measurements | Triangle
+@@ A2L_TYPE = MEASURE
+@@ DATA_TYPE = FLOAT
+@@ DIMENSION = 7
+@@ END
+*/
+
+/*
+@@ INSTANCE = shapes
+@@ shapes_a2l
+@@ STRUCTURE = measurements
+@@ DIMENSION = 10
+@@ OVERWRITE Circle | x RANGE = [ -50 ... 50.0 ]
+@@ OVERWRITE Square | it DESCRIPTION = "ein anderer Kommentar"
+@@ OVERWRITE Triangle | subelem CONVERSION = LINEAR 2 0 "mm"
+@@ OVERWRITE Circle | x CONVERSION = LINEAR 4 1 "mm"
+@@ OVERWRITE Circle | x ALIAS = alias
+@@ OVERWRITE Circle | x GROUP = overwrite_group
+@@ END
+*/
+
+---
+
+/*
+@@ ELEMENT = it
+@@ STRUCTURE = Thing
+@@ A2L_TYPE = STRING 10
+@@ END
+*/
+
+/*
+@@ ELEMENT = part
+@@ STRUCTURE = Thing
+@@ A2L_TYPE = PARAMETER
+@@ DATA_TYPE = FLOAT
+@@ END
+*/
+
+---
+
+/*
+@@ SUB_STRUCTURE = Spoon
+@@ STRUCTURE = parameters
+@@ END
+*/
+
+/*
+@@ ELEMENT = x
+@@ STRUCTURE = parameters | Spoon
+@@ A2L_TYPE = PARAMETER
+@@ DATA_TYPE = SBYTE
+@@ DIMENSION = 5
+@@ END
+*/
+/*
+@@ SUB_STRUCTURE = Fork
+@@ STRUCTURE = parameters
+@@ END
+*/
+/*
+@@ ELEMENT = x
+@@ STRUCTURE = parameters | Fork
+@@ A2L_TYPE = AXIS
+@@ DATA_TYPE = FLOAT
+@@ LAYOUT = AxisLayout
+@@ DIMENSION = 12
+@@ END
+*/
+/*
+@@ ELEMENT = y
+@@ STRUCTURE = parameters | Fork
+@@ A2L_TYPE = CURVE
+@@ DATA_TYPE = UWORD
+@@ LAYOUT = CurveLayout
+@@ X_AXIS = COMMON INSTANCE_NAME x
+@@ END
+*/
+/*
+@@ SUB_STRUCTURE = Knife
+@@ STRUCTURE = parameters
+@@ DIMENSION = 2 SPLIT
+@@ END
+*/
+/*
+@@ ELEMENT = x
+@@ STRUCTURE = parameters | Knife
+@@ A2L_TYPE = STRING 13
+@@ END
+*/
+/*
+@@ SUB_STRUCTURE = something
+@@ STRUCTURE = parameters
+@@ DATA_TYPE = STRUCTURE Thing
+@@ END
+*/
+/*
+@@ SUB_STRUCTURE = other_thing
+@@ STRUCTURE = parameters
+@@ DATA_TYPE = STRUCTURE Thing
+@@ END
+*/
+
+/*
+@@ INSTANCE = parameter_instance
+@@ STRUCTURE = parameters
+@@ DIMENSION = 4
+@@ END
+*/
