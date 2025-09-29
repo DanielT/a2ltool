@@ -304,15 +304,37 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     // We're supporting  the same syntax as the Vector ASAP2 creator.
     if let Some(source_file_patterns) = arg_matches.get_many::<OsString>("FROM_SOURCE") {
         let target_group = arg_matches.get_one::<String>("TARGET_GROUP").cloned();
-        let log_msgs = creator::create_items_from_sources(
+        let result = creator::create_items_from_sources(
             &mut a2l_file,
             source_file_patterns,
             target_group,
             enable_structures,
             force_old_arrays,
         );
-        for msg in log_msgs {
-            cond_print!(verbose, now, msg);
+
+        match result {
+            Ok((warnings, log_msgs)) => {
+                for msg in log_msgs {
+                    cond_print!(verbose, now, msg);
+                }
+                cond_print!(
+                    verbose,
+                    now,
+                    format!("Item creation from source files complete. {warnings} warnings.")
+                );
+                if strict && warnings > 0 {
+                    return Err(format!(
+                        "Exiting because {warnings} warnings were found in strict mode."
+                    ));
+                }
+            }
+            Err(log_msgs) => {
+                let verbose = if verbose > 0 { verbose } else { 1 };
+                for msg in log_msgs {
+                    cond_print!(verbose, now, msg);
+                }
+                return Err("Exiting because errors were found during item creation.".to_string());
+            }
         }
     }
 

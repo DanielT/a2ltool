@@ -369,13 +369,15 @@ struct Creator<'a2l> {
     sub_groups: HashMap<String, String>, // map: group name to description
     structures: HashMap<String, Structure>, // map: structure name to structure definition
     names: Vec<String>,                  // list of all used A2L names to check for duplicates
-    messages: Vec<String>,
     version: A2lVersion,
     deferred_var_characteristic: Vec<(String, u32)>,
     var_criterion: HashMap<String, VarCriterionDefinition>,
     new_arrays: bool,
     enable_structures: bool,
     created_typedefs: HashSet<String>, // set of typedef names that were created by this code, to distinguish from pre-existing typedefs
+    messages: Vec<String>,
+    warnings: usize,
+    errors: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -405,13 +407,16 @@ struct SplitIterator<'a> {
 // in practice it is always @@, so lets hardcode it for now.
 static COMMENT_PREFIX: &[u8] = b"@@";
 
+/// Create items in the given A2lFile from the specified source files.
+///
+/// Returns either Ok(warnings_count, log_messages) or Err(error_messages)
 pub(crate) fn create_items_from_sources<'a>(
     a2l_file: &mut A2lFile,
     source_file_patterns: impl Iterator<Item = &'a OsString>,
     target_group: Option<String>,
     enable_structures: bool,
     force_old_arrays: bool,
-) -> Vec<String> {
+) -> Result<(usize, Vec<String>), Vec<String>> {
     // This function will handle the creation of items from the source file
     // and return the count of inserted items along with any log messages.
     let mut creator = Creator::new(a2l_file, target_group, enable_structures, force_old_arrays);
@@ -426,8 +431,8 @@ pub(crate) fn create_items_from_sources<'a>(
                     .collect::<Vec<_>>(),
                 Err(pattern_error) => {
                     // glob pattern is invalid: log the error, and then try to proceed with the input as a single filename
-                    creator.messages.push(format!(
-                        "Error expanding glob pattern '{source_str}': {pattern_error}"
+                    creator.error(format!(
+                        "Failed to expand glob pattern '{source_str}': {pattern_error}"
                     ));
                     vec![source_file_pattern.clone()]
                 }
@@ -437,12 +442,20 @@ pub(crate) fn create_items_from_sources<'a>(
             vec![source_file_pattern.clone()]
         };
 
+        // if no files were found, log an error and continue with the next pattern
+        if expanded_filenames.is_empty() {
+            creator.warn(format!(
+                "Warning: No files matched the pattern '{}'",
+                source_file_pattern.to_string_lossy()
+            ));
+        }
+
         // for each expanded filename, try to read and process the file
         for source_file in expanded_filenames {
             let data = match std::fs::read(&source_file) {
                 Ok(data) => data,
                 Err(error) => {
-                    creator.messages.push(format!(
+                    creator.error(format!(
                         "Error reading source file '{}': {error}",
                         source_file.to_string_lossy(),
                     ));
@@ -458,7 +471,11 @@ pub(crate) fn create_items_from_sources<'a>(
         }
     }
 
-    creator.messages
+    if creator.errors > 0 {
+        Err(creator.messages)
+    } else {
+        Ok((creator.warnings, creator.messages))
+    }
 }
 
 fn deftokens_to_string(definition_tokens: &[&[u8]]) -> String {
@@ -494,7 +511,6 @@ impl<'a2l> Creator<'a2l> {
             sub_groups: HashMap::new(),
             structures: HashMap::new(),
             names,
-            messages: Vec::new(),
             version,
             deferred_var_characteristic: Vec::new(),
             var_criterion: HashMap::new(),
@@ -503,6 +519,9 @@ impl<'a2l> Creator<'a2l> {
             // TYPEDEF_STRUCTURE and INSTANCE are only usable in 1.7.1 and later
             enable_structures: enable_structures && version >= A2lVersion::V1_7_1,
             created_typedefs: HashSet::new(),
+            messages: Vec::new(),
+            warnings: 0,
+            errors: 0,
         }
     }
 
@@ -517,7 +536,7 @@ impl<'a2l> Creator<'a2l> {
                     let def_result = self.process_definition(definition);
                     if let Err(error) = def_result {
                         let def_str: String = deftokens_to_string(&definition_tokens);
-                        self.messages.push(format!(
+                        self.error(format!(
                         "Error processing definition at offset {offset}: {error} in definition: {def_str}"
                     ));
                     }
@@ -527,12 +546,22 @@ impl<'a2l> Creator<'a2l> {
                 }
                 Err(error) => {
                     let def_text: String = deftokens_to_string(&definition_tokens);
-                    self.messages.push(format!(
+                    self.error(format!(
                     "Error parsing definition at offset {offset}: {error} in definition: {def_text}",
                 ));
                 }
             }
         }
+    }
+
+    fn warn(&mut self, message: String) {
+        self.warnings += 1;
+        self.messages.push(message);
+    }
+
+    fn error(&mut self, message: String) {
+        self.errors += 1;
+        self.messages.push(message);
     }
 
     fn process_definition(&mut self, definition: Definition) -> Result<(), String> {
@@ -1264,7 +1293,7 @@ impl<'a2l> Creator<'a2l> {
                 split
             } else {
                 // split is mandatory for instances when --enable-structures is not set
-                self.messages.push(format!(
+                self.warn(format!(
                     "Warning: Multi-dimensional instance '{}' must have the SPLIT attribute.",
                     instance.name
                 ));
@@ -1295,7 +1324,7 @@ impl<'a2l> Creator<'a2l> {
                         Some(&instance_element),
                     );
                     if let Err(error) = result {
-                        self.messages.push(error);
+                        self.error(error);
                     }
                 }
             }
@@ -1345,7 +1374,7 @@ impl<'a2l> Creator<'a2l> {
                         instance_element,
                     );
                     if let Err(error) = result {
-                        self.messages.push(error);
+                        self.error(error);
                     }
                 }
             }
@@ -1405,7 +1434,7 @@ impl<'a2l> Creator<'a2l> {
                 Some(&instance_sub_element),
             );
             if let Err(error) = result {
-                self.messages.push(format!(
+                self.error(format!(
                     "Error processing item '{}' in instance '{}': {error}",
                     struct_item.a2l_name, instance_element.instance_name
                 ));
@@ -2176,11 +2205,13 @@ impl<'a2l> Creator<'a2l> {
             .iter()
             .position(|e| e.symbol_name == element_def.symbol_name)
         {
+            // usage of self.warn runs into trouble with the borrow checker
             self.messages.push(format!(
                 "Warning: Element '{}' in structure '{}' is redefined. Previous definition will be overwritten.",
                 element_def.symbol_name,
                 element_def.structure.join("."),
             ));
+            self.warnings += 1;
             struct_entry.elements.remove(pos);
         }
 
@@ -3097,6 +3128,9 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
+
         let module = &a2l_file.project.module[0];
         let measurement = module.measurement.get("OtherMeasurementName").unwrap();
         let Some(symbol_link) = &measurement.symbol_link else {
@@ -3135,6 +3169,9 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
+
         let module = &a2l_file.project.module[0];
         assert_eq!(module.measurement.len(), 12);
         let measurement = module
@@ -3166,6 +3203,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = &a2l_file.project.module[0];
         let characteristic = module.characteristic.get("ParameterName").unwrap();
@@ -3195,6 +3234,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = &a2l_file.project.module[0];
         let characteristic = module.characteristic.get("ParameterArrayName_J").unwrap();
@@ -3235,6 +3276,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = &a2l_file.project.module[0];
         let characteristic = module.characteristic.get("CurveName").unwrap();
@@ -3285,6 +3328,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = &a2l_file.project.module[0];
         let characteristic = module.characteristic.get("MapName").unwrap();
@@ -3323,6 +3368,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = creator.module;
         assert!(module.characteristic.contains_key("CurveName"));
@@ -3354,6 +3401,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = creator.module;
         assert!(module.characteristic.contains_key("StringParameterName"));
@@ -3376,6 +3425,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = &a2l_file.project.module[0];
         assert_eq!(module.characteristic.len(), 5);
@@ -3414,6 +3465,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = &a2l_file.project.module[0];
         let axis_pts = module.axis_pts.get("AxisNameA2l").unwrap();
@@ -3454,6 +3507,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = creator.module;
         assert!(module.compu_method.contains_key("TableConversion"));
@@ -3493,6 +3548,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = creator.module;
         assert!(module.compu_method.contains_key("LinearConversion"));
@@ -3567,6 +3624,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         assert_eq!(creator.structures.len(), 3);
         assert!(creator.structures.contains_key("OuterStruct"));
@@ -3598,6 +3657,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         // the main group is only created once an item is created that belongs to it
         let module = creator.module;
@@ -3622,6 +3683,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         // the sub group is only created once an item is created that belongs to it
         let module = creator.module;
@@ -3658,6 +3721,8 @@ mod tests {
         let mut a2l_file = a2lfile::new();
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
 
         let module = creator.module;
         assert!(module.variant_coding.is_some());
@@ -3699,6 +3764,9 @@ mod tests {
 
         let mut creator = Creator::new(&mut a2l_file, None, false, false);
         creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
+
         let module = &a2l_file.project.module[0];
         let measurement = module.measurement.get("MeasurementName").unwrap();
         assert!(measurement.symbol_link.is_none());
@@ -3713,6 +3781,8 @@ mod tests {
 
         let data = std::fs::read("fixtures/a2l/from_source_input.txt").unwrap();
         creator.process_file(&data);
+        assert_eq!(creator.warnings, 2); // Note: missing SPLIT attribute on the two INSTANCE definitions
+        assert_eq!(creator.errors, 0);
 
         let (expected_a2l, _) = a2lfile::load("fixtures/a2l/from_source.a2l", None, false).unwrap();
 
@@ -3778,7 +3848,9 @@ mod tests {
 
         let data = std::fs::read("fixtures/a2l/from_source_input.txt").unwrap();
         creator.process_file(&data);
-        println!("warnings: {:#?}", creator.messages);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
+
         let (expected_a2l, _) =
             a2lfile::load("fixtures/a2l/from_source_structs.a2l", None, false).unwrap();
         let module = &a2l_file.project.module[0];

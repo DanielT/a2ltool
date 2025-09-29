@@ -10,6 +10,8 @@
 - Bugfix: prevent infinite recursion in the DWARF debug data reader if the element type of an array is the array itself
 - Workaround: Some compilers claim that an enum is unsigned even if it contains enumerators with negative values. In this case the datatype is switched to a signed type.
 - ignore case in parameters of command line options. For example `--update ADDRESSES` can also be written as `--update addresses` now.
+- Correctly support the combination of `--enable-structures` with `--from-source`
+- Stop with an error message if there are problems while processing definitions in source files
 
 ## Version 3.0.0
 
