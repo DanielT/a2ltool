@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## Version 3.1.0
 
 - Add the `--old-arrays` option. It allows the use of old array notation (e.g. ".\_3\_") to be forced,
   even if the file version is 1.7.0 or 1.7.1 where new array notation (e.g. [2]) is possible.
