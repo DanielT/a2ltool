@@ -40,7 +40,7 @@ struct TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
     typedef_names: TypedefNames,
     /// information about RECORD_LAYOUT items that exist in the module
     recordlayout_info: &'rl mut RecordLayoutInfo,
-    /// information about references from INSTANCEs to TYPEDEF_*
+    /// information about references from INSTANCEs to TYPEDEF_*; instance.type_ref -> Vec<(TypeInfo, referrer)>
     typedef_ref_info: TypedefsRefInfo<'dbg>,
     /// array of strings used to output log messages
     log_msgs: &'log mut Vec<String>,
@@ -98,7 +98,7 @@ pub(crate) fn create_new_typedefs<'a>(
     let mut typedef_ref_info: TypedefsRefInfo = HashMap::new();
 
     for (typeinfo, instance_idx) in create_list {
-        let name = module.instance[*instance_idx].get_name().to_string();
+        let name = module.instance[*instance_idx].type_ref.clone();
         typedef_ref_info
             .entry(name)
             .or_default()
