@@ -390,17 +390,18 @@ fn evaluate_exprloc(
     }
 }
 
-// get a DW_AT_type attribute and return the number of the unit in which the type is located
-// as well as an entries_tree iterator that can iterate over the DIEs of the type
+// Get a DW_AT_type attribute and return the number of the unit in which the type is located
+// as well as the offset of the type relative to the start of .debug_info
+// If the attribute is missing, return Ok(None)
 pub(crate) fn get_type_attribute(
     entry: &DebuggingInformationEntry<SliceType, usize>,
     unit_list: &UnitList<'_>,
     current_unit: usize,
-) -> Result<(usize, gimli::DebugInfoOffset), String> {
+) -> Result<Option<(usize, gimli::DebugInfoOffset)>, String> {
     match get_attr_value(entry, gimli::constants::DW_AT_type) {
         Some(gimli::AttributeValue::DebugInfoRef(dbginfo_offset)) => {
             if let Some(unit_idx) = unit_list.get_unit(dbginfo_offset.0) {
-                Ok((unit_idx, dbginfo_offset))
+                Ok(Some((unit_idx, dbginfo_offset)))
             } else {
                 Err("invalid debug info ref".to_string())
             }
@@ -408,9 +409,10 @@ pub(crate) fn get_type_attribute(
         Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
             let (unit, _) = &unit_list[current_unit];
             let dbginfo_offset = unit_offset.to_debug_info_offset(unit).unwrap();
-            Ok((current_unit, dbginfo_offset))
+            Ok(Some((current_unit, dbginfo_offset)))
         }
-        _ => Err("failed to get DIE tree".to_string()),
+        None => Ok(None),
+        other => Err(format!("failed to get type attribute: {other:#?}")),
     }
 }
 
