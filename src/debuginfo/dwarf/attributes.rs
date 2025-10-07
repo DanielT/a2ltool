@@ -62,7 +62,6 @@ pub(crate) fn get_name_attribute(
             }
         }
         gimli::AttributeValue::DebugLineStrRef(str_offset) => {
-            println!("using .debug_line_str for names");
             match dwarf.debug_line_str.get_str(str_offset) {
                 Ok(slice) => {
                     if let Ok(utf8string) = slice.to_string() {
