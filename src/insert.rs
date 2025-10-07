@@ -1328,4 +1328,54 @@ mod test {
         assert_eq!(a2l.project.module[0].measurement.len(), 0);
         assert_eq!(a2l.project.module[0].characteristic.len(), 0);
     }
+
+    #[test]
+    fn insert_typedef_characteristic() {
+        // regression test for issue #54 - failed to insert TYPEDEF_CHARACTERISTIC
+        let mut a2l = a2lfile::new();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("fixtures/bin/no_a2l_demo.out"),
+            false,
+        )
+        .unwrap();
+
+        // insert an INSTANCE and a TYPEDEF_CHARACTERISTIC
+        let measurement_symbols = vec![];
+        let characteristic_symbols = vec!["params"];
+        let mut log_msgs = Vec::new();
+        insert_items(
+            &mut a2l,
+            &debug_data,
+            measurement_symbols,
+            characteristic_symbols,
+            None,
+            &mut log_msgs,
+            true,
+        );
+
+        assert_eq!(a2l.project.module[0].instance.len(), 1);
+        let inst = a2l.project.module[0].instance.get("params").unwrap();
+
+        assert_eq!(a2l.project.module[0].typedef_structure.len(), 1);
+        let td_struct = a2l.project.module[0]
+            .typedef_structure
+            .get(&inst.type_ref)
+            .unwrap();
+        assert_eq!(td_struct.structure_component.len(), 2);
+
+        assert_eq!(a2l.project.module[0].typedef_characteristic.len(), 2);
+        assert!(
+            a2l.project.module[0]
+                .typedef_characteristic
+                .contains_key(&td_struct.structure_component[0].component_type)
+        );
+        assert!(
+            a2l.project.module[0]
+                .typedef_characteristic
+                .contains_key(&td_struct.structure_component[1].component_type)
+        );
+
+        // no TYPEDEF_MEASUREMENT should be created
+        assert_eq!(a2l.project.module[0].typedef_measurement.len(), 0);
+    }
 }

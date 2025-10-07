@@ -71,3 +71,8 @@ All code and data sections have been removed from each of these files, so they a
 They only contain debug section, in which all strings have been randomized.
 
 These files are used by the release pipeline to perform a PGO build.
+
+## no_a2l_demo.out
+
+This file came from a branch of the XCPlite repository (see issue #54).
+The code and data sections have been stripped from it, leaving only the DWARF debug info.
