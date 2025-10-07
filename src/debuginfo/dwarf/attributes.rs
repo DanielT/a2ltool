@@ -61,6 +61,18 @@ pub(crate) fn get_name_attribute(
                 Err(err) => Err(err.to_string()),
             }
         }
+        gimli::AttributeValue::DebugLineStrRef(str_offset) => {
+            println!("using .debug_line_str for names");
+            match dwarf.debug_line_str.get_str(str_offset) {
+                Ok(slice) => {
+                    if let Ok(utf8string) = slice.to_string() {
+                        return Ok(utf8string.to_owned());
+                    }
+                    Err(format!("could not decode {slice:#?} as a utf-8 string"))
+                }
+                Err(err) => Err(err.to_string()),
+            }
+        }
         _ => Err(format!("invalid name attribute type {name_attr:#?}")),
     }
 }
