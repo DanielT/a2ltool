@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fix: creating new TYPEDEF_CHARACTERISTICs from the command line was broken
+- Fix: Handle of the offset value in SYMBOL_LINK correctly.
+- DWARF type reader: get names from DebugLineStrRef too
+
 ## Version 3.1.0
 
 - Add the `--old-arrays` option. It allows the use of old array notation (e.g. ".\_3\_") to be forced,

@@ -376,6 +376,7 @@ pub(crate) fn make_symbol_link_string(sym_info: &SymbolInfo, debug_data: &DebugD
 pub(crate) fn set_symbol_link(opt_symbol_link: &mut Option<SymbolLink>, symbol_name: String) {
     if let Some(symbol_link) = opt_symbol_link {
         symbol_link.symbol_name = symbol_name;
+        symbol_link.offset = 0; // reset offset to 0, since the symbol name now contains the full information
     } else {
         *opt_symbol_link = Some(SymbolLink::new(symbol_name, 0));
     }
@@ -668,7 +669,10 @@ mod test {
         A2lVersion,
         debuginfo::{DbgDataType, TypeInfo},
     };
-    use a2lfile::{Coeffs, CoeffsLinear, CompuMethod, ConversionType};
+    use a2lfile::{
+        A2lObjectName, Characteristic, CharacteristicType, Coeffs, CoeffsLinear, CompuMethod,
+        ConversionType, DataType, IndexMode, RecordLayout,
+    };
     use std::ffi::OsString;
 
     #[test]
@@ -1241,5 +1245,62 @@ mod test {
         let mut opt_bm = Some(BitMask::new(0));
         set_bitmask(&mut opt_bm, &typeinfo);
         assert_eq!(opt_bm.unwrap().mask, 0b11100000);
+    }
+
+    #[test]
+    fn test_update_with_offset() {
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("fixtures/bin/update_test.elf"),
+            false,
+        )
+        .unwrap();
+        let mut a2l = a2lfile::new();
+
+        // create a characteristic with a symbol link that has an offset into an array
+        // The symbol "Characteristic_ValBlk" is defined in update_test.elf as
+        // float Characteristic_ValBlk[5]
+        let mut chr = Characteristic::new(
+            "test".to_string(),
+            String::new(),
+            CharacteristicType::Value,
+            0,
+            "record_layout".to_string(),
+            0.0,
+            "NO_COMPU_METHOD".to_string(),
+            0.0,
+            100.0,
+        );
+        chr.symbol_link = Some(a2lfile::SymbolLink::new(
+            "Characteristic_ValBlk".to_string(),
+            16,
+        ));
+        let mut rl = RecordLayout::new("record_layout".to_string());
+        rl.fnc_values = Some(a2lfile::FncValues::new(
+            0,
+            DataType::Float32Ieee,
+            IndexMode::RowDir,
+            AddrType::Direct,
+        ));
+        a2l.project.module[0].characteristic.push(chr);
+
+        // perform address update
+        let mut log_msgs = Vec::new();
+        update_a2l(
+            &mut a2l,
+            &debug_data,
+            &mut log_msgs,
+            UpdateType::Addresses,
+            UpdateMode::Strict,
+            false,
+        );
+
+        let chr = &a2l.project.module[0].characteristic[0];
+        assert_eq!(chr.get_name(), "test");
+        assert_eq!(
+            chr.symbol_link.as_ref().unwrap().symbol_name,
+            "Characteristic_ValBlk._4_"
+        );
+        assert_eq!(chr.symbol_link.as_ref().unwrap().offset, 0);
+        assert_ne!(chr.address, 0);
     }
 }
