@@ -62,6 +62,7 @@ fn update_module_axis_pts<'dbg>(
         &axis_pts.symbol_link,
         &axis_pts.if_data,
         info.debug_data,
+        info.use_new_arrays,
     ) {
         // match update_axis_pts_address(&mut axis_pts, info.debug_data, info.version) {
         Ok(sym_info) => {

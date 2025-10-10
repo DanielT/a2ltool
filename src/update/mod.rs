@@ -99,6 +99,7 @@ pub(crate) struct A2lUpdateInfo<'dbg> {
     pub(crate) full_update: bool,
     pub(crate) version: A2lVersion,
     pub(crate) enable_structures: bool,
+    pub(crate) use_new_arrays: bool,
 }
 
 // This struct contains the data that is modified / updated during the a2l update process.
@@ -120,10 +121,13 @@ pub(crate) fn update_a2l(
     update_type: UpdateType,
     update_mode: UpdateMode,
     enable_structures: bool,
+    force_old_arrays: bool,
 ) -> (UpdateSumary, bool) {
     let version = A2lVersion::from(&*a2l_file);
     let mut summary = UpdateSumary::new();
     let mut strict_error = false;
+    let use_new_arrays = !force_old_arrays && version >= A2lVersion::V1_7_0;
+
     for module in &mut a2l_file.project.module {
         let (mut data, update_info) = init_update(
             debug_data,
@@ -132,6 +136,7 @@ pub(crate) fn update_a2l(
             update_type,
             update_mode,
             enable_structures,
+            use_new_arrays,
         );
         let (module_summary, module_strict_error) = run_update(&mut data, &update_info, log_msgs);
         summary += module_summary;
@@ -147,6 +152,7 @@ pub fn init_update<'a2l, 'dbg>(
     update_type: UpdateType,
     update_mode: UpdateMode,
     enable_structures: bool,
+    use_new_arrays: bool,
 ) -> (A2lUpdater<'a2l>, A2lUpdateInfo<'dbg>) {
     let preserve_unknown = update_mode == UpdateMode::Preserve;
     let strict_update = update_mode == UpdateMode::Strict;
@@ -165,6 +171,7 @@ pub fn init_update<'a2l, 'dbg>(
             full_update,
             version,
             enable_structures,
+            use_new_arrays,
         },
     )
 }
@@ -240,6 +247,7 @@ fn get_symbol_info<'a>(
     opt_symbol_link: &Option<SymbolLink>,
     ifdata_vec: &[IfData],
     debug_data: &'a DebugData,
+    use_new_arrays: bool,
 ) -> Result<SymbolInfo<'a>, Vec<String>> {
     let mut symbol_link_errmsg = None;
     let mut ifdata_errmsg = None;
@@ -251,7 +259,12 @@ fn get_symbol_info<'a>(
                 if symbol_link.offset == 0 {
                     return Ok(sym_info);
                 } else {
-                    match find_symbol_by_offset(&sym_info, symbol_link.offset, debug_data) {
+                    match find_symbol_by_offset(
+                        &sym_info,
+                        symbol_link.offset,
+                        debug_data,
+                        use_new_arrays,
+                    ) {
                         Ok(sym_info) => return Ok(sym_info),
                         Err(errmsg) => return Err(vec![errmsg]),
                     }
@@ -763,6 +776,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -783,6 +797,7 @@ mod test {
             UpdateType::Full,
             UpdateMode::Default,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -808,6 +823,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             true,
+            false,
         );
         let result = update_all_module_axis_pts(&mut data, &info);
         assert_eq!(result.len(), 4);
@@ -830,6 +846,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -850,6 +867,7 @@ mod test {
             UpdateType::Full,
             UpdateMode::Default,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -875,6 +893,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             true,
+            false,
         );
         let result = update_all_module_blobs(&mut data, &info);
         assert_eq!(result.len(), 3);
@@ -896,6 +915,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -916,6 +936,7 @@ mod test {
             UpdateType::Full,
             UpdateMode::Default,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -941,6 +962,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             true,
+            false,
         );
         let result = update_all_module_characteristics(&mut data, &info);
         assert_eq!(result.len(), 7);
@@ -966,6 +988,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -987,6 +1010,7 @@ mod test {
             UpdateType::Full,
             UpdateMode::Default,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -1013,6 +1037,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             true,
+            false,
         );
         let typedef_names = TypedefNames::new(data.module);
         let (result, _) = update_all_module_instances(&mut data, &info, &typedef_names);
@@ -1035,6 +1060,7 @@ mod test {
             UpdateType::Full,
             UpdateMode::Default,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -1055,6 +1081,7 @@ mod test {
             UpdateType::Full,
             UpdateMode::Default,
             true,
+            false,
         );
 
         let mut log_msgs = Vec::new();
@@ -1080,6 +1107,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             true,
+            false,
         );
         let result = update_all_module_measurements(&mut data, &info);
         assert_eq!(result.len(), 7);
@@ -1105,6 +1133,7 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             false,
+            false,
         );
         assert!(!strict_error);
         assert_eq!(summary.axis_pts_not_updated, 0);
@@ -1127,6 +1156,7 @@ mod test {
             &mut log_msgs,
             UpdateType::Full,
             UpdateMode::Default,
+            false,
             false,
         );
         assert_eq!(summary.axis_pts_not_updated, 0);
@@ -1161,7 +1191,8 @@ mod test {
         .unwrap();
 
         let symbol_link_base = a2lfile::SymbolLink::new("Blob_1".to_string(), 0);
-        let sym_info = get_symbol_info("", &Some(symbol_link_base), &[], &debug_data).unwrap();
+        let sym_info =
+            get_symbol_info("", &Some(symbol_link_base), &[], &debug_data, false).unwrap();
         let base_address = sym_info.address;
         assert!(base_address != 0);
         assert!(matches!(
@@ -1171,26 +1202,28 @@ mod test {
 
         // offset 8 is inside the first array of the struct, so the symbol name should be "Blob_1.value_1[2]"
         let symbol_link_elem = a2lfile::SymbolLink::new("Blob_1".to_string(), 8);
-        let sym_info = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data).unwrap();
+        let sym_info =
+            get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data, false).unwrap();
         assert_eq!(sym_info.address, base_address + 8);
         assert_eq!(sym_info.name, "Blob_1.value_1._2_");
         assert!(matches!(sym_info.typeinfo.datatype, DbgDataType::Uint32));
 
         // offset 68 is inside the second array of the struct
         let symbol_link_elem = a2lfile::SymbolLink::new("Blob_1".to_string(), 68);
-        let sym_info = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data).unwrap();
+        let sym_info =
+            get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data, false).unwrap();
         assert_eq!(sym_info.address, base_address + 68);
         assert_eq!(sym_info.name, "Blob_1.value_2._0_.value_2_2");
         assert!(matches!(sym_info.typeinfo.datatype, DbgDataType::Uint32));
 
         // offset 1000 is outside the struct, which should trigger an error
         let symbol_link_elem = a2lfile::SymbolLink::new("Blob_1".to_string(), 1000);
-        let sym_info_result = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data);
+        let sym_info_result = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data, false);
         assert!(sym_info_result.is_err());
 
         // a2l allows negative offsets, which makes no sense at all. This also triggers an error
         let symbol_link_elem = a2lfile::SymbolLink::new("Blob_1".to_string(), -1);
-        let sym_info_result = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data);
+        let sym_info_result = get_symbol_info("", &Some(symbol_link_elem), &[], &debug_data, false);
         assert!(sym_info_result.is_err());
     }
 
@@ -1292,13 +1325,14 @@ mod test {
             UpdateType::Addresses,
             UpdateMode::Strict,
             false,
+            false,
         );
 
         let chr = &a2l.project.module[0].characteristic[0];
         assert_eq!(chr.get_name(), "test");
         assert_eq!(
             chr.symbol_link.as_ref().unwrap().symbol_name,
-            "Characteristic_ValBlk._4_"
+            "Characteristic_ValBlk[4]"
         );
         assert_eq!(chr.symbol_link.as_ref().unwrap().offset, 0);
         assert_ne!(chr.address, 0);

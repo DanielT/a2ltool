@@ -365,6 +365,7 @@ pub(crate) fn find_symbol_by_offset<'a>(
     base_symbol: &SymbolInfo<'a>,
     offset: i32,
     debug_data: &'a DebugData,
+    use_new_arrays: bool,
 ) -> Result<SymbolInfo<'a>, String> {
     if offset < 0 || offset > base_symbol.typeinfo.get_size() as i32 {
         return Err(format!(
@@ -375,7 +376,7 @@ pub(crate) fn find_symbol_by_offset<'a>(
 
     let offset = offset as u64;
 
-    let iter = TypeInfoIter::new(&debug_data.types, base_symbol.typeinfo, false);
+    let iter = TypeInfoIter::new(&debug_data.types, base_symbol.typeinfo, use_new_arrays);
     for (name, typeinfo, item_offset) in iter {
         if item_offset == offset {
             return Ok(SymbolInfo {

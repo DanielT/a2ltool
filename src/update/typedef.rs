@@ -2135,6 +2135,7 @@ mod test {
                 &inst.symbol_link,
                 &inst.if_data,
                 &debug_data,
+                false,
             ) {
                 let typeinfo = sym_info
                     .typeinfo
@@ -2157,6 +2158,7 @@ mod test {
             full_update: true,
             version,
             enable_structures: true,
+            use_new_arrays: false,
         };
         update_module_typedefs(
             &info,

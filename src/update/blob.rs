@@ -46,6 +46,7 @@ fn update_module_blob(blob: &mut Blob, info: &A2lUpdateInfo<'_>) -> UpdateResult
         &blob.symbol_link,
         &blob.if_data,
         info.debug_data,
+        info.use_new_arrays,
     ) {
         // match update_blob_address(&mut blob, debug_data) {
         Ok(sym_info) => {

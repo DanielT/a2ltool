@@ -68,6 +68,7 @@ fn update_module_instance<'dbg>(
         &instance.symbol_link,
         &instance.if_data,
         info.debug_data,
+        info.use_new_arrays,
     ) {
         // match update_instance_address(&mut instance, info.debug_data) {
         Ok(sym_info) => {

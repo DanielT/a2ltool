@@ -63,6 +63,7 @@ fn update_module_measurement<'dbg>(
             &measurement.symbol_link,
             &measurement.if_data,
             info.debug_data,
+            info.use_new_arrays,
         ) {
             // match update_measurement_address(&mut measurement, info.debug_data, info.version) {
             Ok(sym_info) => {

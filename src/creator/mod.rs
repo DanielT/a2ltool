@@ -2672,34 +2672,6 @@ impl<'a2l> Creator<'a2l> {
         }
     }
 
-    // fn get_typedef_axis_for_axis_descr(
-    //     &self,
-    //     ref_name: &str,
-    //     is_instance: bool,  // set if the definition has the INSTANCE_NAME flag
-    //     context_name: &str, // this is the full name of the parent item
-    // ) -> Option<&a2lfile::TypedefAxis> {
-    //     // context_name is something like "instance.characteristic.XAxis" or "instance.sub_struct.characteristic.XAxis"
-    //     // in any case we'll need to strip two levels to get the name of the containing structure or instance
-    //     let any_td = if is_instance {
-    //         println!(
-    //             "Looking for typedef axis '{ref_name}' in instance context '{context_name}'"
-    //         );
-    //         let base_name = make_base_name(make_base_name(context_name)?)?;
-    //         let full_name = format!("{base_name}.{ref_name}");
-    //         println!(" -> full name '{full_name}'");
-    //         self.module.find_instance_component(&full_name)?
-    //     } else {
-    //         println!("Looking for typedef axis with full name '{ref_name}'");
-    //         self.module.find_instance_component(ref_name)?
-    //     };
-    //     println!(" -> found typedef '{:?}'", any_td);
-
-    //     if let a2lfile::AnyTypedef::TypedefAxis(td_axis) = any_td {
-    //         Some(td_axis)
-    //     } else {
-    //         None
-    //     }
-    // }
     fn get_typedef_axis_for_axis_descr(
         &self,
         ref_name: &str,

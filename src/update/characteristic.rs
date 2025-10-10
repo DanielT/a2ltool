@@ -83,6 +83,7 @@ fn update_module_characteristic<'dbg>(
             &characteristic.symbol_link,
             &characteristic.if_data,
             info.debug_data,
+            info.use_new_arrays,
         ) {
             Ok(sym_info) => {
                 update_characteristic_address(

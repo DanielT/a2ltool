@@ -353,6 +353,7 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
                 *update_type,
                 *update_mode,
                 enable_structures,
+                force_old_arrays,
             );
 
             let display_msg = if verbose > 0 || update_mode != &UpdateMode::Strict {
