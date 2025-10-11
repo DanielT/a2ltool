@@ -347,7 +347,7 @@ fn demangle_cpp_varnames(input: &[&String]) -> HashMap<String, String> {
             && let Ok(sym) = cpp_demangle::Symbol::new(*varname)
         {
             // exclude useless demangled names like "typeinfo for std::type_info" or "{vtable(std::type_info)}"
-            if let Ok(demangled) = sym.demangle(&demangle_opts)
+            if let Ok(demangled) = sym.demangle_with_options(&demangle_opts)
                 && !demangled.contains(' ')
                 && !demangled.starts_with("{vtable")
             {
