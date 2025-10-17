@@ -1520,7 +1520,7 @@ impl<'a2l> Creator<'a2l> {
             .contains_key(&instance.structure_name)
         {
             self.verify_structure(&instance.structure_name)?;
-            self.create_typedef_structure(&instance.structure_name)?;
+            self.create_typedef_structure(&instance.structure_name, None)?;
         } else if !self.created_typedefs.contains(&instance.structure_name) {
             // already exists, but was not created by us
             // this is not supposed to happen, and we don't know that the existing structure is compatible
@@ -1575,14 +1575,20 @@ impl<'a2l> Creator<'a2l> {
         Ok((measurements, characteristics))
     }
 
-    fn create_typedef_structure(&mut self, struct_name: &str) -> Result<(), String> {
+    fn create_typedef_structure(
+        &mut self,
+        struct_name: &str,
+        size: Option<u32>,
+    ) -> Result<(), String> {
         let Some(structure_def) = self.structures.get(struct_name).cloned() else {
             return Err(format!("Structure '{}' not found", struct_name));
         };
 
+        let size = size.unwrap_or(self.estimate_size(&structure_def));
+
         // first, create the TYPEDEF_STRUCTURE, with all of its STRUCTURE_COMPONENTs
         let mut typedef_structure =
-            a2lfile::TypedefStructure::new(struct_name.to_string(), String::new(), 0);
+            a2lfile::TypedefStructure::new(struct_name.to_string(), String::new(), size);
 
         for item in &structure_def.elements {
             let mut item_path = item.structure.clone();
@@ -1669,7 +1675,10 @@ impl<'a2l> Creator<'a2l> {
                         .unwrap_or(item_fullname);
                     if !self.module.typedef_structure.contains_key(&sub_struct_name) {
                         // no need to verify the structure again, it was already verified as part of the instance
-                        self.create_typedef_structure(&sub_struct_name)?;
+                        self.create_typedef_structure(
+                            &sub_struct_name,
+                            sub_structure_cfg.attributes.size,
+                        )?;
                     } else if !self.created_typedefs.contains(&sub_struct_name) {
                         // already exists, but was not created by us
                         // this is not supposed to happen, and we don't know that the existing structure is compatible
@@ -1947,6 +1956,91 @@ impl<'a2l> Creator<'a2l> {
         self.module.typedef_axis.push(td_axis);
 
         Ok(())
+    }
+
+    // try to estimate the size of a structure in bytes
+    // this has all several problems: not all elements are necessarily defined at all, and
+    // the ordering in the original program is unknown, so we don't know about padding/alignment,
+    // and finally, it is not possible to get the axis dimensions of curve/map when the axis is a
+    // reference to an external item.
+    fn estimate_size(&self, structure: &Structure) -> u32 {
+        let mut total_size: u32 = 0;
+        for item in &structure.elements {
+            match &item.config {
+                ItemConfig::Measure(cfg) => {
+                    total_size += Self::datatype_size(&cfg.datatype)
+                        * cfg.attributes.dimension.iter().product::<u32>();
+                }
+                ItemConfig::Parameter(cfg) => {
+                    total_size += Self::datatype_size(&cfg.datatype)
+                        * cfg.attributes.dimension.iter().product::<u32>();
+                }
+                ItemConfig::CurveMap(cfg) => {
+                    let x_axis_dim = Self::get_axis_dimension(&cfg.x_axis).unwrap_or(1);
+                    let y_axis_dim = cfg
+                        .y_axis
+                        .as_ref()
+                        .and_then(|y| Self::get_axis_dimension(y))
+                        .unwrap_or(1);
+                    total_size += Self::datatype_size(&cfg.datatype) * x_axis_dim * y_axis_dim;
+                }
+                ItemConfig::Axis(cfg) => {
+                    total_size +=
+                        Self::datatype_size(&cfg.datatype) * cfg.dimension.iter().product::<u32>();
+                }
+                ItemConfig::String(cfg) => {
+                    total_size += cfg.length * cfg.attributes.dimension.iter().product::<u32>();
+                }
+                ItemConfig::SubStructure(sub_struct_cfg) => {
+                    let sub_struct_name = sub_struct_cfg
+                        .data_type_struct
+                        .as_ref()
+                        .cloned()
+                        .unwrap_or_else(|| {
+                            let mut path = item.structure.clone();
+                            path.push(item.symbol_name.clone());
+                            path.join(".")
+                        });
+                    if let Some(sub_structure) = self.structures.get(&sub_struct_name) {
+                        let sub_structure_size = self.estimate_size(sub_structure);
+                        let dim_product =
+                            sub_struct_cfg.attributes.dimension.iter().product::<u32>();
+                        total_size += sub_structure_size * dim_product;
+                    }
+                }
+            }
+        }
+        total_size
+    }
+
+    fn get_axis_dimension(axis: &AxisInfo) -> Option<u32> {
+        match axis {
+            AxisInfo::Standard { dimension, .. } => Some(dimension[0]),
+            AxisInfo::FixList { axis_points, .. } => Some(axis_points.len() as u32),
+            AxisInfo::FixRange {
+                range_min,
+                range_max,
+                range_step,
+                ..
+            } => {
+                let range_step = range_step.unwrap_or(1.0);
+                if range_step > 0.0 {
+                    Some(((*range_max - *range_min) / range_step).floor() as u32 + 1)
+                } else {
+                    None
+                }
+            }
+            AxisInfo::Common { .. } => None, // unknown!
+        }
+    }
+
+    fn datatype_size(datatype: &DataType) -> u32 {
+        match datatype {
+            DataType::Ubyte | DataType::Sbyte => 1,
+            DataType::Uword | DataType::Sword | DataType::Float16Ieee => 2,
+            DataType::Ulong | DataType::Slong | DataType::Float32Ieee => 4,
+            DataType::AUint64 | DataType::AInt64 | DataType::Float64Ieee => 8,
+        }
     }
 
     //#########################################################################

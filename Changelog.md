@@ -5,6 +5,7 @@
 - Fix: creating new TYPEDEF_CHARACTERISTICs from the command line was broken
 - Fix: Handle of the offset value in SYMBOL_LINK correctly.
 - DWARF type reader: get names from DebugLineStrRef too
+- estimate sizes for structures created using `--from-source`
 
 ## Version 3.1.0
 
@@ -25,10 +26,10 @@
 - Implement additional modes for file merges.
   The standard so far was to keep both conflicting elements. Now the `--merge-preference` option can be used to always use the existing version or the new version instead.
 - Add a manual for a2ltool.
-- Support non-standard `SYMBOL-LINK` notation, where the compile unit name is used as a prefix of the real symbol name
+- Support non-standard `SYMBOL_LINK` notation, where the compile unit name is used as a prefix of the real symbol name
 - Implement the ability to update `VAR_ADDRESS` info of `VAR_CHARACTERISTIC`
 - Handle negative bit-offsets in DWARF2 debug info correctly instead of panicing
-- Increase the size of the containing type for bitfields that extend past the end of their nominal containig type.
+- Increase the size of the containing type for bitfields that extend past the end of their nominal containing type.
 - Add more plausibility checks to `--check`
 
 ## Version 2.7.0
