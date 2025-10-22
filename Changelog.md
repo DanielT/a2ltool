@@ -1,6 +1,6 @@
 # Changelog
 
-## Verswion 3.2.0
+## Version 3.2.0
 
 - Fix: creating new TYPEDEF_CHARACTERISTICs from the command line was broken
 - Fix: Handle of the offset value in SYMBOL_LINK correctly.
