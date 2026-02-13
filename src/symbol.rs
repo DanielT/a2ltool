@@ -322,6 +322,7 @@ fn find_membertype<'a>(
                 }
 
                 let elementaddr = address + (multi_index as u64 * stride);
+                let arraytype = arraytype.get_reference(&debug_data.types);
                 find_membertype(
                     arraytype,
                     debug_data,
