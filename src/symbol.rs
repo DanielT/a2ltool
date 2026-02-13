@@ -554,6 +554,89 @@ mod test {
     }
 
     #[test]
+    fn test_find_symbol_in_nested_typerefs() {
+        let mut dbgdata = DebugData {
+            types: HashMap::new(),
+            typenames: HashMap::new(),
+            variables: IndexMap::new(),
+            demangled_names: HashMap::new(),
+            unit_names: Vec::new(),
+            sections: HashMap::new(),
+        };
+
+        dbgdata.types.insert(
+            86352,
+            TypeInfo {
+                name: Some("shorttype".to_string()),
+                datatype: DbgDataType::Sint16,
+                unit_idx: 0,
+                dbginfo_offset: 86352,
+            },
+        );
+        dbgdata.types.insert(
+            86353,
+            TypeInfo {
+                name: Some("consttype".to_string()),
+                datatype: DbgDataType::TypeRef(86352, 2),
+                unit_idx: 0,
+                dbginfo_offset: 86353,
+            },
+        );
+        dbgdata.types.insert(
+            86310,
+            TypeInfo {
+                name: Some("constshortarraytype".to_string()),
+                unit_idx: 0,
+                datatype: DbgDataType::Array {
+                    size: 20,
+                    dim: vec![10],
+                    stride:2,
+                    arraytype: Box::new(TypeInfo {
+                        name: Some("constshorttype".to_string()),
+                        unit_idx: 0,
+                        datatype: DbgDataType::TypeRef(86353, 2),
+                        dbginfo_offset: 86309,
+                    })
+                },
+                dbginfo_offset: 86310,
+            },
+        );
+        dbgdata.variables.insert(
+            "variable".to_string(),
+            vec![crate::debuginfo::VarInfo {
+                address: 0x00ca_fe00,
+                typeref: 86310,
+                unit_idx: 0,
+                function: None,
+                namespaces: vec![],
+            }],
+        );
+
+        // try the different array indexing notations
+        let result: Result<SymbolInfo<'_>, String> = find_symbol("variable._0_", &dbgdata);
+        assert!(result.is_ok());
+        let symbolinfo = result.unwrap();
+        assert!(symbolinfo.address == 0x00ca_fe00);
+        assert!(matches!(symbolinfo.typeinfo.datatype, DbgDataType::Sint16));
+        let result: Result<SymbolInfo<'_>, String> = find_symbol("variable[0]", &dbgdata);
+        assert!(result.is_ok());
+        assert!(result.unwrap().address == 0x00ca_fe00);
+        let result: Result<SymbolInfo<'_>, String> = find_symbol("variable[1]", &dbgdata);
+        assert!(result.is_ok());
+        assert!(result.unwrap().address == 0x00ca_fe02);
+        let result: Result<SymbolInfo<'_>, String> = find_symbol("variable[9]", &dbgdata);
+        assert!(result.is_ok());
+        assert!(result.unwrap().address == 0x00ca_fe12);
+
+        // there should not be a result if the symbol name contains extra unmatched components
+        let result: Result<SymbolInfo<'_>, String> = find_symbol("variable[0].three", &dbgdata);
+        assert!(result.is_err());
+        // there should not be a result if the symbol name goes outside array boundaries
+        let result: Result<SymbolInfo<'_>, String> = find_symbol("variable[10]", &dbgdata);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_select_varinfo() {
         let mut debug_data = DebugData {
             types: HashMap::new(),
