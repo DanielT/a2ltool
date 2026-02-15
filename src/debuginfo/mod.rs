@@ -170,10 +170,20 @@ impl TypeInfo {
     }
 
     pub(crate) fn get_reference<'a>(&'a self, types: &'a HashMap<usize, TypeInfo>) -> &'a Self {
-        if let DbgDataType::TypeRef(dbginfo_offset, _) = &self.datatype {
-            types.get(dbginfo_offset).unwrap_or(self)
-        } else {
-            self
+        let mut current: &'a TypeInfo = self;
+        loop {
+            match &current.datatype {
+                DbgDataType::TypeRef(dbginfo_offset, _) => {
+                    // Try to follow the reference; if missing, stop and return current
+                    let next = types.get(dbginfo_offset);
+
+                    match next {
+                        Some(t) => current = t,
+                        None => return current, // broken ref: stop here
+                    }
+                }
+                _ => return current, // reached a concrete type
+            }
         }
     }
 
