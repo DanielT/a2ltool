@@ -62,8 +62,8 @@ pub fn convert(a2l_file: &mut A2lFile, new_version: A2lVersion) {
 fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
     for module in &mut a2l_file.project.module {
         for axis_pts in &mut module.axis_pts {
-            if axis_pts.monotony.is_some() {
-                match axis_pts.monotony.as_ref().unwrap().monotony {
+            if let Some(monotony) = axis_pts.monotony.as_ref() {
+                match monotony.monotony {
                     a2lfile::MonotonyType::Monotonous
                     | a2lfile::MonotonyType::StrictMon
                     | a2lfile::MonotonyType::NotMon => axis_pts.monotony = None,
@@ -79,8 +79,8 @@ fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
         });
         for characteristic in &mut module.characteristic {
             for axis_descr in &mut characteristic.axis_descr {
-                if axis_descr.monotony.is_some() {
-                    match axis_descr.monotony.as_ref().unwrap().monotony {
+                if let Some(monotony) = axis_descr.monotony.as_ref() {
+                    match monotony.monotony {
                         a2lfile::MonotonyType::Monotonous
                         | a2lfile::MonotonyType::StrictMon
                         | a2lfile::MonotonyType::NotMon => axis_descr.monotony = None,

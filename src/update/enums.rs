@@ -77,7 +77,7 @@ pub(crate) fn update_enum_compu_methods(
         {
             // some enums are not sorted by ID in the source, but we want to output sorted COMPU_VTABs
             let mut enumerators = enumerators.clone();
-            enumerators.sort_by(|e1, e2| e1.1.cmp(&e2.1));
+            enumerators.sort_by_key(|e1| e1.1);
 
             // TabVerb is the only permitted conversion type for a compu_vtab
             compu_vtab.conversion_type = ConversionType::TabVerb;
@@ -111,7 +111,7 @@ pub(crate) fn update_enum_compu_methods(
         {
             // some enums are not sorted by ID in the source, but we want to output sorted COMPU_VTAB_RANGEs
             let mut enumerators = enumerators.clone();
-            enumerators.sort_by(|e1, e2| e1.1.cmp(&e2.1));
+            enumerators.sort_by_key(|e1| e1.1);
 
             // if compu_vtab_range has more entries than the enum, delete the extras
             while compu_vtab_range.value_triples.len() > enumerators.len() {
