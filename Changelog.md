@@ -1,9 +1,5 @@
 # Changelog
 
-## Unreleased
-
-- Disable unused unicode support in the regex crate to shrink the generated binary by about 10%
-
 ## Version 3.2.0
 
 - Fix: creating new TYPEDEF_CHARACTERISTICs from the command line was broken

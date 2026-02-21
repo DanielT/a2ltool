@@ -14,7 +14,7 @@ gimli = { version = "0.32", default-features = false, features = ["read"] }
 memmap2 = "0.9"
 clap = { version = "4.5", features = ["wrap_help"]}
 cpp_demangle = "0.5.0"
-regex = { version = "1", default-features = false, features = ["perf", "std"] }
+regex = "1"
 indexmap = "2.8.0"
 fnv = "1.0.7"
 argfile = { version ="0.2.0", features=["response"]}
