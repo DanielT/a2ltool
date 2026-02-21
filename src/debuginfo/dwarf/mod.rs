@@ -193,7 +193,7 @@ impl DebugDataReader<'_> {
                 if self.verbose {
                     let offset = unit
                         .offset()
-                        .as_debug_info_offset()
+                        .to_debug_info_offset(&unit)
                         .unwrap_or(gimli::DebugInfoOffset(0))
                         .0;
                     println!("Error: Failed to get abbreviations for unit @{offset:x}");
@@ -209,7 +209,7 @@ impl DebugDataReader<'_> {
             // in functions are declared inside of DW_TAG_subprogram[/DW_TAG_lexical_block]*.
             // We can easily find all of them by using depth-first traversal of the tree
             let mut entries_cursor = unit.entries(abbreviations);
-            if let Ok(Some((_, entry))) = entries_cursor.next_dfs()
+            if let Ok(Some(entry)) = entries_cursor.next_dfs()
                 && (entry.tag() == gimli::constants::DW_TAG_compile_unit
                     || entry.tag() == gimli::constants::DW_TAG_partial_unit)
             {
@@ -217,10 +217,9 @@ impl DebugDataReader<'_> {
                     .push(get_name_attribute(entry, &self.dwarf, unit).ok());
             }
 
-            let mut depth = 0;
             let mut context: Vec<(gimli::DwTag, Option<String>)> = Vec::new();
-            while let Ok(Some((depth_delta, entry))) = entries_cursor.next_dfs() {
-                depth += depth_delta;
+            while let Ok(Some(entry)) = entries_cursor.next_dfs() {
+                let depth = entry.depth();
                 debug_assert!(depth >= 1);
                 context.truncate((depth - 1) as usize);
                 let tag = entry.tag();
@@ -371,7 +370,7 @@ impl<'a> UnitList<'a> {
 
     fn get_unit(&self, itemoffset: usize) -> Option<usize> {
         for (idx, (unit, _)) in self.list.iter().enumerate() {
-            let unitoffset = unit.offset().as_debug_info_offset().unwrap().0;
+            let unitoffset = unit.offset().to_debug_info_offset(unit).unwrap().0;
             if unitoffset < itemoffset && unitoffset + unit.length_including_self() > itemoffset {
                 return Some(idx);
             }

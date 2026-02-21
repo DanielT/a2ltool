@@ -308,7 +308,7 @@ impl DebugDataReader<'_> {
 
     fn get_array_type(
         &self,
-        entry: &gimli::DebuggingInformationEntry<'_, '_, EndianSlice<'_, RunTimeEndian>, usize>,
+        entry: &gimli::DebuggingInformationEntry<EndianSlice<'_, RunTimeEndian>, usize>,
         current_unit: usize,
         offset: UnitOffset,
         typereader_data: &mut TypeReaderData,

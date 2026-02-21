@@ -590,13 +590,13 @@ mod test {
                 datatype: DbgDataType::Array {
                     size: 20,
                     dim: vec![10],
-                    stride:2,
+                    stride: 2,
                     arraytype: Box::new(TypeInfo {
                         name: Some("constshorttype".to_string()),
                         unit_idx: 0,
                         datatype: DbgDataType::TypeRef(86353, 2),
                         dbginfo_offset: 86309,
-                    })
+                    }),
                 },
                 dbginfo_offset: 86310,
             },
