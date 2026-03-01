@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 3.2.1
+
+- Fix: repeatedly resolve type references until an actual type is found. This fixed nested type references in PDB debug info (by Louis Caron)
+- Fix new clippy warnings
+- update to a2lfile 3.3.2
+  - Fix: Allow fallback parser to skip comments in unknown IF_DATA blocks (Akhil T Thomas)
+  - Fix: Non-strict parsing should not fail if a string was expected, but comment + identifier was found. Previously the comment prevented the error recovery, where an identifier is accepted in place of a string. (Louis Caron)
+
 ## Version 3.2.0
 
 - Fix: creating new TYPEDEF_CHARACTERISTICs from the command line was broken
