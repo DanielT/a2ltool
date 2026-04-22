@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 3.2.2
+
+- Fix: Comments at the top level of a2l files are preserved during all operations
+
 ## Version 3.2.1
 
 - Fix: repeatedly resolve type references until an actual type is found. This fixed nested type references in PDB debug info (by Louis Caron)
