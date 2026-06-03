@@ -277,9 +277,24 @@ fn get_symbol_info<'a>(
     // second option: get symbol information from a CANAPE_EXT block inside of IF_DATA.
     // The content of IF_DATA can be different for each tool vendor, but the blocks used
     // by the Vector tools are understood by some other software.
-    if let Some(ifdata_symbol_name) = get_symbol_name_from_ifdata(ifdata_vec) {
+    if let Some((ifdata_symbol_name, ifdata_offset)) = get_symbol_name_from_ifdata(ifdata_vec) {
         match find_symbol(&ifdata_symbol_name, debug_data) {
-            Ok(sym_info) => return Ok(sym_info),
+            Ok(sym_info) => {
+                if ifdata_offset == 0 {
+                    return Ok(sym_info);
+                } else {
+                    // the "segment_offset" in the IF_DATA is used just like the offset in the SYMBOL_LINK
+                    match find_symbol_by_offset(
+                        &sym_info,
+                        ifdata_offset,
+                        debug_data,
+                        use_new_arrays,
+                    ) {
+                        Ok(sym_info) => return Ok(sym_info),
+                        Err(errmsg) => return Err(vec![errmsg]),
+                    }
+                }
+            }
             Err(errmsg) => ifdata_errmsg = Some(errmsg),
         };
     }
@@ -503,13 +518,13 @@ pub(crate) fn set_address_type(address_type_opt: &mut Option<AddressType>, newty
 
 // Try to get a symbol name from an IF_DATA object.
 // specifically the pseudo-standard CANAPE_EXT could be present and contain symbol information
-fn get_symbol_name_from_ifdata(ifdata_vec: &[IfData]) -> Option<String> {
+fn get_symbol_name_from_ifdata(ifdata_vec: &[IfData]) -> Option<(String, i32)> {
     for ifdata in ifdata_vec {
         if let Some(decoded) = ifdata::A2mlVector::load_from_ifdata(ifdata)
             && let Some(canape_ext) = decoded.canape_ext
             && let Some(link_map) = canape_ext.link_map
         {
-            return Some(link_map.symbol_name);
+            return Some((link_map.symbol_name, link_map.segment_offset));
         }
     }
     None
