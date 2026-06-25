@@ -404,7 +404,7 @@ After stripping the `@@` marker, the remaining text is parsed as a `<definition>
                    [ <address-attr> ]
                    [ <dimension-attr> [ <split> ]]
                    [ <size-attr> ]
-                   [ <group-attr> ]
+                   ( <group-attr> )*
                    ( <overwrite> )*
                    "END"
 

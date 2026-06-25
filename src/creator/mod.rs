@@ -161,7 +161,7 @@ struct InstanceDefinition {
     dimension: Vec<u32>,
     split: Option<SplitType>,
     _size: Option<u32>, // unused: instance size could be used for address offset calculation
-    group: Option<GroupAttribute>,
+    group: Vec<GroupAttribute>,
     overwrites: Vec<Overwrite>,
 }
 
@@ -389,7 +389,7 @@ struct Structure {
 struct InstanceElement<'a> {
     instance_name: &'a str,
     struct_path: &'a [String],
-    instance_group: &'a Option<GroupAttribute>,
+    instance_group: &'a [GroupAttribute],
     overwrites: &'a Vec<Overwrite>,
 }
 
@@ -2744,15 +2744,17 @@ impl<'a2l> Creator<'a2l> {
             };
             self.create_group_entry(group_spec, item_name, is_input);
         } else if let Some(instance_element) = instance_element
-            && let Some(group_attr) = instance_element.instance_group
+            && !instance_element.instance_group.is_empty()
         {
-            let group_spec = match group_attr {
-                GroupAttribute::In(g)
-                | GroupAttribute::Out(g)
-                | GroupAttribute::Def(g)
-                | GroupAttribute::Std(g) => g,
-            };
-            self.create_group_entry(group_spec, item_name, is_input);
+            for group_attr in instance_element.instance_group {
+                let group_spec = match group_attr {
+                    GroupAttribute::In(g)
+                    | GroupAttribute::Out(g)
+                    | GroupAttribute::Def(g)
+                    | GroupAttribute::Std(g) => g,
+                };
+                self.create_group_entry(group_spec, item_name, is_input);
+            }
         } else {
             for group_attr in group_attributes {
                 let group_spec = match group_attr {
