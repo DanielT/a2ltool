@@ -474,13 +474,12 @@ impl<'text> Parser<'_, 'text> {
         } else {
             None
         };
-        let group = if self.check_next_token(b"GROUP") {
+        let mut group = vec![];
+        while self.check_next_token(b"GROUP") {
             self.get_token("")?; // consume GROUP
             let group_attribute = self.parse_group_attribute()?;
-            Some(group_attribute)
-        } else {
-            None
-        };
+            group.push(group_attribute);
+        }
 
         let mut overwrites = vec![];
         while let Some(overwrite) = self.parse_opt_overwrite()? {
@@ -2175,6 +2174,7 @@ mod tests {
         @@ DIMENSION = 3 4 SPLIT
         @@ SIZE = 9000
         @@ GROUP = GroupName
+        @@ GROUP IN = FuncName
         @@ OVERWRITE x RANGE = [ -1 ... 1 ]
         @@ OVERWRITE y CONVERSION = LINEAR 2 3 "s"
         @@ END
@@ -2195,6 +2195,7 @@ mod tests {
         assert_eq!(instance_def.address, Some(0x1234));
         assert_eq!(instance_def.dimension, vec![3, 4]);
         assert_eq!(instance_def._size, Some(9000));
+        assert_eq!(instance_def.group.len(), 2);
         assert_eq!(instance_def.overwrites.len(), 2);
     }
 
