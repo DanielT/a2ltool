@@ -158,6 +158,7 @@ struct InstanceDefinition {
     a2l_name: Option<String>,
     structure_name: String,
     address: Option<u32>,
+    alias: Option<String>,
     dimension: Vec<u32>,
     split: Option<SplitType>,
     _size: Option<u32>, // unused: instance size could be used for address offset calculation
@@ -1475,6 +1476,10 @@ impl<'a2l> Creator<'a2l> {
         // the definition format for INSTANCEs does not allow a BASE_OFFSET to be specified
         // additionally, INSTANCEs only exist in A2L versions >= 1.7.0, so there is no need to handle old versions here
         instance_obj.symbol_link = Some(a2lfile::SymbolLink::new(symbol_name, 0));
+
+        if let Some(alias) = &instance.alias {
+            instance_obj.display_identifier = Some(a2lfile::DisplayIdentifier::new(alias.clone()));
+        }
 
         if !instance.dimension.is_empty() {
             let mut matrix_dim = a2lfile::MatrixDim::new();

@@ -402,6 +402,7 @@ After stripping the `@@` marker, the remaining text is parsed as a `<definition>
     <instance> ::= "INSTANCE" "=" <identifier> [ <identifier> ]
                    "STRUCTURE" "=" <identifier>
                    [ <address-attr> ]
+                   [ <alias-attr> ]
                    [ <dimension-attr> [ <split> ]]
                    [ <size-attr> ]
                    ( <group-attr> )*
