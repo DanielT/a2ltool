@@ -990,6 +990,9 @@ impl<'text> Parser<'_, 'text> {
                     while let Ok(txt) = self.get_string("") {
                         split_strings.push(txt);
                     }
+                    if split_strings.is_empty() {
+                        return Err("SPLIT USE requires at least one string".to_string());
+                    }
                     Ok(Some(SplitType::Manual(split_strings)))
                 }
                 Some(b"USE_TEMPLATE") => {
@@ -1149,6 +1152,9 @@ impl<'text> Parser<'_, 'text> {
                         .to_string(),
                 );
             }
+        }
+        if rows.is_empty() {
+            return Err("TABLE conversion must have at least one row".to_string());
         }
 
         let default_value = if self.check_next_token(b"DEFAULT_VALUE") {
