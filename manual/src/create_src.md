@@ -360,7 +360,7 @@ After stripping the `@@` marker, the remaining text is parsed as a `<definition>
                             ( value [<value>] <string> )+
                             [ "DEFAULT_VALUE" <string> ]
                             [ "FORMAT" <length> <digits> ]
-                          | "UNIT" "=" [[ <length> ] <digits> ]
+                          | "UNIT" "=" <string> [[ <length> ] <digits> ]
 
     <description-attr> ::= "DESCRIPTION" "=" <string>
 
@@ -392,7 +392,7 @@ After stripping the `@@` marker, the remaining text is parsed as a `<definition>
                         END
 
     <structure-attribute> ::=   <base-offset-attr>
-                              | <dimension-attr>
+                              | <dimension-attr> [ <split> ]
                               | <size-attr>
 
     <size-attr> ::= "SIZE" "=" <value>
@@ -422,7 +422,7 @@ After stripping the `@@` marker, the remaining text is parsed as a `<definition>
 #### Conversion
 
     <conversion> ::= "CONVERSION" "=" <identifier>
-                     "A2L_TYPE" = "=" <conversion-type>
+                     "A2L_TYPE" "=" <conversion-type>
                      [ "UNIT" "=" <string> <length> <digits> ]
                      [ "DESCRIPTION" "=" <string> ]
                      "END"
