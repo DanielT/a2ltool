@@ -467,6 +467,12 @@ impl<'text> Parser<'_, 'text> {
         } else {
             None
         };
+        let alias = if self.check_next_token(b"ALIAS") {
+            let alias = self.parse_tagged_identifier(b"ALIAS", "INSTANCE alias")?;
+            Some(alias)
+        } else {
+            None
+        };
         let (dimension, split) = self.parse_opt_dimension()?;
         let size = if self.check_next_token(b"SIZE") {
             let size = self.parse_tagged_uint(b"SIZE", "INSTANCE size")?;
@@ -493,6 +499,7 @@ impl<'text> Parser<'_, 'text> {
             a2l_name,
             structure_name,
             address,
+            alias,
             dimension,
             split,
             _size: size,
