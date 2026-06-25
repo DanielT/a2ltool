@@ -421,6 +421,7 @@ pub(crate) fn create_items_from_sources<'a>(
     // This function will handle the creation of items from the source file
     // and return the count of inserted items along with any log messages.
     let mut creator = Creator::new(a2l_file, target_group, enable_structures, force_old_arrays);
+    let mut num_files = 0;
 
     for source_file_pattern in source_file_patterns {
         // try to expand the pattern using glob, if the input is valid unicode, and if glob understands the pattern
@@ -463,6 +464,7 @@ pub(crate) fn create_items_from_sources<'a>(
                     continue;
                 }
             };
+            num_files += 1; // count how many files were actually processed
 
             creator.messages.push(format!(
                 "Processing source file '{}'",
@@ -470,6 +472,10 @@ pub(crate) fn create_items_from_sources<'a>(
             ));
             creator.process_file(&data);
         }
+    }
+
+    if num_files == 0 {
+        creator.error("No input pattern matched any source files.".into());
     }
 
     if creator.errors > 0 {
