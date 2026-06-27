@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 3.3.0
+
+- Allow the INSTANCE definition in source comments to contain multpile groups and an alias.
+- Fix: Take the symbol offset into account when using CANAPE_EXT/LINK_MAP to identify a symbol
+- Fix: specifiying an invalid file name with `--from-source` is an error. When specifiying multiple files or patterns at least one file must be valid and readable.
+- Fix: Correct some errors in the documented grammar of the comment syntax used by `--from-source`
+
 ## Version 3.2.2
 
 - Fix: Comments at the top level of a2l files are preserved during all operations
