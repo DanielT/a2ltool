@@ -161,7 +161,9 @@ struct InstanceDefinition {
     alias: Option<String>,
     dimension: Vec<u32>,
     split: Option<SplitType>,
-    _size: Option<u32>, // unused: instance size could be used for address offset calculation
+    #[allow(unused)]
+    // vector's asap2 creator allows (requires?) the user to specify the size. Here we expect the size to be set by the updater and don't use this value.
+    size: Option<u32>,
     group: Vec<GroupAttribute>,
     overwrites: Vec<Overwrite>,
 }
@@ -710,7 +712,7 @@ impl<'a2l> Creator<'a2l> {
         let datatype = config.datatype;
         let conversion = choose_conversion(&config.attributes.conversion, instance_element);
         let (conversion_name, unit, format) =
-            self.handle_conversion_attribute(&a2l_name, conversion);
+            self.create_conversion_for_attribute(&a2l_name, conversion);
         let (lower_limit, upper_limit) = choose_range(&config.range, instance_element, &datatype);
         let address = config.attributes.address.unwrap_or(0);
 
@@ -853,7 +855,7 @@ impl<'a2l> Creator<'a2l> {
         let datatype = config.datatype;
         let conversion = choose_conversion(&config.attributes.conversion, instance_element);
         let (conversion_name, unit, format) =
-            self.handle_conversion_attribute(&a2l_name, conversion);
+            self.create_conversion_for_attribute(&a2l_name, conversion);
         let (lower_limit, upper_limit) = choose_range(&config.range, instance_element, &datatype);
         let address = config.attributes.address.unwrap_or(0);
 
@@ -966,7 +968,7 @@ impl<'a2l> Creator<'a2l> {
         let datatype = config.datatype;
         let conversion = choose_conversion(&config.attributes.conversion, instance_element);
         let (conversion_name, unit, format) =
-            self.handle_conversion_attribute(&a2l_name, conversion);
+            self.create_conversion_for_attribute(&a2l_name, conversion);
         let (lower_limit, upper_limit) = config.range.unwrap_or_else(|| datatype_limits(&datatype));
         let address = config.attributes.address.unwrap_or(0);
 
@@ -1082,7 +1084,7 @@ impl<'a2l> Creator<'a2l> {
 
         let conversion = choose_conversion(&config.attributes.conversion, instance_element);
         let (conversion_name, unit, format) =
-            self.handle_conversion_attribute(&a2l_name, conversion);
+            self.create_conversion_for_attribute(&a2l_name, conversion);
         let (lower_limit, upper_limit) =
             choose_range(&config.range, instance_element, &config.datatype);
 
@@ -1507,8 +1509,8 @@ impl<'a2l> Creator<'a2l> {
             match &overwrite_def.details {
                 OverwriteSpec::Conversion(conversion_attribute) => {
                     let parent_name = format!("{a2l_name}.{ov_path}");
-                    let (conversion_name, _, _) =
-                        self.handle_conversion_attribute(&parent_name, Some(conversion_attribute));
+                    let (conversion_name, _, _) = self
+                        .create_conversion_for_attribute(&parent_name, Some(conversion_attribute));
                     overwrite.conversion = Some(a2lfile::Conversion::new(conversion_name));
                 }
                 OverwriteSpec::Range(lower, upper) => {
@@ -1606,27 +1608,11 @@ impl<'a2l> Creator<'a2l> {
             item_path.push(item.symbol_name.clone());
             let item_fullname = item_path.join(".");
             match &item.config {
-                ItemConfig::Measure(_) => {
-                    let struct_item =
-                        a2lfile::StructureComponent::new(item.a2l_name.clone(), item_fullname, 0);
-                    typedef_structure.structure_component.push(struct_item);
-                }
-                ItemConfig::Parameter(_) => {
-                    let struct_item =
-                        a2lfile::StructureComponent::new(item.a2l_name.clone(), item_fullname, 0);
-                    typedef_structure.structure_component.push(struct_item);
-                }
-                ItemConfig::CurveMap(_) => {
-                    let struct_item =
-                        a2lfile::StructureComponent::new(item.a2l_name.clone(), item_fullname, 0);
-                    typedef_structure.structure_component.push(struct_item);
-                }
-                ItemConfig::Axis(_) => {
-                    let struct_item =
-                        a2lfile::StructureComponent::new(item.a2l_name.clone(), item_fullname, 0);
-                    typedef_structure.structure_component.push(struct_item);
-                }
-                ItemConfig::String(_) => {
+                ItemConfig::Measure(_)
+                | ItemConfig::Parameter(_)
+                | ItemConfig::CurveMap(_)
+                | ItemConfig::Axis(_)
+                | ItemConfig::String(_) => {
                     let struct_item =
                         a2lfile::StructureComponent::new(item.a2l_name.clone(), item_fullname, 0);
                     typedef_structure.structure_component.push(struct_item);
@@ -1721,7 +1707,7 @@ impl<'a2l> Creator<'a2l> {
 
         let description = config.attributes.description.as_deref().unwrap_or("");
         let (conversion_name, unit, format) =
-            self.handle_conversion_attribute(full_name, config.attributes.conversion.as_ref());
+            self.create_conversion_for_attribute(full_name, config.attributes.conversion.as_ref());
         let (lower_limit, upper_limit) = config
             .range
             .unwrap_or_else(|| datatype_limits(&config.datatype));
@@ -1773,7 +1759,7 @@ impl<'a2l> Creator<'a2l> {
 
         let description = config.attributes.description.as_deref().unwrap_or("");
         let (conversion_name, unit, format) =
-            self.handle_conversion_attribute(full_name, config.attributes.conversion.as_ref());
+            self.create_conversion_for_attribute(full_name, config.attributes.conversion.as_ref());
         let (lower_limit, upper_limit) = config
             .range
             .unwrap_or_else(|| datatype_limits(&config.datatype));
@@ -1835,7 +1821,7 @@ impl<'a2l> Creator<'a2l> {
 
         let description = config.attributes.description.as_deref().unwrap_or("");
         let (conversion_name, unit, format) =
-            self.handle_conversion_attribute(full_name, config.attributes.conversion.as_ref());
+            self.create_conversion_for_attribute(full_name, config.attributes.conversion.as_ref());
         let (lower_limit, upper_limit) = config
             .range
             .unwrap_or_else(|| datatype_limits(&config.datatype));
@@ -1936,7 +1922,7 @@ impl<'a2l> Creator<'a2l> {
 
         let description = config.attributes.description.as_deref().unwrap_or("");
         let (conversion_name, unit, format) =
-            self.handle_conversion_attribute(a2l_name, config.attributes.conversion.as_ref());
+            self.create_conversion_for_attribute(a2l_name, config.attributes.conversion.as_ref());
         let (lower_limit, upper_limit) = config
             .range
             .unwrap_or_else(|| datatype_limits(&config.datatype));
@@ -2057,11 +2043,18 @@ impl<'a2l> Creator<'a2l> {
     //#########################################################################
 
     /// Handle the conversion attribute and create necessary COMPU_METHOD entries
-    fn handle_conversion_attribute(
+    ///
+    /// As a special case, the function can also return a `Unit` for `ConversionAttribute::Unit`
+    fn create_conversion_for_attribute(
         &mut self,
         parent: &str,
         conv_attr: Option<&ConversionAttribute>,
     ) -> (String, Option<PhysUnit>, Option<Format>) {
+        // The a2l standard requires NO_COMPU_METHOD to be used if no conversion is specified
+        let Some(conv) = conv_attr else {
+            return ("NO_COMPU_METHOD".to_string(), None, None);
+        };
+
         // The parent could be multi-dimensional and use the SPLIT attribute, e.g. "parent[x]"
         // We don't want to create COMPU_METHODs for each dimension, so we'll remove any array index at the end.
         let parent = if parent.ends_with(']')
@@ -2080,119 +2073,115 @@ impl<'a2l> Creator<'a2l> {
             parent_short = &parent_short[pos + 1..];
         }
 
-        if let Some(conv) = conv_attr {
-            let (mut compu_method, unit, format) = match conv {
-                ConversionAttribute::Linear {
-                    factor,
-                    offset,
-                    unit,
-                    length,
-                    digits,
-                } => {
-                    // Handle linear conversion
-                    let conv_name = format!("{parent_short}.Conversion");
-                    let format = build_format(length, digits).unwrap_or("%.3".to_string());
-                    let mut compu_method = a2lfile::CompuMethod::new(
-                        conv_name.clone(),
-                        String::new(),
-                        ConversionType::Linear,
-                        format,
-                        unit.clone(),
-                    );
-                    compu_method.coeffs_linear = Some(CoeffsLinear::new(*factor, *offset));
+        let (mut compu_method, unit, format) = match conv {
+            ConversionAttribute::Linear {
+                factor,
+                offset,
+                unit,
+                length,
+                digits,
+            } => {
+                // Handle linear conversion
+                let conv_name = format!("{parent_short}.Conversion");
+                let format = build_format(length, digits).unwrap_or("%.3".to_string());
+                let mut compu_method = a2lfile::CompuMethod::new(
+                    conv_name.clone(),
+                    String::new(),
+                    ConversionType::Linear,
+                    format,
+                    unit.clone(),
+                );
+                compu_method.coeffs_linear = Some(CoeffsLinear::new(*factor, *offset));
 
-                    (compu_method, None, None)
-                }
-                ConversionAttribute::Formula {
-                    formula,
-                    inverse_formula,
-                    unit,
-                    length,
-                    digits,
-                } => {
-                    // Handle formula conversion
-                    let conv_name = format!("{parent_short}.Conversion");
-                    let format = build_format(length, digits).unwrap_or("%.3".to_string());
-                    let mut compu_method = a2lfile::CompuMethod::new(
-                        conv_name.clone(),
-                        String::new(),
-                        ConversionType::Form,
-                        format,
-                        unit.clone(),
-                    );
-                    let mut formula = Formula::new(formula.clone());
-                    if let Some(inv) = inverse_formula {
-                        formula.formula_inv = Some(FormulaInv::new(inv.clone()));
-                    }
-                    compu_method.formula = Some(formula);
-
-                    (compu_method, None, None)
-                }
-                ConversionAttribute::Table {
-                    rows,
-                    default_value,
-                    format_values,
-                } => {
-                    // Handle table conversion
-                    let conv_name = format!("{parent_short}.Conversion");
-                    let mut compu_method = a2lfile::CompuMethod::new(
-                        conv_name.clone(),
-                        String::new(),
-                        ConversionType::TabVerb,
-                        "%.0".to_string(),
-                        String::new(),
-                    );
-                    compu_method.compu_tab_ref = Some(CompuTabRef::new(conv_name.clone()));
-
-                    self.create_compu_method_table(&conv_name, rows, default_value);
-
-                    let format = if let Some((length, digits)) = format_values {
-                        let fmt = format!("%{length}.{digits}");
-                        Some(Format::new(fmt.clone()))
-                    } else {
-                        None
-                    };
-
-                    (compu_method, None, format)
-                }
-                ConversionAttribute::Reference {
-                    name,
-                    length,
-                    digits,
-                } => {
-                    // Handle reference to an existing conversion
-                    let format = build_format(length, digits).map(Format::new);
-                    return (name.clone(), None, format);
-                }
-                ConversionAttribute::Unit {
-                    name,
-                    length,
-                    digits,
-                } => {
-                    // Handle unit conversion
-                    let unit = PhysUnit::new(name.clone());
-                    let format = build_format(length, digits).map(Format::new);
-                    return ("NO_COMPU_METHOD".to_string(), Some(unit), format);
-                }
-            };
-
-            // if a conflicting COMPU_METHOD already exists using the short name, then rename the new one
-            // using the full parent name
-            if let Some(existing_cm) = self.module.compu_method.get(compu_method.get_name())
-                && existing_cm != &compu_method
-            {
-                compu_method.set_name(format!("{parent}.Conversion"));
+                (compu_method, None, None)
             }
-            let cm_name = compu_method.get_name().to_string();
-            if !self.module.compu_method.contains_key(&cm_name) {
-                // only add if it does not already exist. We'll use the existing one even if it is different
-                self.module.compu_method.push(compu_method.clone());
-            }
+            ConversionAttribute::Formula {
+                formula,
+                inverse_formula,
+                unit,
+                length,
+                digits,
+            } => {
+                // Handle formula conversion
+                let conv_name = format!("{parent_short}.Conversion");
+                let format = build_format(length, digits).unwrap_or("%.3".to_string());
+                let mut compu_method = a2lfile::CompuMethod::new(
+                    conv_name.clone(),
+                    String::new(),
+                    ConversionType::Form,
+                    format,
+                    unit.clone(),
+                );
+                let mut formula = Formula::new(formula.clone());
+                if let Some(inv) = inverse_formula {
+                    formula.formula_inv = Some(FormulaInv::new(inv.clone()));
+                }
+                compu_method.formula = Some(formula);
 
-            (cm_name, unit, format)
-        } else {
-            ("NO_COMPU_METHOD".to_string(), None, None)
+                (compu_method, None, None)
+            }
+            ConversionAttribute::Table {
+                rows,
+                default_value,
+                format_values,
+            } => {
+                // Handle table conversion
+                let conv_name = format!("{parent_short}.Conversion");
+                let mut compu_method = a2lfile::CompuMethod::new(
+                    conv_name.clone(),
+                    String::new(),
+                    ConversionType::TabVerb,
+                    "%.0".to_string(),
+                    String::new(),
+                );
+                compu_method.compu_tab_ref = Some(CompuTabRef::new(conv_name.clone()));
+
+                self.create_compu_method_table(&conv_name, rows, default_value);
+
+                let format = if let Some((length, digits)) = format_values {
+                    let fmt = format!("%{length}.{digits}");
+                    Some(Format::new(fmt.clone()))
+                } else {
+                    None
+                };
+
+                (compu_method, None, format)
+            }
+            ConversionAttribute::Reference {
+                name,
+                length,
+                digits,
+            } => {
+                // Handle reference to an existing conversion
+                let format = build_format(length, digits).map(Format::new);
+                return (name.clone(), None, format);
+            }
+            ConversionAttribute::Unit {
+                name,
+                length,
+                digits,
+            } => {
+                // Handle unit conversion
+                let unit = PhysUnit::new(name.clone());
+                let format = build_format(length, digits).map(Format::new);
+                return ("NO_COMPU_METHOD".to_string(), Some(unit), format);
+            }
+        };
+
+        // if a conflicting COMPU_METHOD already exists using the short name, then rename the new one
+        // using the full parent name
+        if let Some(existing_cm) = self.module.compu_method.get(compu_method.get_name())
+            && existing_cm != &compu_method
+        {
+            compu_method.set_name(format!("{parent}.Conversion"));
         }
+        let cm_name = compu_method.get_name().to_string();
+        if !self.module.compu_method.contains_key(&cm_name) {
+            // only add if it does not already exist. We'll use the existing one even if it is different
+            self.module.compu_method.push(compu_method.clone());
+        }
+
+        (cm_name, unit, format)
     }
 
     fn create_compu_method_table(
@@ -2419,7 +2408,7 @@ impl<'a2l> Creator<'a2l> {
                 let input = build_input_signal_name(base_name, input_signal, *input_is_instance);
 
                 let (conversion_name, unit, format) =
-                    self.handle_conversion_attribute(context_name, conversion.as_ref());
+                    self.create_conversion_for_attribute(context_name, conversion.as_ref());
 
                 let mut axis_descr = a2lfile::AxisDescr::new(
                     a2lfile::AxisDescrAttribute::StdAxis,
@@ -2449,7 +2438,7 @@ impl<'a2l> Creator<'a2l> {
                 let input = build_input_signal_name(base_name, input_signal, *input_is_instance);
 
                 let (conversion_name, unit, format) =
-                    self.handle_conversion_attribute(context_name, conversion.as_ref());
+                    self.create_conversion_for_attribute(context_name, conversion.as_ref());
 
                 let mut axis_descr = a2lfile::AxisDescr::new(
                     a2lfile::AxisDescrAttribute::FixAxis,
@@ -2481,7 +2470,7 @@ impl<'a2l> Creator<'a2l> {
                 let input = build_input_signal_name(base_name, input_signal, *input_is_instance);
 
                 let (conversion_name, unit, format) =
-                    self.handle_conversion_attribute(context_name, conversion.as_ref());
+                    self.create_conversion_for_attribute(context_name, conversion.as_ref());
 
                 let mut axis_descr = a2lfile::AxisDescr::new(
                     a2lfile::AxisDescrAttribute::FixAxis,
@@ -2703,7 +2692,7 @@ impl<'a2l> Creator<'a2l> {
         let Some(var_criterion_def) = self.var_criterion.get(var_criterion_name) else {
             // named VAR_CRITERION doesn't exist (yet?) - defer creation of VAR_CHARACTERISTIC
             self.deferred_var_characteristic
-                .push((var_criterion_name.to_string(), address));
+                .push((a2l_name.to_string(), address));
             return;
         };
 
@@ -2747,33 +2736,18 @@ impl<'a2l> Creator<'a2l> {
         is_input: bool,
     ) {
         if let Some(group_attr) = get_overwrite_group(instance_element) {
-            let group_spec = match group_attr {
-                GroupAttribute::In(g)
-                | GroupAttribute::Out(g)
-                | GroupAttribute::Def(g)
-                | GroupAttribute::Std(g) => g,
-            };
+            let group_spec = group_attr_spec(group_attr);
             self.create_group_entry(group_spec, item_name, is_input);
         } else if let Some(instance_element) = instance_element
             && !instance_element.instance_group.is_empty()
         {
             for group_attr in instance_element.instance_group {
-                let group_spec = match group_attr {
-                    GroupAttribute::In(g)
-                    | GroupAttribute::Out(g)
-                    | GroupAttribute::Def(g)
-                    | GroupAttribute::Std(g) => g,
-                };
+                let group_spec = group_attr_spec(group_attr);
                 self.create_group_entry(group_spec, item_name, is_input);
             }
         } else {
             for group_attr in group_attributes {
-                let group_spec = match group_attr {
-                    GroupAttribute::In(g)
-                    | GroupAttribute::Out(g)
-                    | GroupAttribute::Def(g)
-                    | GroupAttribute::Std(g) => g,
-                };
+                let group_spec = group_attr_spec(group_attr);
                 self.create_group_entry(group_spec, item_name, is_input);
             }
         }
@@ -2820,6 +2794,16 @@ impl<'a2l> Creator<'a2l> {
         } else {
             None
         }
+    }
+}
+
+/// get the group specification from a GroupAttribute
+fn group_attr_spec(group_attr: &GroupAttribute) -> &Vec<String> {
+    match group_attr {
+        GroupAttribute::In(g)
+        | GroupAttribute::Out(g)
+        | GroupAttribute::Def(g)
+        | GroupAttribute::Std(g) => g,
     }
 }
 
@@ -3100,19 +3084,6 @@ fn apply_template(template: &str, indices: &[u32]) -> Option<String> {
     Some(output)
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_apply_template() {
-        let template = "a_%d_b_%x_c_%C";
-        let indices = vec![1, 2, 3];
-        let result = apply_template(template, &indices);
-        assert_eq!(result, Some("a_1_b_2_c_D".into()));
-    }
-}
-
 fn get_overwrite_conversion<'a>(
     instance_element: Option<&InstanceElement<'a>>,
 ) -> Option<&'a ConversionAttribute> {
@@ -3188,6 +3159,14 @@ fn get_overwrite_range<'a>(instance_element: Option<&InstanceElement<'a>>) -> Op
 mod tests {
     use super::*;
     use a2lfile::CharacteristicType;
+
+    #[test]
+    fn test_apply_template() {
+        let template = "a_%d_b_%x_c_%C";
+        let indices = vec![1, 2, 3];
+        let result = apply_template(template, &indices);
+        assert_eq!(result, Some("a_1_b_2_c_D".into()));
+    }
 
     #[test]
     fn measurement() {

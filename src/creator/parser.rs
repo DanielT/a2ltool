@@ -502,7 +502,7 @@ impl<'text> Parser<'_, 'text> {
             alias,
             dimension,
             split,
-            _size: size,
+            size,
             group,
             overwrites,
         })
@@ -611,6 +611,10 @@ impl<'text> Parser<'_, 'text> {
         }
     }
 
+    /// Parse the A2L name if it is present.
+    ///
+    /// The A2L name is expected to be the next token unless it is a stop word, i.e. a valid
+    /// keyword that indicates the start of another definition.
     fn parse_a2l_name(&mut self, stop_words: &[&[u8]]) -> Option<String> {
         // If the next token is not a stop word (e.g., "DATA_TYPE"), we assume it is the "a2l name"
         if let Some(token) = self.peek_token()
@@ -2201,7 +2205,7 @@ mod tests {
         assert_eq!(instance_def.structure_name, "abc");
         assert_eq!(instance_def.address, Some(0x1234));
         assert_eq!(instance_def.dimension, vec![3, 4]);
-        assert_eq!(instance_def._size, Some(9000));
+        assert_eq!(instance_def.size, Some(9000));
         assert_eq!(instance_def.group.len(), 2);
         assert_eq!(instance_def.overwrites.len(), 2);
     }

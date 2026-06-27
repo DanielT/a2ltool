@@ -23,6 +23,8 @@ impl<'prefix> CommentScanner<'prefix> {
     /// Find all comments in the source code.
     pub(crate) fn scan_comments<'a>(&self, data: &'a [u8]) -> Vec<(usize, PreprocessedInput<'a>)> {
         let mut commands: Vec<(usize, PreprocessedInput)> = vec![];
+        // Track whether the previous comment was a single-line comment to determine if we should merge consecutive single-line comments.
+        // This is done if they are separated only by whitespace.
         let mut previous_single_line_comment = false;
         let mut pos = 0;
 
