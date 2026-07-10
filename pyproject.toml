@@ -1,0 +1,47 @@
+[build-system]
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
+
+[project]
+name = "a2ltool"
+description = "Command-line tool for working with A2L files"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT OR Apache-2.0" }
+dynamic = ["version"]
+authors = [
+    { name = "Daniel Thaler", email = "daniel@dthaler.de" },
+]
+keywords = [
+    "a2l",
+    "asam",
+    "ecu",
+    "calibration",
+    "automotive",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Manufacturing",
+    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.urls]
+Homepage = "https://github.com/DanielT/a2ltool"
+Repository = "https://github.com/DanielT/a2ltool"
+Issues = "https://github.com/DanielT/a2ltool/issues"
+
+[tool.setuptools_scm]
+# presence enables setuptools_scm
+
+[tool.maturin]
+bindings = "bin"
+strip = true
