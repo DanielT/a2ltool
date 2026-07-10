@@ -1,0 +1,71 @@
+name: Build & Release
+
+on:
+  pull_request:
+  push:
+    tags:
+      - 'v*'
+    branches-ignore:
+      - 'dependabot/**'
+
+permissions:
+  contents: read
+
+env:
+  PY_COLORS: "1"
+  CIBW_BEFORE_ALL_LINUX: curl -sSf https://sh.rustup.rs | sh -s -- -y
+  CIBW_BEFORE_ALL_WINDOWS: rustup target add i686-pc-windows-msvc
+  CIBW_ENVIRONMENT_LINUX: "PATH=$HOME/.cargo/bin:$PATH"
+  MACOSX_DEPLOYMENT_TARGET: "10.12"
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-15-intel, macos-latest, windows-latest]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # 7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # 8.2.0
+        with:
+          enable-cache: false
+      - name: Install cibuildwheel
+        run: uv tool install cibuildwheel
+      - name: Build wheels
+        run: cibuildwheel --output-dir wheelhouse
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # 7.0.1
+        with:
+          name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
+          path: ./wheelhouse/*.whl
+
+  upload_pypi:
+    name: Create release
+    needs: [ build_wheels ]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/a2ltool
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+      attestations: write  # for attest-build-provenance
+
+    # upload to PyPI on new tag
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # 8.0.1
+        with:
+          pattern: cibw-*
+          path: dist
+          merge-multiple: true
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # 4.1.1
+        with:
+          subject-path: 'dist/*'
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # 1.14.0
