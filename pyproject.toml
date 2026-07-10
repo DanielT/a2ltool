@@ -45,3 +45,7 @@ Issues = "https://github.com/DanielT/a2ltool/issues"
 [tool.maturin]
 bindings = "bin"
 strip = true
+
+[tool.cibuildwheel]
+test-command = "a2ltool --version"
+build-frontend = "uv"
