@@ -674,7 +674,7 @@ fn read_array(
 
     let stride = array_type.stride.map_or(element_type.get_size(), u64::from);
     // stride must be at least 1
-    let stride = u64::max(stride, 1);
+    let mut stride = u64::max(stride, 1);
 
     // assumption: multi-dimensional arrays are created by nesting arrays in the element type
     // this matches the observed behavior PDB files created in MSVC
@@ -688,9 +688,19 @@ fn read_array(
     let mut array_dim = Vec::new();
     array_dim.push(size / stride);
 
-    if let DbgDataType::Array { dim, arraytype, .. } = element_type.datatype {
-        // the element type is already an array, so we need to merge the dimensions
+    if let DbgDataType::Array {
+        dim,
+        stride: element_stride,
+        arraytype,
+        ..
+    } = element_type.datatype
+    {
+        // the element type is already an array, so we need to merge the dimensions.
+        // The merged array must use the stride of the innermost element, so that
+        // size / stride is the total number of elements and address calculations
+        // based on flattened element indices are correct
         array_dim.extend(dim);
+        stride = element_stride;
         element_type = *arraytype;
     }
 

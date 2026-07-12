@@ -459,12 +459,22 @@ mod test {
 
             let varinfo = debugdata.variables.get("var_multidim").unwrap();
             let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();
-            let DbgDataType::Array { dim, arraytype, .. } = &typeinfo.datatype else {
+            let DbgDataType::Array {
+                size,
+                dim,
+                stride,
+                arraytype,
+            } = &typeinfo.datatype
+            else {
                 panic!("Expected array type, got {:?}", typeinfo.datatype);
             };
             assert_eq!(dim.len(), 3);
             assert_eq!(dim, &[10, 3, 7]);
             assert!(matches!(arraytype.datatype, DbgDataType::Float));
+            // the stride of a merged multi-dimensional array must be the stride
+            // of the innermost element, so that size / stride == 10 * 3 * 7
+            assert_eq!(*size, 840);
+            assert_eq!(*stride, 4);
         }
     }
 }
