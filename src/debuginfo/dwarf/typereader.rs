@@ -391,6 +391,8 @@ impl DebugDataReader<'_> {
             dim[0] = count;
         }
         let size = maybe_size.unwrap_or_else(|| dim.iter().fold(stride, |acc, num| acc * num));
+        // other code will fail with divide by zero if stride is zero, so set it to 1 in that case
+        let stride = stride.max(1);
         Ok((
             DbgDataType::Array {
                 dim,
