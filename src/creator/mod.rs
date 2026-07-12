@@ -2716,7 +2716,9 @@ impl<'a2l> Creator<'a2l> {
 
         // set the "is hexadecimal" flag of each address to true. Additionally, the first value should be offset by one line
         let mut layout = vec![(0, true); var_address.address_list.len()];
-        layout[0].0 = 1;
+        if let Some(first) = layout.first_mut() {
+            first.0 = 1;
+        }
         var_address.get_layout_mut().item_location.0 = layout;
 
         var_characteristic.var_address = Some(var_address);
@@ -3801,6 +3803,33 @@ mod tests {
             .get("VariantCodedParam")
             .unwrap();
         assert_eq!(var_char.criterion_name_list[0], "Variant");
+    }
+
+    #[test]
+    fn var_criterion_without_variants() {
+        let input = br#"
+        /*
+        @@ VAR_CRITERION = Variant
+        @@ DESCRIPTION = "Variant description"
+        @@ SELECTOR = MEASURE InputMeasurement
+        @@ END
+        */
+
+        /*
+        @@ SYMBOL = VariantCodedParam
+        @@ A2L_TYPE = PARAMETER
+        @@ DATA_TYPE = UBYTE
+        @@ VAR_CRITERION = Variant
+        @@ END
+        */"#;
+
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        assert_eq!(creator.errors, 1);
+
+        let module = creator.module;
+        assert!(module.variant_coding.is_none());
     }
 
     #[test]

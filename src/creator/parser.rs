@@ -564,8 +564,13 @@ impl<'text> Parser<'_, 'text> {
         let selector = self.get_identifier("VAR_CRITERION")?;
 
         let mut variants = vec![];
-        while let Ok(Some(variant)) = self.parse_opt_variant() {
+        while let Some(variant) = self.parse_opt_variant()? {
             variants.push(variant);
+        }
+        if variants.is_empty() {
+            return Err(format!(
+                "VAR_CRITERION {name} does not define any VARIANTs"
+            ));
         }
 
         self.require_token("VAR_CRITERION", b"END")?;
