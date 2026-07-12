@@ -29,11 +29,6 @@ fn update_ifdata_address_canape_ext(
         }
         link_map.address = address as i32;
         link_map.symbol_name = symbol_name.to_string();
-        // these can be set to valid values later on by update_ifdata_type_canape_ext
-        link_map.datatype = 0;
-        link_map.bit_offset = 0;
-        link_map.datatype_valid = 0;
-        link_map.segment_offset = 0; // this is used as the address offset
     }
 }
 
