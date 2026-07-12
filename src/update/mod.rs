@@ -560,8 +560,9 @@ fn adjust_limits(
                         new_upper_limit = c.a * new_upper_limit + c.b;
                     } else {
                         // factor a is negative, so the lower and upper limits are swapped
+                        let ul = new_upper_limit;
                         new_upper_limit = c.a * new_lower_limit + c.b;
-                        new_lower_limit = c.a * new_upper_limit + c.b;
+                        new_lower_limit = c.a * ul + c.b;
                     }
                 }
             }
