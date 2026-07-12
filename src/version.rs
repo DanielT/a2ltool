@@ -113,10 +113,10 @@ fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
             compu_tab.default_value_numeric = None;
         }
         for function in &mut module.function {
-            function.if_data.truncate(0);
+            function.if_data.clear();
         }
         for group in &mut module.group {
-            group.if_data.truncate(0);
+            group.if_data.clear();
         }
         for measurement in &mut module.measurement {
             measurement.discrete = None;

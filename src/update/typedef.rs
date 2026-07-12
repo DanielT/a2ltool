@@ -1791,21 +1791,13 @@ fn fully_unwrap_typeinfo<'dbg>(
         match &cur_typeinfo.datatype {
             DbgDataType::Pointer(_, off) => {
                 // for void* the off may be 0, then debug_data.types.get() fails
-                if let Some(ptype) = debug_data.types.get(off) {
-                    cur_typeinfo = ptype;
-                } else {
-                    return None;
-                }
+                cur_typeinfo = debug_data.types.get(off)?;
             }
             DbgDataType::Array { arraytype, .. } => {
                 cur_typeinfo = arraytype;
             }
             DbgDataType::TypeRef(off, _) => {
-                if let Some(reftype) = debug_data.types.get(off) {
-                    cur_typeinfo = reftype;
-                } else {
-                    return None;
-                }
+                cur_typeinfo = debug_data.types.get(off)?;
             }
             _ => return Some(cur_typeinfo),
         }
