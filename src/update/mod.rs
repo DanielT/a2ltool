@@ -215,9 +215,9 @@ fn run_update(
     let typedef_names = TypedefNames::new(data.module);
 
     // update all INSTANCEs
-    let (update_result, typedef_ref_info) = update_all_module_instances(data, info, &typedef_names);
+    let (results, typedef_ref_info) = update_all_module_instances(data, info, &typedef_names);
     strict_error |= results.iter().any(|r| r != &UpdateResult::Updated);
-    let (updated, not_updated) = log_update_results(log_msgs, &update_result);
+    let (updated, not_updated) = log_update_results(log_msgs, &results);
     summary.instance_updated += updated;
     summary.instance_not_updated += not_updated;
 
@@ -234,6 +234,7 @@ fn run_update(
 
     // update VAR_CHARACTERISTICs inside a VARIANT_CODING block
     let results = update_variant_coding(data, info);
+    strict_error |= results.iter().any(|r| r != &UpdateResult::Updated);
     let (updated, not_updated) = log_update_results(log_msgs, &results);
     summary.var_characteristic_updated += updated;
     summary.var_characteristic_not_updated += not_updated;
