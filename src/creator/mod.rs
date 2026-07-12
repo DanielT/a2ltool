@@ -373,7 +373,7 @@ struct Creator<'a2l> {
     structures: HashMap<String, Structure>, // map: structure name to structure definition
     names: Vec<String>,                  // list of all used A2L names to check for duplicates
     version: A2lVersion,
-    deferred_var_characteristic: Vec<(String, u32)>,
+    deferred_var_characteristic: Vec<(String, String, u32)>, // (a2l name, VAR_CRITERION name, address)
     var_criterion: HashMap<String, VarCriterionDefinition>,
     new_arrays: bool,
     enable_structures: bool,
@@ -479,6 +479,10 @@ pub(crate) fn create_items_from_sources<'a>(
     if num_files == 0 {
         creator.error("No input pattern matched any source files.".into());
     }
+
+    // all files have been processed: any VAR_CHARACTERISTICs that are still deferred
+    // reference a VAR_CRITERION that was never defined
+    creator.report_missing_var_criteria();
 
     if creator.errors > 0 {
         Err(creator.messages)
@@ -2674,10 +2678,11 @@ impl<'a2l> Creator<'a2l> {
         self.var_criterion
             .insert(var_criterion_def.name.clone(), var_criterion_def);
 
-        // try to create deferred VAR_CHARACTERISTIC
+        // try to create deferred VAR_CHARACTERISTICs. Entries that reference this criterion
+        // are created now; all others are simply re-deferred by create_var_characteristic
         let deferred_var_characteristic = std::mem::take(&mut self.deferred_var_characteristic);
-        for (a2l_name, address) in deferred_var_characteristic {
-            self.create_var_characteristic(a2l_name, &name, address);
+        for (a2l_name, criterion_name, address) in deferred_var_characteristic {
+            self.create_var_characteristic(a2l_name, &criterion_name, address);
         }
 
         Ok(())
@@ -2691,8 +2696,11 @@ impl<'a2l> Creator<'a2l> {
     ) {
         let Some(var_criterion_def) = self.var_criterion.get(var_criterion_name) else {
             // named VAR_CRITERION doesn't exist (yet?) - defer creation of VAR_CHARACTERISTIC
-            self.deferred_var_characteristic
-                .push((a2l_name.to_string(), address));
+            self.deferred_var_characteristic.push((
+                a2l_name,
+                var_criterion_name.to_string(),
+                address,
+            ));
             return;
         };
 
@@ -2723,6 +2731,16 @@ impl<'a2l> Creator<'a2l> {
 
         var_characteristic.var_address = Some(var_address);
         variant_coding.var_characteristic.push(var_characteristic);
+    }
+
+    /// warn about deferred VAR_CHARACTERISTICs whose VAR_CRITERION was never defined
+    fn report_missing_var_criteria(&mut self) {
+        let deferred = std::mem::take(&mut self.deferred_var_characteristic);
+        for (a2l_name, criterion_name, _) in deferred {
+            self.warn(format!(
+                "Warning: no VAR_CHARACTERISTIC was created for '{a2l_name}', because the referenced VAR_CRITERION '{criterion_name}' is not defined"
+            ));
+        }
     }
 
     // group assignment gets a bit complex for elements of instances.
@@ -3803,6 +3821,81 @@ mod tests {
             .get("VariantCodedParam")
             .unwrap();
         assert_eq!(var_char.criterion_name_list[0], "Variant");
+    }
+
+    #[test]
+    fn deferred_var_characteristic() {
+        // the parameter references CritA before any criterion is defined, so the
+        // VAR_CHARACTERISTIC creation is deferred.
+        let input = br#"
+        /*
+        @@ SYMBOL = VariantCodedParam
+        @@ A2L_TYPE = PARAMETER
+        @@ DATA_TYPE = UBYTE
+        @@ ADDRESS = 0x8000
+        @@ VAR_CRITERION = CritA
+        @@ END
+        */
+
+        /*
+        @@ VAR_CRITERION = CritB
+        @@ DESCRIPTION = "other criterion"
+        @@ SELECTOR = MEASURE OtherMeasurement
+        @@   VARIANT = Left 1 0x1000
+        @@   VARIANT = Right 2 0x2000
+        @@ END
+        */
+
+        /*
+        @@ VAR_CRITERION = CritA
+        @@ DESCRIPTION = "referenced criterion"
+        @@ SELECTOR = MEASURE InputMeasurement
+        @@   VARIANT = Apple 1 0x100
+        @@   VARIANT = Orange 2 0x200
+        @@ END
+        */"#;
+
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        creator.report_missing_var_criteria();
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
+
+        let variant_coding = creator.module.variant_coding.as_ref().unwrap();
+        let var_char = variant_coding
+            .var_characteristic
+            .get("VariantCodedParam")
+            .unwrap();
+        assert_eq!(var_char.criterion_name_list, vec!["CritA"]);
+        // the addresses must be based on CritA's variant offsets
+        assert_eq!(
+            var_char.var_address.as_ref().unwrap().address_list,
+            vec![0x8100, 0x8200]
+        );
+    }
+
+    #[test]
+    fn var_characteristic_with_undefined_criterion() {
+        // referencing a VAR_CRITERION that is never defined must produce a warning,
+        // not silently discard the VAR_CHARACTERISTIC
+        let input = br#"
+        /*
+        @@ SYMBOL = VariantCodedParam
+        @@ A2L_TYPE = PARAMETER
+        @@ DATA_TYPE = UBYTE
+        @@ VAR_CRITERION = MissingCriterion
+        @@ END
+        */"#;
+
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        creator.report_missing_var_criteria();
+        assert_eq!(creator.warnings, 1);
+        assert_eq!(creator.errors, 0);
+        assert!(creator.module.variant_coding.is_none());
     }
 
     #[test]
