@@ -74,6 +74,7 @@ impl<'text> Parser<'_, 'text> {
 
     fn get_string(&mut self, context: &str) -> Result<String, String> {
         if let Some(t) = self.tokens.get(self.position)
+            && t.len() >= 2
             && t.starts_with(b"\"")
             && t.ends_with(b"\"")
         {

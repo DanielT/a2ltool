@@ -29,7 +29,7 @@ impl<'prefix> CommentScanner<'prefix> {
         let mut pos = 0;
 
         // Iterate through the data to find comments; if there are less than two bytes left, there is nothing useful to do.
-        while pos < data.len() - 2 {
+        while pos + 1 < data.len() {
             /*
             Process the source code to find comments. The naive approach of only looking for a leading slash will not work:
             - slashes can be stored in strings
@@ -56,6 +56,10 @@ impl<'prefix> CommentScanner<'prefix> {
                     previous_single_line_comment = false;
                 }
                 b'/' => {
+                    if find_pos + 1 >= data.len() {
+                        // a '/' as the last byte of the data cannot start a comment
+                        break;
+                    }
                     if data[find_pos + 1] == b'/' {
                         let should_merge = previous_single_line_comment
                             && data[pos..find_pos].iter().all(|&b| b.is_ascii_whitespace());
@@ -148,9 +152,15 @@ impl<'prefix> CommentScanner<'prefix> {
                 if remaining[0] == b'"' {
                     // whole strings may include whitespace, e.g in descriptions
                     // find the closing double quote
-                    let end = memchr(b'"', &remaining[1..]).unwrap_or(remaining.len()) + 1;
-                    parts.push(&remaining[..end + 1]); // this includes the closing quote
-                    remaining = &remaining[end + 1..];
+                    if let Some(rel_end) = memchr(b'"', &remaining[1..]) {
+                        let end = rel_end + 2; // this includes the closing quote
+                        parts.push(&remaining[..end]);
+                        remaining = &remaining[end..];
+                    } else {
+                        // unterminated string: the token has no closing quote, so the parser will reject it
+                        parts.push(remaining.trim_ascii_end());
+                        remaining = &[];
+                    }
                 } else if remaining[0] == b'=' {
                     // equals sign should be a separate token, even if it is not separated with whitespace
                     parts.push(&remaining[..1]);
@@ -238,6 +248,30 @@ mod tests {
         let data = b"'a'";
         let pos = skip_char_literal(data, 0);
         assert_eq!(pos, data.len());
+    }
+
+    #[test]
+    fn malformed_input() {
+        let scanner = CommentScanner::new(b"@@ ");
+
+        // very short inputs and inputs ending in '/' must not panic
+        assert!(scanner.scan_comments(b"").is_empty());
+        assert!(scanner.scan_comments(b"/").is_empty());
+        assert!(scanner.scan_comments(b"ab").is_empty());
+        assert!(scanner.scan_comments(b"abc/").is_empty());
+
+        // an unterminated string in a creator comment must not panic;
+        // the rest of the line becomes a single token without a closing quote
+        let comments = scanner.scan_comments(b"// @@ DESCRIPTION = \"missing close quote\n");
+        assert_eq!(comments.len(), 1);
+        let (_, tokens) = &comments[0];
+        assert_eq!(tokens[2], b"\"missing close quote");
+
+        // a lone '"' at the end of a comment must not panic either
+        let comments = scanner.scan_comments(b"// @@ DESCRIPTION = \"\n");
+        assert_eq!(comments.len(), 1);
+        let (_, tokens) = &comments[0];
+        assert_eq!(tokens[2], b"\"");
     }
 
     #[test]
