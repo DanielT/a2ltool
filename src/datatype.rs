@@ -63,7 +63,7 @@ pub(crate) fn get_type_limits(
         }
         DbgDataType::Bitfield {
             bit_size, basetype, ..
-        } => {
+        } if *bit_size < 64 => {
             let raw_range: u64 = 1 << bit_size;
             match &basetype.datatype {
                 DbgDataType::Sint8
@@ -71,7 +71,7 @@ pub(crate) fn get_type_limits(
                 | DbgDataType::Sint32
                 | DbgDataType::Sint64 => {
                     let lower = -((raw_range / 2) as f64);
-                    let upper = (raw_range / 2) as f64;
+                    let upper = (raw_range / 2 - 1) as f64;
                     (lower, upper)
                 }
                 _ => (0f64, (raw_range - 1) as f64),
