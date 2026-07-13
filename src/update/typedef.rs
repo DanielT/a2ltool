@@ -589,7 +589,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             let mut dtypes = calc_distinct_types(&update_info, self.debug_data);
             // try to ensure the distinct type whose name matches the typedef name is first in the list
             for idx in 1..dtypes.len() {
-                if let Some(name) = dtypes[0].name.as_deref()
+                if let Some(name) = dtypes[idx].name.as_deref()
                     && name == refname
                 {
                     dtypes.swap(0, idx);
