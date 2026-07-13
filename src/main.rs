@@ -1009,7 +1009,7 @@ The arg --update must be present.")
         ArgGroup::new("INSERT_ARGGROUP")
             .args(["INSERT_CHARACTERISTIC", "INSERT_CHARACTERISTIC_RANGE", "INSERT_CHARACTERISTIC_REGEX",
                 "INSERT_MEASUREMENT", "INSERT_MEASUREMENT_RANGE", "INSERT_MEASUREMENT_REGEX",
-                "INSERT_MEASUREMENT_SECTION", "INSERT_MEASUREMENT_SECTION", ])
+                "INSERT_CHARACTERISTIC_SECTION", "INSERT_MEASUREMENT_SECTION", "FROM_SOURCE" ])
             .multiple(true)
     )
     .next_line_help(false)
