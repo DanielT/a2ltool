@@ -193,6 +193,18 @@ pub(crate) fn update_record_layout(
                 recordlayout_info.refcount[existing_idx] += 1;
                 existing_reclayout.get_name().to_string()
             } else if recordlayout_info.refcount[idx] == 1 {
+                // ensure that there is no name collision with the target name. By convention datatype based record
+                // layouts have specific content, e.g. a __UBYTE_Z is always a record layout with datatype UBYTE and
+                // ROW_DIR access. If this holds, we don't get any collisions because the content comparison above
+                // would have found the existing record layout. If the content does not match, we need to ensure that
+                // the name is unique. If the name is unchanged it is not checked, because it would
+                // collide with the original record layout, which is about to be replaced.
+                if new_reclayout.get_name() != name {
+                    new_reclayout.set_name(make_unique_reclayout_name(
+                        new_reclayout.get_name().to_string(),
+                        &module.record_layout,
+                    ));
+                }
                 // the original record layout only has one reference; that means we can replace it
                 // append the new record layout to the and of the list, and then move it to idx using swap_remove
                 module.record_layout.push(new_reclayout);
