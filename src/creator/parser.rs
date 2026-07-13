@@ -6,14 +6,43 @@ struct Parser<'tokens, 'text> {
     position: usize,
 }
 
-/// Parse a definition comment
-pub(crate) fn parse_definition(tokens: &[&[u8]]) -> Result<Option<Definition>, String> {
+/// Parse all definitions contained in one definition comment.
+///
+/// A block comment (or a sequence of merged single-line comments) may contain any
+/// number of definitions, each of which is terminated by the END keyword.
+///
+/// Definitions that were parsed successfully before an error occurred are returned
+/// together with the error, so that they are not lost.
+pub(crate) fn parse_definitions(tokens: &[&[u8]]) -> (Vec<Definition>, Option<String>) {
     let mut parser = Parser {
         tokens,
         position: 0,
     };
+    let mut definitions = vec![];
 
-    parser.run()
+    while parser.position < parser.tokens.len() {
+        let start_position = parser.position;
+        match parser.run() {
+            Ok(Some(definition)) => definitions.push(definition),
+            Ok(None) => {
+                if start_position != 0 {
+                    // any tokens following a complete definition should be the start of another definition
+                    let token = String::from_utf8_lossy(parser.tokens[start_position]);
+                    return (
+                        definitions,
+                        Some(format!(
+                            "Unexpected token '{token}' after the end of a definition"
+                        )),
+                    );
+                }
+                // The comment does not begin with a definition keyword, so it is
+                // presumably some other kind of markup: ignore it entirely
+                return (definitions, None);
+            }
+            Err(error) => return (definitions, Some(error)),
+        }
+    }
+    (definitions, None)
 }
 
 impl<'text> Parser<'_, 'text> {
@@ -568,9 +597,7 @@ impl<'text> Parser<'_, 'text> {
             variants.push(variant);
         }
         if variants.is_empty() {
-            return Err(format!(
-                "VAR_CRITERION {name} does not define any VARIANTs"
-            ));
+            return Err(format!("VAR_CRITERION {name} does not define any VARIANTs"));
         }
 
         self.require_token("VAR_CRITERION", b"END")?;
@@ -1518,6 +1545,19 @@ fn convert_float_value(token: &[u8], context: &str) -> Result<f64, String> {
 mod tests {
     use super::*;
     use std::vec;
+
+    /// Test helper: Parse a comment that is expected to contain exactly one definition
+    pub(crate) fn parse_definition(tokens: &[&[u8]]) -> Result<Option<Definition>, String> {
+        let (mut definitions, error) = parse_definitions(tokens);
+        if let Some(error) = error {
+            Err(error)
+        } else if definitions.is_empty() {
+            Ok(None)
+        } else {
+            assert_eq!(definitions.len(), 1);
+            Ok(Some(definitions.swap_remove(0)))
+        }
+    }
 
     #[test]
     fn invalid_item() {

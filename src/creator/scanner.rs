@@ -23,9 +23,9 @@ impl<'prefix> CommentScanner<'prefix> {
     /// Find all comments in the source code.
     pub(crate) fn scan_comments<'a>(&self, data: &'a [u8]) -> Vec<(usize, PreprocessedInput<'a>)> {
         let mut commands: Vec<(usize, PreprocessedInput)> = vec![];
-        // Track whether the previous comment was a single-line comment to determine if we should merge consecutive single-line comments.
-        // This is done if they are separated only by whitespace.
-        let mut previous_single_line_comment = false;
+        // Track whether the previous single-line comment contained a command, to determine if we should
+        // merge consecutive single-line command comments. This is done if they are separated only by whitespace.
+        let mut previous_line_had_command = false;
         let mut pos = 0;
 
         // Iterate through the data to find comments; if there are less than two bytes left, there is nothing useful to do.
@@ -49,11 +49,11 @@ impl<'prefix> CommentScanner<'prefix> {
             match data[find_pos] {
                 b'"' => {
                     pos = skip_string_literal(data, find_pos);
-                    previous_single_line_comment = false;
+                    previous_line_had_command = false;
                 }
                 b'\'' => {
                     pos = skip_char_literal(data, find_pos);
-                    previous_single_line_comment = false;
+                    previous_line_had_command = false;
                 }
                 b'/' => {
                     if find_pos + 1 >= data.len() {
@@ -61,7 +61,7 @@ impl<'prefix> CommentScanner<'prefix> {
                         break;
                     }
                     if data[find_pos + 1] == b'/' {
-                        let should_merge = previous_single_line_comment
+                        let should_merge = previous_line_had_command
                             && data[pos..find_pos].iter().all(|&b| b.is_ascii_whitespace());
 
                         if let Some(mut cur_command) =
@@ -74,9 +74,12 @@ impl<'prefix> CommentScanner<'prefix> {
                             } else {
                                 commands.push((find_pos, cur_command));
                             }
+                            // only a comment line that contained a command can be merged with the next line;
+                            // an ordinary comment ends any command sequence
+                            previous_line_had_command = true;
+                        } else {
+                            previous_line_had_command = false;
                         }
-
-                        previous_single_line_comment = true; // Set comment state
                     } else if data[find_pos + 1] == b'*' {
                         // Multi-line comment, find the closing '*/'
                         if let Some(end_comment_rel_pos) =
@@ -98,11 +101,11 @@ impl<'prefix> CommentScanner<'prefix> {
                             // No closing '*/' found, ignore the rest of the data
                             pos = data.len();
                         }
-                        previous_single_line_comment = false;
+                        previous_line_had_command = false;
                     } else {
                         // Not a comment, just a single slash, continue processing
                         pos += 1;
-                        previous_single_line_comment = false;
+                        previous_line_had_command = false;
                     }
                 }
                 _ => {
@@ -272,6 +275,25 @@ mod tests {
         assert_eq!(comments.len(), 1);
         let (_, tokens) = &comments[0];
         assert_eq!(tokens[2], b"\"");
+    }
+
+    #[test]
+    fn ordinary_comment_ends_command_sequence() {
+        let input = br#"
+        // @@ SYMBOL = a
+        // @@ END
+        // an ordinary comment, not a command
+        // @@ SYMBOL = b
+        // @@ END
+        "#;
+        let scanner = CommentScanner::new(b"@@");
+        let comments = scanner.scan_comments(input);
+        // The ordinary comment interrupts the merging of single-line comments, so two
+        // separate commands result. Previously the command after the ordinary comment
+        // was appended to the first command.
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].1, vec![b"SYMBOL" as &[u8], b"=", b"a", b"END"]);
+        assert_eq!(comments[1].1, vec![b"SYMBOL" as &[u8], b"=", b"b", b"END"]);
     }
 
     #[test]

@@ -543,26 +543,22 @@ impl<'a2l> Creator<'a2l> {
         let creator_definitions = comment_scanner.scan_comments(data);
 
         for (offset, definition_tokens) in creator_definitions {
-            let parse_result = parser::parse_definition(&definition_tokens);
-            match parse_result {
-                Ok(Some(definition)) => {
-                    let def_result = self.process_definition(definition);
-                    if let Err(error) = def_result {
-                        let def_str: String = deftokens_to_string(&definition_tokens);
-                        self.error(format!(
+            // one comment (or a merged sequence of single-line comments) may contain multiple definitions
+            let (definitions, parse_error) = parser::parse_definitions(&definition_tokens);
+            for definition in definitions {
+                let def_result = self.process_definition(definition);
+                if let Err(error) = def_result {
+                    let def_str: String = deftokens_to_string(&definition_tokens);
+                    self.error(format!(
                         "Error processing definition at offset {offset}: {error} in definition: {def_str}"
                     ));
-                    }
                 }
-                Ok(None) => {
-                    // No definition recognized: no problem, just skip it
-                }
-                Err(error) => {
-                    let def_text: String = deftokens_to_string(&definition_tokens);
-                    self.error(format!(
+            }
+            if let Some(error) = parse_error {
+                let def_text: String = deftokens_to_string(&definition_tokens);
+                self.error(format!(
                     "Error parsing definition at offset {offset}: {error} in definition: {def_text}",
                 ));
-                }
             }
         }
     }
@@ -3821,6 +3817,70 @@ mod tests {
             .get("VariantCodedParam")
             .unwrap();
         assert_eq!(var_char.criterion_name_list[0], "Variant");
+    }
+
+    #[test]
+    fn multiple_definitions_in_one_comment() {
+        // multiple definitions in a single block comment, as well as in an unbroken
+        // sequence of single-line comments, must all be processed
+        let input = br#"
+        /*
+        @@ SYMBOL = Measurement1
+        @@ A2L_TYPE = MEASURE
+        @@ DATA_TYPE = UBYTE
+        @@ END
+        @@ SYMBOL = Measurement2
+        @@ A2L_TYPE = MEASURE
+        @@ DATA_TYPE = UBYTE
+        @@ END
+        */
+
+        // @@ SYMBOL = Measurement3
+        // @@ A2L_TYPE = MEASURE
+        // @@ DATA_TYPE = UBYTE
+        // @@ END
+        // @@ SYMBOL = Measurement4
+        // @@ A2L_TYPE = MEASURE
+        // @@ DATA_TYPE = UBYTE
+        // @@ END
+
+        /*
+        @@ some other markup, which is not a definition, causes no error
+        */"#;
+
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
+
+        let module = creator.module;
+        assert!(module.measurement.get("Measurement1").is_some());
+        assert!(module.measurement.get("Measurement2").is_some());
+        assert!(module.measurement.get("Measurement3").is_some());
+        assert!(module.measurement.get("Measurement4").is_some());
+    }
+
+    #[test]
+    fn trailing_tokens_after_definition() {
+        // tokens after a complete definition that do not start another definition
+        // must be reported as an error instead of being silently discarded
+        let input = br#"
+        /*
+        @@ SYMBOL = Measurement1
+        @@ A2L_TYPE = MEASURE
+        @@ DATA_TYPE = UBYTE
+        @@ END
+        @@ SYMBOLL = Measurement2
+        */"#;
+
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        assert_eq!(creator.errors, 1);
+
+        // the complete first definition is still processed
+        assert!(creator.module.measurement.get("Measurement1").is_some());
     }
 
     #[test]
