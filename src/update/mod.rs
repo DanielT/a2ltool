@@ -689,6 +689,8 @@ impl AddAssign for UpdateSumary {
         self.measurement_updated += other.measurement_updated;
         self.instance_not_updated += other.instance_not_updated;
         self.instance_updated += other.instance_updated;
+        self.var_characteristic_not_updated += other.var_characteristic_not_updated;
+        self.var_characteristic_updated += other.var_characteristic_updated;
     }
 }
 
