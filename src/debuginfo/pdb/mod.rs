@@ -47,7 +47,7 @@ pub(crate) fn load_pdb(filename: &OsStr, _verbose: bool) -> Result<DebugData, St
 }
 
 fn read_pdb(mut pdb: PDB<'_, File>) -> Result<DebugData, pdb2::Error> {
-    let address_map = pdb.address_map().unwrap();
+    let address_map = pdb.address_map()?;
     let global_variables = read_global_variables(&mut pdb, &address_map)?;
     let ModuleVars {
         static_variables,

@@ -338,7 +338,7 @@ fn read_forward_referenced_type(
     // a table that was previously built by reading all types in the PDB file
     let (fw_ref_idx, _) = pdb_data
         .lookup_forward_reference(type_index)
-        .expect("failed to lookup forward reference");
+        .ok_or_else(|| "failed to lookup forward reference".to_string())?;
     // PDB file contain some cases where the forward reference is not resolvable or points to itself
     if fw_ref_idx != type_index {
         read_type(fw_ref_idx, typereader_data, pdb_data)?;
