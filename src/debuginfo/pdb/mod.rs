@@ -53,10 +53,18 @@ fn read_pdb(mut pdb: PDB<'_, File>) -> Result<DebugData, pdb2::Error> {
         static_variables,
         unit_list,
     } = read_static_variables(&mut pdb, &address_map)?;
-    let mut variables = global_variables
-        .into_iter()
-        .chain(static_variables)
-        .collect();
+    // combine globals and statics into a single variable list, merging variables with the same name
+    let mut variables = global_variables;
+    for (name, varinfo) in static_variables {
+        match variables.entry(name) {
+            indexmap::map::Entry::Occupied(mut entry) => {
+                entry.get_mut().extend(varinfo);
+            }
+            indexmap::map::Entry::Vacant(entry) => {
+                entry.insert(varinfo);
+            }
+        }
+    }
 
     let TypeReaderData {
         types, typenames, ..
