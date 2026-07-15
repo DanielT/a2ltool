@@ -966,12 +966,12 @@ impl<'a2l> Creator<'a2l> {
         instance_element: Option<&InstanceElement>,
     ) -> Result<(), String> {
         // Create the characteristic object in the module
-        let description = config.attributes.description.as_deref().unwrap_or("");
+        let description = choose_description(config.attributes.description.as_deref(), instance_element);
         let datatype = config.datatype;
         let conversion = choose_conversion(&config.attributes.conversion, instance_element);
         let (conversion_name, unit, format) =
             self.create_conversion_for_attribute(&a2l_name, conversion);
-        let (lower_limit, upper_limit) = config.range.unwrap_or_else(|| datatype_limits(&datatype));
+        let (lower_limit, upper_limit) = choose_range(&config.range, instance_element, &datatype);
         let address = config.attributes.address.unwrap_or(0);
 
         let chara_type = if config.y_axis.is_some() {
@@ -1021,9 +1021,9 @@ impl<'a2l> Creator<'a2l> {
         if let Some(bitmask) = config.bitmask {
             characteristic.bit_mask = Some(a2lfile::BitMask::new(bitmask));
         }
-        if let Some(alias) = &config.attributes.alias {
+        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element) {
             characteristic.display_identifier =
-                Some(a2lfile::DisplayIdentifier::new(alias.clone()));
+                Some(a2lfile::DisplayIdentifier::new(alias.to_string()));
         }
 
         let base_offset = config.attributes.base_offset.unwrap_or(0);
