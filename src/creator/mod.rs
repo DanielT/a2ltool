@@ -966,7 +966,8 @@ impl<'a2l> Creator<'a2l> {
         instance_element: Option<&InstanceElement>,
     ) -> Result<(), String> {
         // Create the characteristic object in the module
-        let description = choose_description(config.attributes.description.as_deref(), instance_element);
+        let description =
+            choose_description(config.attributes.description.as_deref(), instance_element);
         let datatype = config.datatype;
         let conversion = choose_conversion(&config.attributes.conversion, instance_element);
         let (conversion_name, unit, format) =
@@ -2478,7 +2479,16 @@ impl<'a2l> Creator<'a2l> {
                 conversion,
             } => {
                 let range_step = range_step.unwrap_or(1.0);
-                let num_axis_points = ((*range_max - *range_min) / range_step).floor() as u16 + 1;
+                if range_step == 0.0 {
+                    return Err(format!(
+                        "Axis range step cannot be zero for '{context_name}'"
+                    ));
+                }
+
+                let num_axis_points_raw = ((*range_max - *range_min) / range_step).floor() as u32;
+                let num_axis_points = u16::try_from(num_axis_points_raw)
+                    .unwrap_or(u16::MAX)
+                    .saturating_add(1);
                 let input = build_input_signal_name(base_name, input_signal, *input_is_instance);
 
                 let (conversion_name, unit, format) =
