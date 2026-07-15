@@ -8,14 +8,20 @@ pub(crate) fn remove_items(a2l_file: &mut A2lFile, regex_strings: &[&str]) -> (V
 
     let compiled_regexes = regex_strings
         .iter()
-        .map(|re| {
+        .filter_map(|re| {
             // extend the regex to match only the whole string, not just a substring
             let extended_regex = if !re.starts_with('^') && !re.ends_with('$') {
                 format!("^{re}$")
             } else {
                 re.to_string()
             };
-            regex::Regex::new(&extended_regex).unwrap()
+            match regex::Regex::new(&extended_regex) {
+                Ok(regex) => Some(regex),
+                Err(err) => {
+                    log_messages.push(format!("Warning: ignoring invalid regex '{re}': {err}"));
+                    None
+                }
+            }
         })
         .collect::<Vec<_>>();
 
@@ -306,6 +312,20 @@ mod tests {
         assert_eq!(a2l_file.project.module[0].instance.len(), 1);
         assert_eq!(a2l_file.project.module[0].axis_pts.len(), 0);
         assert_eq!(a2l_file.project.module[0].blob.len(), 0);
+
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (log_messages, count) = remove_items(&mut a2l_file, &["[", ".*_xyz_.*"]);
+        assert_eq!(count, 2);
+        assert!(
+            log_messages
+                .iter()
+                .any(|msg| msg.starts_with("Warning: ignoring invalid regex '[':"))
+        );
+        assert_eq!(a2l_file.project.module[0].characteristic.len(), 0);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 0);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 1);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 1);
+        assert_eq!(a2l_file.project.module[0].blob.len(), 1);
     }
 
     #[test]
