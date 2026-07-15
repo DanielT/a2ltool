@@ -717,7 +717,7 @@ impl<'a2l> Creator<'a2l> {
         let address = config.attributes.address.unwrap_or(0);
 
         let mut meas = Measurement::new(
-            a2l_name,
+            a2l_name.clone(),
             description.to_string(),
             datatype,
             conversion_name,
@@ -801,6 +801,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.measurement.push(meas);
+        self.names.push(a2l_name);
     }
 
     /// Create parameter objects from the configuration
@@ -949,6 +950,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.characteristic.push(characteristic);
+        self.names.push(a2l_name.clone());
 
         // create a VAR_CHARACTERISTIC that references the named VAR_CRITERION
         if let Some(var_criterion_name) = &config.attributes.var_criterion {
@@ -1059,6 +1061,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.characteristic.push(characteristic);
+        self.names.push(a2l_name.clone());
 
         // create a VAR_CHARACTERISTIC that references the named VAR_CRITERION
         if let Some(var_criterion_name) = &config.attributes.var_criterion {
@@ -1146,6 +1149,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.axis_pts.push(axis_pts);
+        self.names.push(a2l_name.clone());
 
         // create a VAR_CHARACTERISTIC that references the named VAR_CRITERION
         if let Some(var_criterion_name) = &config.attributes.var_criterion {
@@ -1251,6 +1255,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.characteristic.push(characteristic);
+        self.names.push(a2l_name.clone());
 
         // create a VAR_CHARACTERISTIC that references the named VAR_CRITERION
         if let Some(var_criterion_name) = &config.attributes.var_criterion {
@@ -1525,6 +1530,7 @@ impl<'a2l> Creator<'a2l> {
         }
 
         self.module.instance.push(instance_obj);
+        self.names.push(a2l_name);
 
         // create TYPEDEF_STRUCTURE for the INSTANCE if it does not already exist
         if !self
