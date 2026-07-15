@@ -86,8 +86,8 @@ fn update_var_address(var_address: &mut a2lfile::VarAddress, char_address: u32) 
         for address in &mut var_address.address_list {
             // Update the address by adding the difference to the base address
             // If the address is larger than u32::MAX, the address is invalidated
-            *address =
-                u32::try_from(i64::from(*address) + difference).unwrap_or(address.saturating_sub(base_address));
+            *address = u32::try_from(i64::from(*address) + difference)
+                .unwrap_or(address.saturating_sub(base_address));
         }
     }
 }

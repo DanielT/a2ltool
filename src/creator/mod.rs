@@ -3057,7 +3057,19 @@ impl Iterator for SplitIterator<'_> {
             SplitType::Template(template) => {
                 // a template string exists, which is applied to the current list of indices
                 // this template must contain one format specifier "%_" for each index
-                let postfix = apply_template(template, &indices)?;
+                let Some(postfix) = apply_template(template, &indices) else {
+                    if self.current_value == 0 {
+                        // Failed to apply the template to any items - the template must be bad.
+                        // Unfortunately there is no way to emit a warning from the iterator, but we can
+                        // fall back to auto for the rest of the iteration.
+                        self.split = &SplitType::Auto;
+                        // current_value is not incremented yet, so we can just call next() again to retry
+                        return self.next();
+                    } else {
+                        // the template matched at least some items, but not this one - the iteration is done early
+                        return None;
+                    }
+                };
                 let a2l_name = format!("{}{postfix}", self.base_a2l_name);
                 Some((a2l_name, symbol_name))
             }
