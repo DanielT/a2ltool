@@ -2180,6 +2180,12 @@ impl<'a2l> Creator<'a2l> {
             && existing_cm != &compu_method
         {
             compu_method.set_name(format!("{parent}.Conversion"));
+            if matches!(conv, ConversionAttribute::Table { .. }) {
+                // also rename the COMPU_VTAB or COMPU_VTAB_RANGE
+                if let Some(compu_tab_ref) = &mut compu_method.compu_tab_ref {
+                    compu_tab_ref.conversion_table = format!("{parent}.Conversion");
+                }
+            }
         }
         let cm_name = compu_method.get_name().to_string();
         if !self.module.compu_method.contains_key(&cm_name) {
