@@ -791,7 +791,7 @@ fn check_and_insert_instance<'dbg>(
                     "Inserted INSTANCE {instance_name} for calibration (0x{:08x})",
                     sym_info.address
                 ));
-                isupp.measurement_list.push(instance_name.clone());
+                isupp.characteristic_list.push(instance_name.clone());
                 isupp.instance_count += 1;
 
                 // update mappings to prevent the creation of duplicates
