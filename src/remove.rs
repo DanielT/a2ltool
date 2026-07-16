@@ -139,7 +139,7 @@ pub(crate) fn remove_address_ranges(
             std::mem::swap(&mut module.characteristic, &mut swapped_characteristics);
             for characteristic in swapped_characteristics {
                 let address = characteristic.address as u64;
-                if address >= start && address <= end {
+                if address >= start && address < end {
                     log_messages.push(format!(
                         "Removed characteristic {} at address {address:#X}",
                         characteristic.get_name()
@@ -159,7 +159,7 @@ pub(crate) fn remove_address_ranges(
                     .as_ref()
                     .map(|addr| addr.address as u64)
                     && address >= start
-                    && address <= end
+                    && address < end
                 {
                     log_messages.push(format!(
                         "Removed measurement {} at address {address:#X}",
@@ -176,7 +176,7 @@ pub(crate) fn remove_address_ranges(
             std::mem::swap(&mut module.instance, &mut swapped_instances);
             for instance in swapped_instances {
                 let address = instance.start_address as u64;
-                if address >= start && address <= end {
+                if address >= start && address < end {
                     log_messages.push(format!(
                         "Removed instance {} at address {address:#X}",
                         instance.get_name(),
@@ -192,7 +192,7 @@ pub(crate) fn remove_address_ranges(
             std::mem::swap(&mut module.axis_pts, &mut swapped_axis_pts);
             for axis_pt in swapped_axis_pts {
                 let address = axis_pt.address as u64;
-                if address >= start && address <= end {
+                if address >= start && address < end {
                     log_messages.push(format!(
                         "Removed axis points {} at address {address:#X}",
                         axis_pt.get_name(),
@@ -208,7 +208,7 @@ pub(crate) fn remove_address_ranges(
             std::mem::swap(&mut module.blob, &mut swapped_blobs);
             for blob in swapped_blobs {
                 let address = blob.start_address as u64;
-                if address >= start && address <= end {
+                if address >= start && address < end {
                     log_messages.push(format!(
                         "Removed blob {} at address {address:#X}",
                         blob.get_name(),
