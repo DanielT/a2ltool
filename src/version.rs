@@ -5,12 +5,16 @@ use a2lfile::{
 };
 
 pub fn convert(a2l_file: &mut A2lFile, new_version: A2lVersion) {
+    // assume max version if the version is not set, so that we can downgrade to any version
+    if a2l_file.asap2_version.is_none() {
+        a2l_file.asap2_version = Some(a2lfile::Asap2Version::new(1, 71));
+    }
     match new_version {
         A2lVersion::V1_5_0 => {
             downgrade_v1_71_to_1_70(a2l_file);
             downgrade_v1_70_to_1_61(a2l_file);
             downgrade_v1_61_to_1_51(a2l_file);
-            // don't know what differencs between 1.5.0 and 1.5.1 are, so just set the version and hope for the best
+            // don't know what the differences between 1.5.0 and 1.5.1 are, so just set the version and hope for the best
             if let Some(ver) = a2l_file.asap2_version.as_mut() {
                 ver.version_no = 1;
                 ver.upgrade_no = 50;
@@ -72,6 +76,7 @@ fn downgrade_v1_61_to_1_51(a2l_file: &mut A2lFile) {
             }
             axis_pts.phys_unit = None;
             axis_pts.step_size = None;
+            axis_pts.symbol_link = None;
         }
         module.characteristic.retain(|ch| {
             ch.characteristic_type != CharacteristicType::Cube4
