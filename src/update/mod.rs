@@ -329,12 +329,6 @@ fn get_symbol_info<'a>(
     Err(errorstrings)
 }
 
-fn log_update_errors(errorlog: &mut Vec<String>, errmsgs: Vec<String>, blockname: &str, line: u32) {
-    for msg in errmsgs {
-        errorlog.push(format!("Error updating {blockname} on line {line}: {msg}"));
-    }
-}
-
 fn log_update_results(errorlog: &mut Vec<String>, results: &[UpdateResult]) -> (u32, u32) {
     let mut updated = 0;
     let mut not_updated = 0;
@@ -352,7 +346,6 @@ fn log_update_results(errorlog: &mut Vec<String>, results: &[UpdateResult]) -> (
                         "Error updating {blocktype} {name} on line {line}: {err}",
                     ));
                 }
-                log_update_errors(errorlog, errors.clone(), blocktype, *line);
                 not_updated += 1;
             }
             UpdateResult::InvalidDataType {
