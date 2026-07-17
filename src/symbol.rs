@@ -50,7 +50,7 @@ pub(crate) fn find_symbol<'a>(
                     find_symbol_from_components(&components_mangled, &additional_spec, debug_data)
                 {
                     let mangled_varname =
-                        mangled.to_owned() + varname.strip_prefix(components[0]).unwrap();
+                        mangled.to_owned() + plain_symbol.strip_prefix(components[0]).unwrap();
                     return Ok(SymbolInfo {
                         name: mangled_varname,
                         ..sym_info
