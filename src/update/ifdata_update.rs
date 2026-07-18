@@ -36,7 +36,6 @@ fn update_ifdata_address_asap1b_ccp(asap1b_ccp: &mut ifdata::Asap1bCcp, address:
     if let Some(dp_blob) = &mut asap1b_ccp.dp_blob {
         dp_blob.address_extension = 0;
         dp_blob.base_address = address as u32;
-        dp_blob.size = 0;
     }
 }
 
