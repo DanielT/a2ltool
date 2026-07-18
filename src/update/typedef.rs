@@ -156,7 +156,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
         self.calc_structure_category();
         self.build_structure_hash();
         self.process_structure_components(create_only);
-        self.create_missing_instance_targets();
+        let delete_instances = self.create_missing_instance_targets();
 
         if !create_only {
             self.update_all_typedef_axis();
@@ -169,6 +169,14 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 self.cleanup_unused_typedefs();
             }
         }
+
+        // delete all INSTANCEs that create_missing_instance_targets marked as invalid.
+        // This may only happen after all other processing, because deleting an INSTANCE
+        // invalidates the indices stored in TypedefReferrer::Instance
+        let mut delete_iter = delete_instances.iter();
+        self.module
+            .instance
+            .retain(|_| !*delete_iter.next().unwrap_or(&false));
 
         // store the TPEDEF_STRUCTUREs in the module again
         for (_, td_struct) in self.typedef_structs {
@@ -555,7 +563,11 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
     /// Additionally, a dwarf typeinfo was associated with each of them by looking up
     /// the variable name of the INSTANCE in the debug data.
     /// Now we need to make sure that a correct target exists for each of these references.
-    fn create_missing_instance_targets(&mut self) {
+    ///
+    /// Returns a flag for each INSTANCE in the module, indicating if it should be deleted.
+    /// The caller must perform the deletion after all TYPEDEF_* processing is complete,
+    /// since deleting any INSTANCE invalidates the indices stored in `TypedefReferrer::Instance`.
+    fn create_missing_instance_targets(&mut self) -> Vec<bool> {
         let mut enum_convlist = HashMap::<String, &TypeInfo>::new();
         let mut delete_instances = vec![false; self.module.instance.len()];
         let mut refnames: Vec<_> = self.typedef_ref_info.keys().cloned().collect();
@@ -634,13 +646,9 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             }
         }
 
-        // now delete all instances that are no longer valid
-        let mut delete_iter = delete_instances.iter();
-        self.module
-            .instance
-            .retain(|_| !*delete_iter.next().unwrap_or(&true));
-
         update_enum_compu_methods(self.module, &enum_convlist);
+
+        delete_instances
     }
 
     /// ensure a `TYPEDEF_STRUCTURE`, `TYPEDEF_CHARACTERISTIC` or `TYPEDEF_MEASUREMENT`
@@ -1806,10 +1814,10 @@ fn fully_unwrap_typeinfo<'dbg>(
 
 #[cfg(test)]
 mod test {
-    use super::{TypedefUpdater, update_module_typedefs};
+    use super::{FLAG_CREATE_MEAS, TypedefUpdater, update_module_typedefs};
     use crate::{
         A2lVersion,
-        debuginfo::{DebugData, TypeInfo},
+        debuginfo::{DbgDataType, DebugData, TypeInfo},
         update::{A2lUpdateInfo, RecordLayoutInfo, TypedefNames, TypedefReferrer, get_symbol_info},
     };
     use a2lfile::{A2lFile, A2lObjectName};
@@ -1999,6 +2007,83 @@ mod test {
         assert_eq!(tdu.typedef_structs.len(), 2);
         assert!(tdu.typedef_structs.get("StructA").is_some());
         assert!(tdu.typedef_structs.get("StructB").is_some());
+    }
+
+    #[test]
+    fn test_deleted_instance_does_not_invalidate_referrer_indices() {
+        // an INSTANCE whose target TYPEDEF can't be created gets deleted during the update.
+        // The indices stored in TypedefReferrer::Instance must remain valid regardless,
+        // because they are used again by the update_all_typedef_* phases which run later.
+        let mut a2l = a2lfile::new();
+        let elf_name = OsString::from("fixtures/bin/update_typedef_test.elf");
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(&elf_name, false).unwrap();
+        let typedef_names = TypedefNames::new(&a2l.project.module[0]);
+        let mut recordlayout_info = RecordLayoutInfo::build(&a2l.project.module[0]);
+
+        // instance 0 refers to a type that is unusable for a measurement:
+        // no TYPEDEF can be created for it, so the instance will be deleted
+        let instance = a2lfile::Instance::new(
+            "other_instance".to_string(),
+            String::new(),
+            FLAG_CREATE_MEAS.to_string(),
+            0,
+        );
+        a2l.project.module[0].instance.push(instance);
+        // instance 1 refers to a uint8 variable, and gets a newly created TYPEDEF_MEASUREMENT
+        let instance = a2lfile::Instance::new(
+            "val_u8_instance".to_string(),
+            String::new(),
+            FLAG_CREATE_MEAS.to_string(),
+            0,
+        );
+        a2l.project.module[0].instance.push(instance);
+
+        // type of instance 0: DbgDataType::Other is not usable for either a
+        // TYPEDEF_MEASUREMENT or a TYPEDEF_STRUCTURE, so create_typedef returns None
+        let other_typeinfo = TypeInfo {
+            name: None,
+            unit_idx: usize::MAX,
+            datatype: DbgDataType::Other(0),
+            dbginfo_offset: 0,
+        };
+        // type of instance 1: the uint8 type of the variable "val_u8"
+        let val_u8_var = &debug_data.variables.get("val_u8").unwrap()[0];
+        let val_u8_typeinfo = debug_data.types.get(&val_u8_var.typeref).unwrap();
+
+        let mut typedef_ref_info: HashMap<_, Vec<_>> = HashMap::new();
+        typedef_ref_info.insert(
+            FLAG_CREATE_MEAS.to_string(),
+            vec![
+                (Some(&other_typeinfo), TypedefReferrer::Instance(0)),
+                (Some(val_u8_typeinfo), TypedefReferrer::Instance(1)),
+            ],
+        );
+
+        let mut msgs = Vec::new();
+        let tdu = TypedefUpdater::new(
+            &mut a2l.project.module[0],
+            &debug_data,
+            &mut msgs,
+            typedef_names,
+            &mut recordlayout_info,
+            typedef_ref_info,
+        );
+        // run the full update; before the fix this panicked with an index out of bounds,
+        // because instance 0 was deleted before update_all_typedef_measurement used index 1
+        tdu.process_typedefs(false, false);
+
+        // the other_instance was deleted, the val_u8_instance remains and refers to the created TYPEDEF_MEASUREMENT
+        let module = &a2l.project.module[0];
+        assert_eq!(module.instance.len(), 1);
+        let instance = &module.instance[0];
+        assert_eq!(instance.get_name(), "val_u8_instance");
+        assert_ne!(instance.type_ref, FLAG_CREATE_MEAS);
+        assert!(
+            module
+                .typedef_measurement
+                .get(instance.type_ref.as_str())
+                .is_some()
+        );
     }
 
     #[test]
