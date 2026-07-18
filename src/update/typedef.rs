@@ -1463,6 +1463,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                         self.typedef_structs[idx].get_name()
                     ));
                     self.typedef_structs.swap_remove_index(idx);
+                    updated = true;
                 } else {
                     idx += 1;
                 }
