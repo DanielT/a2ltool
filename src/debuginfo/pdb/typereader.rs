@@ -386,10 +386,13 @@ fn read_class(
                         ..
                     } => {
                         for (name, (m_type, m_offset)) in baseclass_members {
-                            members.insert(
-                                name.clone(),
-                                (m_type.clone(), m_offset + baseclass_offset),
-                            );
+                            if !members.contains_key(name) {
+                                // if the derived class has a member with the same name as an inherited member, the derived class member takes precedence
+                                members.insert(
+                                    name.clone(),
+                                    (m_type.clone(), m_offset + baseclass_offset),
+                                );
+                            }
                         }
                     }
                     _ => {
