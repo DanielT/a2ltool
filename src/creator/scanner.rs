@@ -104,7 +104,7 @@ impl<'prefix> CommentScanner<'prefix> {
                         previous_line_had_command = false;
                     } else {
                         // Not a comment, just a single slash, continue processing
-                        pos += 1;
+                        pos = find_pos + 1;
                         previous_line_had_command = false;
                     }
                 }
