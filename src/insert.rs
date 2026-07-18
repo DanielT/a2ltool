@@ -511,9 +511,10 @@ pub(crate) fn insert_many<'param>(
     };
     // compile the regular expressions
     for expr in measurement_regexes {
-        // extend the regex to match only the whole string, not just a substring
+        // an unanchored regex is extended to match only the whole string, not just a substring
+        // The pattern must be wrapped in a group, so that "a|b" becomes "^(?:a|b)$" instead of "^a|b$"
         let extended_regex = if !expr.starts_with('^') && !expr.ends_with('$') {
-            format!("^{expr}$")
+            format!("^(?:{expr})$")
         } else {
             expr.to_string()
         };
@@ -523,9 +524,10 @@ pub(crate) fn insert_many<'param>(
         }
     }
     for expr in characteristic_regexes {
-        // extend the regex to match only the whole string, not just a substring
+        // an unanchored regex is extended to match only the whole string, not just a substring
+        // The pattern must be wrapped in a group, so that "a|b" becomes "^(?:a|b)$" instead of "^a|b$"
         let extended_regex = if !expr.starts_with('^') && !expr.ends_with('$') {
-            format!("^{expr}$")
+            format!("^(?:{expr})$")
         } else {
             expr.to_string()
         };

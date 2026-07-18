@@ -9,9 +9,10 @@ pub(crate) fn remove_items(a2l_file: &mut A2lFile, regex_strings: &[&str]) -> (V
     let compiled_regexes = regex_strings
         .iter()
         .filter_map(|re| {
-            // extend the regex to match only the whole string, not just a substring
+            // an unanchored regex is extended to match only the whole string, not just a substring
+            // The pattern must be wrapped in a group, so that "a|b" becomes "^(?:a|b)$" instead of "^a|b$"
             let extended_regex = if !re.starts_with('^') && !re.ends_with('$') {
-                format!("^{re}$")
+                format!("^(?:{re})$")
             } else {
                 re.to_string()
             };
@@ -326,6 +327,44 @@ mod tests {
         assert_eq!(a2l_file.project.module[0].instance.len(), 1);
         assert_eq!(a2l_file.project.module[0].axis_pts.len(), 1);
         assert_eq!(a2l_file.project.module[0].blob.len(), 1);
+    }
+
+    #[test]
+    fn test_remove_items_regex() {
+        // an alternation must be treated as a whole-string match for each alternative:
+        // "axis|_1" must not match "axis_abc_def_1" (prefix) or names ending in "_1" (suffix)
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_items(&mut a2l_file, &["axis|_1"]);
+        assert_eq!(count, 0);
+
+        // alternatives that are complete names should match exactly those items
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_items(&mut a2l_file, &["axis_abc_def_1|ghi_def_blob_1"]);
+        assert_eq!(count, 2);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 0);
+        assert_eq!(a2l_file.project.module[0].blob.len(), 0);
+        assert_eq!(a2l_file.project.module[0].characteristic.len(), 1);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 1);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 1);
+
+        // a pattern with a user-supplied anchor is used as-is: "def_1$" is a suffix match
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_items(&mut a2l_file, &["def_1$"]);
+        assert_eq!(count, 1);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 0);
+
+        // likewise "^lmn_" is a prefix match
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_items(&mut a2l_file, &["^lmn_"]);
+        assert_eq!(count, 2);
+        assert_eq!(a2l_file.project.module[0].measurement.len(), 0);
+        assert_eq!(a2l_file.project.module[0].instance.len(), 0);
+
+        // a pattern that the user anchored on both ends still works
+        let (mut a2l_file, _) = a2lfile::load_from_string(INPUT, None, false).unwrap();
+        let (_, count) = remove_items(&mut a2l_file, &["^axis_abc_def_1$"]);
+        assert_eq!(count, 1);
+        assert_eq!(a2l_file.project.module[0].axis_pts.len(), 0);
     }
 
     #[test]

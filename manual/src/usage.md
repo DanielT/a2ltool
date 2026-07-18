@@ -92,7 +92,8 @@ Insert a CHARACTERISTIC based on a variable in the elf file. The variable name c
 
 #### `--characteristic-regex <REGEX>`
 
-Compare all symbol names in the elf file to the given regex. All matching ones will be inserted as CHARACTERISTICs
+Compare all symbol names in the elf file to the given regex. All matching ones will be inserted as CHARACTERISTICs.
+See [Regex matching](#regex-matching) for how the pattern is applied.
 
 #### `--characteristic-range <ADDR> <ADDR>`
 
@@ -111,7 +112,8 @@ Insert a MEASUREMENT based on a variable in the elf file. The variable name can 
 
 #### `--measurement-regex <REGEX>`
 
-Compare all symbol names in the elf file to the given regex. All matching ones will be inserted as MEASUREMENTs
+Compare all symbol names in the elf file to the given regex. All matching ones will be inserted as MEASUREMENTs.
+See [Regex matching](#regex-matching) for how the pattern is applied.
 
 #### `--measurement-range <ADDR> <ADDR>`
 
@@ -144,6 +146,18 @@ This flag affects all commands that insert data (`--characteristic`, `--measurem
 #### `-R <REGEX>`, `--remove <REGEX>`
 
 Remove any CHARACTERISTICs, MEASUREMENTs, AXIS_PTS and INSTANCEs whose name matches the given regex.
+See [Regex matching](#regex-matching) for how the pattern is applied.
+
+#### Regex matching
+
+The options `--remove`, `--characteristic-regex` and `--measurement-regex` all apply their regex the same way:
+
+- A pattern without anchors matches only the **whole name**: `speed` matches only an item named exactly `speed`,
+  and `speed|rpm` matches only the names `speed` and `rpm`. Use `.*speed.*` to match a substring anywhere in the name.
+- A pattern that starts with `^` or ends with `$` is used **as-is**. This makes prefix and suffix matching possible:
+  `^engine_` matches every name starting with `engine_`, and `_raw$` matches every name ending in `_raw`.
+  Note that in this case the pattern is a plain search, so `^a|b` matches names starting with `a` as well as names containing `b` anywhere;
+  write `^(a|b)` to require the prefix for both alternatives.
 
 #### `--remove-range <ADDR> <ADDR>`
 
