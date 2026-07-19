@@ -129,9 +129,8 @@ fn update_axis_pts_datatype<'dbg>(
             DbgDataType::Array { dim, arraytype, .. } => {
                 // this is the only reasonable case for an AXIS_PTS object
                 // update max_axis_points to match the size of the array
-                if !dim.is_empty() {
-                    axis_pts.max_axis_points = dim[0] as u16;
-                }
+                axis_pts.max_axis_points =
+                    u16::try_from(*dim.first().unwrap_or(&0)).unwrap_or(u16::MAX);
                 update_axis_pts_conversion(data.module, axis_pts, arraytype, enum_convlist);
             }
             DbgDataType::Enum { .. } => {
@@ -194,7 +193,7 @@ fn verify_axis_pts_datatype(
     let member_id = get_axis_pts_x_memberid(data.module, &axis_pts.deposit_record);
     if let Some(inner_typeinfo) = get_inner_type(sym_info.typeinfo, member_id) {
         let max_axis_pts = if let DbgDataType::Array { dim, .. } = &inner_typeinfo.datatype {
-            *dim.first().unwrap_or(&1) as u16
+            u16::try_from(*dim.first().unwrap_or(&1)).unwrap_or(u16::MAX)
         } else {
             1
         };

@@ -90,7 +90,8 @@ pub(crate) fn update_record_layout(
             if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                 // FIX_NO_AXIS_PTS_X
                 if let Some(fix_no_axis_pts_x) = &mut new_reclayout.fix_no_axis_pts_x {
-                    fix_no_axis_pts_x.number_of_axis_points = dim[0] as u16;
+                    fix_no_axis_pts_x.number_of_axis_points =
+                        u16::try_from(*dim.first().unwrap_or(&1)).unwrap_or(u16::MAX);
                 }
             }
         }
@@ -109,7 +110,8 @@ pub(crate) fn update_record_layout(
             if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                 // FIX_NO_AXIS_PTS_Y
                 if let Some(fix_no_axis_pts_y) = &mut new_reclayout.fix_no_axis_pts_y {
-                    fix_no_axis_pts_y.number_of_axis_points = dim[0] as u16;
+                    fix_no_axis_pts_y.number_of_axis_points =
+                        u16::try_from(*dim.first().unwrap_or(&1)).unwrap_or(u16::MAX);
                 }
             }
         }
@@ -128,7 +130,8 @@ pub(crate) fn update_record_layout(
             if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                 // FIX_NO_AXIS_PTS_Z
                 if let Some(fix_no_axis_pts_z) = &mut new_reclayout.fix_no_axis_pts_z {
-                    fix_no_axis_pts_z.number_of_axis_points = dim[0] as u16;
+                    fix_no_axis_pts_z.number_of_axis_points =
+                        u16::try_from(*dim.first().unwrap_or(&1)).unwrap_or(u16::MAX);
                 }
             }
         }
@@ -147,7 +150,8 @@ pub(crate) fn update_record_layout(
             if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                 // FIX_NO_AXIS_PTS_4
                 if let Some(fix_no_axis_pts_4) = &mut new_reclayout.fix_no_axis_pts_4 {
-                    fix_no_axis_pts_4.number_of_axis_points = dim[0] as u16;
+                    fix_no_axis_pts_4.number_of_axis_points =
+                        u16::try_from(*dim.first().unwrap_or(&1)).unwrap_or(u16::MAX);
                 }
             }
         }
@@ -166,7 +170,8 @@ pub(crate) fn update_record_layout(
             if let DbgDataType::Array { dim, .. } = &itemtype.datatype {
                 // FIX_NO_AXIS_PTS_5
                 if let Some(fix_no_axis_pts_5) = &mut new_reclayout.fix_no_axis_pts_5 {
-                    fix_no_axis_pts_5.number_of_axis_points = dim[0] as u16;
+                    fix_no_axis_pts_5.number_of_axis_points =
+                        u16::try_from(*dim.first().unwrap_or(&1)).unwrap_or(u16::MAX);
                 }
             }
         }

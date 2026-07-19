@@ -296,7 +296,8 @@ pub(crate) fn update_characteristic_axis(
                     ..
                 }) = get_inner_type(typeinfo, position)
             {
-                axis_descr.max_axis_points = dim[0] as u16;
+                axis_descr.max_axis_points =
+                    u16::try_from(*dim.first().unwrap_or(&0)).unwrap_or(u16::MAX);
             }
         }
     }
