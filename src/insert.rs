@@ -85,7 +85,7 @@ pub(crate) fn insert_items(
         {
             if is_calib {
                 match insert_characteristic_sym(
-                    module, debug_data, sym_name, &sym_info, &name_map, &sym_map, version,
+                    module, debug_data, &sym_info, &name_map, &sym_map, version,
                 ) {
                     Ok(characteristic_name) => {
                         log_msgs.push(format!("Inserted CHARACTERISTIC {characteristic_name}"));
@@ -224,14 +224,15 @@ fn insert_measurement_sym(
 fn insert_characteristic_sym(
     module: &mut Module,
     debug_data: &DebugData,
-    characteristic_sym: &str,
     sym_info: &SymbolInfo,
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, Vec<ItemType>>,
     version: A2lVersion,
 ) -> Result<String, String> {
+    // the item name is based on sym_info.name, not on the user-supplied symbol string:
+    // the input might use the extended syntax "var{CompileUnit:...}", which is not valid in an item name
     let symbol_link_text = make_symbol_link_string(sym_info, debug_data);
-    let item_name = make_unique_characteristic_name(module, sym_map, characteristic_sym, name_map)?;
+    let item_name = make_unique_characteristic_name(module, sym_map, &sym_info.name, name_map)?;
 
     let mut matrix_dim = None;
     set_matrix_dim(
@@ -251,7 +252,7 @@ fn insert_characteristic_sym(
 
     let mut new_characteristic = Characteristic::new(
         item_name.clone(),
-        format!("characteristic for {characteristic_sym}"),
+        format!("characteristic for {}", sym_info.name),
         ctype,
         sym_info.address as u32,
         recordlayout_name.clone(),
@@ -687,7 +688,6 @@ fn check_and_insert_simple_type(
         match insert_characteristic_sym(
             isupp.module,
             isupp.debug_data,
-            &sym_info.name,
             sym_info,
             &isupp.name_map,
             &isupp.sym_map,
@@ -973,6 +973,39 @@ mod test {
             &addr_ranges,
             &name_regexes
         ));
+    }
+
+    #[test]
+    fn test_insert_items_extended_symbol_syntax() {
+        // symbols given with the Vector extended syntax "var{CompileUnit:...}{Namespace:Global}"
+        // must produce items named after the plain symbol; braces are not valid in item names
+        let mut a2l = a2lfile::new();
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("fixtures/bin/update_test.elf"),
+            false,
+        )
+        .unwrap();
+
+        let measurement_symbols =
+            vec!["Measurement_Value{CompileUnit:update_test_c}{Namespace:Global}"];
+        let characteristic_symbols =
+            vec!["Characteristic_Value{CompileUnit:update_test_c}{Namespace:Global}"];
+        let mut log_msgs = Vec::new();
+        insert_items(
+            &mut a2l,
+            &debug_data,
+            measurement_symbols,
+            characteristic_symbols,
+            None,
+            &mut log_msgs,
+            false,
+        );
+
+        let module = &a2l.project.module[0];
+        assert_eq!(module.measurement.len(), 1);
+        assert!(module.measurement.contains_key("Measurement_Value"));
+        assert_eq!(module.characteristic.len(), 1);
+        assert!(module.characteristic.contains_key("Characteristic_Value"));
     }
 
     #[test]

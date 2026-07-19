@@ -228,6 +228,7 @@ fn update_characteristic_datatype<'enumlist, 'typeinfo: 'enumlist>(
         }
         characteristic.number = None;
     } else {
+        // note: CharacteristicType::Ascii uses number rather than matrix_dim, so resetting matrix_dim doesn't hurt that case
         characteristic.matrix_dim = None;
     }
 
