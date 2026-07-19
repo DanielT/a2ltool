@@ -443,6 +443,7 @@ fn core(args: impl Iterator<Item = OsString>) -> Result<(), String> {
                 target_group,
                 &mut log_msgs,
                 enable_structures,
+                force_old_arrays,
             );
             for msg in log_msgs {
                 cond_print!(verbose, now, msg);

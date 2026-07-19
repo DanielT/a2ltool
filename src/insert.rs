@@ -39,9 +39,11 @@ struct InsertSupport<'a2l, 'dbg, 'param> {
     chara_count: u32,
     instance_count: u32,
     version: A2lVersion,
+    use_new_arrays: bool,
     create_typedef: Vec<(&'dbg TypeInfo, usize)>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn insert_items(
     a2l_file: &mut A2lFile,
     debug_data: &DebugData,
@@ -50,8 +52,10 @@ pub(crate) fn insert_items(
     target_group: Option<&str>,
     log_msgs: &mut Vec<String>,
     enable_structures: bool,
+    force_old_arrays: bool,
 ) {
     let version = A2lVersion::from(&*a2l_file);
+    let use_new_arrays = !force_old_arrays && version >= A2lVersion::V1_7_0;
     let module = &mut a2l_file.project.module[0];
     let (mut name_map, mut sym_map) = build_maps(module);
     let mut characteristic_list = vec![];
@@ -86,7 +90,13 @@ pub(crate) fn insert_items(
         {
             if is_calib {
                 match insert_characteristic_sym(
-                    module, debug_data, &sym_info, &name_map, &sym_map, version,
+                    module,
+                    debug_data,
+                    &sym_info,
+                    &name_map,
+                    &sym_map,
+                    version,
+                    use_new_arrays,
                 ) {
                     Ok(characteristic_name) => {
                         log_msgs.push(format!("Inserted CHARACTERISTIC {characteristic_name}"));
@@ -102,7 +112,13 @@ pub(crate) fn insert_items(
                 }
             } else {
                 match insert_measurement_sym(
-                    module, debug_data, &sym_info, &name_map, &sym_map, version,
+                    module,
+                    debug_data,
+                    &sym_info,
+                    &name_map,
+                    &sym_map,
+                    version,
+                    use_new_arrays,
                 ) {
                     Ok(measure_name) => {
                         log_msgs.push(format!("Inserted MEASUREMENT {measure_name}"));
@@ -164,6 +180,7 @@ fn insert_measurement_sym(
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, Vec<ItemType>>,
     version: A2lVersion,
+    use_new_arrays: bool,
 ) -> Result<String, String> {
     // Abort if a MEASUREMENT for this symbol already exists. Warn if any other reference to the symbol exists
     let symbol_link_text = make_symbol_link_string(sym_info, debug_data);
@@ -199,11 +216,7 @@ fn insert_measurement_sym(
         .map_or(sym_info.typeinfo, |(_, t)| t);
 
     // handle arrays and unwrap the typeinfo
-    update::set_matrix_dim(
-        &mut new_measurement.matrix_dim,
-        typeinfo,
-        version >= A2lVersion::V1_7_0,
-    );
+    update::set_matrix_dim(&mut new_measurement.matrix_dim, typeinfo, use_new_arrays);
     let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
 
     if let DbgDataType::Enum { enumerators, .. } = &typeinfo.datatype {
@@ -229,6 +242,7 @@ fn insert_characteristic_sym(
     name_map: &HashMap<String, ItemType>,
     sym_map: &HashMap<String, Vec<ItemType>>,
     version: A2lVersion,
+    use_new_arrays: bool,
 ) -> Result<String, String> {
     // the item name is based on sym_info.name, not on the user-supplied symbol string:
     // the input might use the extended syntax "var{CompileUnit:...}", which is not valid in an item name
@@ -236,11 +250,7 @@ fn insert_characteristic_sym(
     let item_name = make_unique_characteristic_name(module, sym_map, sym_info, name_map)?;
 
     let mut matrix_dim = None;
-    set_matrix_dim(
-        &mut matrix_dim,
-        sym_info.typeinfo,
-        version >= A2lVersion::V1_7_0,
-    );
+    set_matrix_dim(&mut matrix_dim, sym_info.typeinfo, use_new_arrays);
     let (typeinfo, ctype) = if let Some(arraytype) = sym_info.typeinfo.get_arraytype() {
         (arraytype, CharacteristicType::ValBlk)
     } else {
@@ -551,6 +561,7 @@ pub(crate) fn insert_many<'param>(
         chara_count: 0u32,
         instance_count: 0u32,
         version: file_version,
+        use_new_arrays,
         create_typedef: Vec::new(),
     };
     // compile the regular expressions
@@ -695,6 +706,7 @@ fn check_and_insert_simple_type(
             &isupp.name_map,
             &isupp.sym_map,
             isupp.version,
+            isupp.use_new_arrays,
         ) {
             Ok(measurement_name) => {
                 log_msgs.push(format!(
@@ -735,6 +747,7 @@ fn check_and_insert_simple_type(
             &isupp.name_map,
             &isupp.sym_map,
             isupp.version,
+            isupp.use_new_arrays,
         ) {
             Ok(characteristic_name) => {
                 log_msgs.push(format!(
@@ -1060,6 +1073,56 @@ mod test {
     }
 
     #[test]
+    fn test_insert_items_old_arrays() {
+        // the force_old_arrays option controls the format of MATRIX_DIM in inserted items:
+        // new style uses the exact dimensions, old style always has exactly 3 values
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("fixtures/bin/update_test.elf"),
+            false,
+        )
+        .unwrap();
+
+        // insert with the default (new) array format; the file version 1.7.1 permits this
+        let mut a2l = a2lfile::new();
+        let mut log_msgs = Vec::new();
+        insert_items(
+            &mut a2l,
+            &debug_data,
+            vec!["Measurement_Matrix"],
+            vec!["Characteristic_ValBlk"],
+            None,
+            &mut log_msgs,
+            false,
+            false,
+        );
+        let module = &a2l.project.module[0];
+        // Measurement_Matrix is uint8[5][4], Characteristic_ValBlk is float[5]
+        let meas = &module.measurement[0];
+        assert_eq!(meas.matrix_dim.as_ref().unwrap().dim_list, vec![5, 4]);
+        let chara = &module.characteristic[0];
+        assert_eq!(chara.matrix_dim.as_ref().unwrap().dim_list, vec![5]);
+
+        // insert with force_old_arrays: MATRIX_DIM must have exactly 3 values
+        let mut a2l = a2lfile::new();
+        let mut log_msgs = Vec::new();
+        insert_items(
+            &mut a2l,
+            &debug_data,
+            vec!["Measurement_Matrix"],
+            vec!["Characteristic_ValBlk"],
+            None,
+            &mut log_msgs,
+            false,
+            true,
+        );
+        let module = &a2l.project.module[0];
+        let meas = &module.measurement[0];
+        assert_eq!(meas.matrix_dim.as_ref().unwrap().dim_list, vec![5, 4, 1]);
+        let chara = &module.characteristic[0];
+        assert_eq!(chara.matrix_dim.as_ref().unwrap().dim_list, vec![5, 1, 1]);
+    }
+
+    #[test]
     fn test_insert_items_extended_symbol_syntax() {
         // symbols given with the Vector extended syntax "var{CompileUnit:...}{Namespace:Global}"
         // must produce items named after the plain symbol; braces are not valid in item names
@@ -1082,6 +1145,7 @@ mod test {
             characteristic_symbols,
             None,
             &mut log_msgs,
+            false,
             false,
         );
 
@@ -1114,6 +1178,7 @@ mod test {
             target_group,
             &mut log_msgs,
             false,
+            false,
         );
         assert_eq!(a2l.project.module[0].measurement.len(), 2);
         assert_eq!(a2l.project.module[0].characteristic.len(), 2);
@@ -1132,6 +1197,7 @@ mod test {
             characteristic_symbols,
             target_group,
             &mut log_msgs,
+            false,
             false,
         );
         // verify that the new items were added with a prefix
@@ -1161,6 +1227,7 @@ mod test {
             characteristic_symbols,
             target_group,
             &mut log_msgs,
+            false,
             false,
         );
         for msg in log_msgs {
@@ -1193,6 +1260,7 @@ mod test {
             target_group,
             &mut log_msgs,
             false,
+            false,
         );
         // nothing was added
         assert_eq!(a2l.project.module[0].measurement.len(), 0);
@@ -1211,6 +1279,7 @@ mod test {
             target_group,
             &mut log_msgs,
             true,
+            false,
         );
         // nothing was added
         assert_eq!(a2l.project.module[0].measurement.len(), 0);
@@ -1247,6 +1316,7 @@ mod test {
             target_group,
             &mut log_msgs,
             true,
+            false,
         );
         // the basic types are inserted as MEASUREMENTs and CHARACTERISTICs as in the previous test
         assert_eq!(a2l.project.module[0].measurement.len(), 2);
@@ -1443,6 +1513,7 @@ mod test {
             target_group,
             &mut log_msgs,
             false,
+            false,
         );
         assert_eq!(a2l.project.module[0].measurement.len(), 0);
         assert_eq!(a2l.project.module[0].characteristic.len(), 0);
@@ -1470,6 +1541,7 @@ mod test {
             None,
             &mut log_msgs,
             true,
+            false,
         );
 
         assert_eq!(a2l.project.module[0].instance.len(), 1);
