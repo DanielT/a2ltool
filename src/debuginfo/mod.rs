@@ -169,6 +169,27 @@ impl TypeInfo {
         }
     }
 
+    /// strip away all levels of array nesting and return the innermost element type.
+    /// A multi-dimensional array is represented either as a single array with multiple
+    /// dimensions, or as nested arrays with one dimension each. Nesting occurs when the
+    /// element type of an array is a typedef of another array type.
+    /// This function is the counterpart of `set_matrix_dim`, which collects the
+    /// dimensions from all levels of nesting.
+    pub(crate) fn get_innermost_arraytype<'a>(
+        &'a self,
+        types: &'a HashMap<usize, TypeInfo>,
+    ) -> &'a Self {
+        let mut typeinfo = self;
+        // the depth limit prevents an endless loop for (pathological) self-referential array types
+        for _ in 0..32 {
+            let Some(arraytype) = typeinfo.get_arraytype() else {
+                break;
+            };
+            typeinfo = arraytype.get_reference(types);
+        }
+        typeinfo
+    }
+
     pub(crate) fn get_reference<'a>(&'a self, types: &'a HashMap<usize, TypeInfo>) -> &'a Self {
         let mut current: &'a TypeInfo = self;
         loop {

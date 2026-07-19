@@ -84,7 +84,9 @@ fn update_module_instance<'dbg>(
                 .get_pointer(&info.debug_data.types)
                 .map_or(sym_info.typeinfo, |(_, t)| t);
 
-            let basetype = basetype.get_arraytype().unwrap_or(basetype);
+            // the MATRIX_DIM of the INSTANCE covers all levels of array nesting,
+            // so the type for the TYPEDEF_* must be fully unwrapped
+            let basetype = basetype.get_innermost_arraytype(&info.debug_data.types);
 
             if info.full_update {
                 if type_ref_valid {

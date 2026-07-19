@@ -975,7 +975,9 @@ fn insert_instance_sym<'dbg>(
             .map_or(sym_info.typeinfo, |(_, t)| t);
 
         set_matrix_dim(&mut new_instance_sym.matrix_dim, typeinfo, true);
-        let typeinfo = typeinfo.get_arraytype().unwrap_or(typeinfo);
+        // the MATRIX_DIM of the INSTANCE covers all levels of array nesting,
+        // so the type for the TYPEDEF_* must be fully unwrapped
+        let typeinfo = typeinfo.get_innermost_arraytype(&debug_data.types);
 
         // set the eddress of the new instance to be witten as hex
         new_instance_sym.get_layout_mut().item_location.3 = (0, true);
@@ -1120,6 +1122,52 @@ mod test {
         assert_eq!(meas.matrix_dim.as_ref().unwrap().dim_list, vec![5, 4, 1]);
         let chara = &module.characteristic[0];
         assert_eq!(chara.matrix_dim.as_ref().unwrap().dim_list, vec![5, 1, 1]);
+    }
+
+    #[test]
+    fn test_insert_structures_nested_arrays() {
+        // nested_array_test.elf was built with clang, which represents the member
+        // "Vec3 pts[10]" (with typedef float Vec3[3]) as nested array types, while
+        // "float plain[10][3]" is a single array type with two dimensions.
+        // Both describe identical memory, so both must produce the same a2l content: MATRIX_DIM 10 3.
+        let debug_data = crate::debuginfo::DebugData::load_dwarf(
+            &OsString::from("fixtures/bin/nested_array_test.elf"),
+            false,
+        )
+        .unwrap();
+
+        let mut a2l = a2lfile::new();
+        let mut log_msgs = Vec::new();
+        insert_items(
+            &mut a2l,
+            &debug_data,
+            vec!["s", "varr"],
+            vec![],
+            None,
+            &mut log_msgs,
+            true,
+            false,
+        );
+
+        let module = &a2l.project.module[0];
+        let td_struct = module.typedef_structure.get("S").unwrap();
+        let sc_pts = td_struct.structure_component.get("pts").unwrap();
+        let sc_plain = td_struct.structure_component.get("plain").unwrap();
+        assert_eq!(sc_pts.matrix_dim.as_ref().unwrap().dim_list, vec![10, 3]);
+        assert_eq!(sc_plain.matrix_dim.as_ref().unwrap().dim_list, vec![10, 3]);
+        // both members must reference the same, scalar TYPEDEF_MEASUREMENT
+        assert_eq!(sc_pts.component_type, sc_plain.component_type);
+        let td_meas = module
+            .typedef_measurement
+            .get(sc_pts.component_type.as_str())
+            .unwrap();
+        assert!(td_meas.matrix_dim.is_none());
+
+        // the INSTANCE for "Vec3 varr[10]" (nested array types) gets MATRIX_DIM 10 3
+        // and must also reference the scalar TYPEDEF_MEASUREMENT
+        let instance = module.instance.get("varr").unwrap();
+        assert_eq!(instance.matrix_dim.as_ref().unwrap().dim_list, vec![10, 3]);
+        assert_eq!(instance.type_ref, sc_pts.component_type);
     }
 
     #[test]

@@ -448,6 +448,10 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             }) {
                 // rare: typeinfo is a pointer or array. In this case a TYPEDEF_STRUCTURE is used as a layer of indirection.
                 // This structure can only have a single structure component
+                // unwrap any remaining array nesting, so that the recorded type matches
+                // the one that update_typedef_structure will later use for the component
+                let component_typeinfo =
+                    component_typeinfo.get_innermost_arraytype(&self.debug_data.types);
                 self.typedef_structs[idx].structure_component.truncate(1);
                 if let Some(sc) = self.typedef_structs[idx].structure_component.pop()
                     && (self.is_valid_structure_component(&sc.component_type, component_typeinfo)
@@ -1271,7 +1275,9 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 sc.symbol_type_link = None;
                 set_matrix_dim(&mut sc.matrix_dim, typeinfo, true);
 
-                let inner_type = typeinfo.get_arraytype().unwrap_or(typeinfo);
+                // set_matrix_dim collected the dimensions of all levels of array
+                // nesting, so all levels must be unwrapped here
+                let inner_type = typeinfo.get_innermost_arraytype(&self.debug_data.types);
                 if let Some(typedef_name) = self.create_typedef(inner_type, is_calib, enum_convlist)
                 {
                     sc.component_type = typedef_name;
@@ -1307,7 +1313,9 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                     .map_or(typeinfo, |(_, t)| t);
                 sc.symbol_type_link = None;
 
-                let inner_type = inner_type.get_arraytype().unwrap_or(inner_type);
+                // set_matrix_dim collected the dimensions of all levels of array
+                // nesting, so all levels must be unwrapped here
+                let inner_type = inner_type.get_innermost_arraytype(&self.debug_data.types);
                 if let Some(typedef_name) = self.create_typedef(inner_type, is_calib, enum_convlist)
                 {
                     sc.component_type = typedef_name;
@@ -1350,9 +1358,10 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             let cur_type_nopointer = cur_type
                 .get_pointer(&self.debug_data.types)
                 .map_or(cur_type, |(_, t)| t);
-            let cur_type_unwrapped = cur_type_nopointer
-                .get_arraytype()
-                .unwrap_or(cur_type_nopointer);
+            // unwrap all levels of array nesting: set_matrix_dim collects the dimensions of
+            // all levels, so a partially unwrapped type would encode the inner dimensions twice
+            let cur_type_unwrapped =
+                cur_type_nopointer.get_innermost_arraytype(&self.debug_data.types);
 
             if let Some(final_typeinfo) = fully_unwrap_typeinfo(self.debug_data, cur_type_unwrapped)
             {
