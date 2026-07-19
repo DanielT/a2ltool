@@ -563,7 +563,7 @@ fn adjust_limits(
                 // f(x)=(ax^2 + bx + c)/(dx^2 + ex + f); INT = f(PHYS)
                 if let Some(c) = &cm.coeffs {
                     // we're only handling the simple linear case here
-                    if c.a == 0.0 && c.d == 0.0 && c.e == 0.0 && c.f != 0.0 {
+                    if c.a == 0.0 && c.d == 0.0 && c.e == 0.0 && c.f != 0.0 && c.b != 0.0 {
                         // now the rational function is reduced to
                         //   y = (bx + c) / f
                         // which can be inverted to
