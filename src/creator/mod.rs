@@ -392,6 +392,7 @@ struct Structure {
 #[derive(Debug, Clone)]
 struct InstanceElement<'a> {
     instance_name: &'a str,
+    alias: Option<&'a str>,
     struct_path: &'a [String],
     instance_group: &'a [GroupAttribute],
     overwrites: &'a Vec<Overwrite>,
@@ -742,8 +743,8 @@ impl<'a2l> Creator<'a2l> {
         if let Some(bitmask) = config.bitmask {
             meas.bit_mask = Some(a2lfile::BitMask::new(bitmask));
         }
-        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element) {
-            meas.display_identifier = Some(a2lfile::DisplayIdentifier::new(alias.to_string()));
+        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element, &a2l_name) {
+            meas.display_identifier = Some(a2lfile::DisplayIdentifier::new(alias));
         }
 
         let base_offset = config.attributes.base_offset.unwrap_or(0);
@@ -897,9 +898,8 @@ impl<'a2l> Creator<'a2l> {
         if let Some(bitmask) = config.bitmask {
             characteristic.bit_mask = Some(a2lfile::BitMask::new(bitmask));
         }
-        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element) {
-            characteristic.display_identifier =
-                Some(a2lfile::DisplayIdentifier::new(alias.to_string()));
+        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element, &a2l_name) {
+            characteristic.display_identifier = Some(a2lfile::DisplayIdentifier::new(alias));
         }
 
         let base_offset = config.attributes.base_offset.unwrap_or(0);
@@ -1024,9 +1024,8 @@ impl<'a2l> Creator<'a2l> {
         if let Some(bitmask) = config.bitmask {
             characteristic.bit_mask = Some(a2lfile::BitMask::new(bitmask));
         }
-        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element) {
-            characteristic.display_identifier =
-                Some(a2lfile::DisplayIdentifier::new(alias.to_string()));
+        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element, &a2l_name) {
+            characteristic.display_identifier = Some(a2lfile::DisplayIdentifier::new(alias));
         }
 
         let base_offset = config.attributes.base_offset.unwrap_or(0);
@@ -1114,8 +1113,8 @@ impl<'a2l> Creator<'a2l> {
                 Some(a2lfile::EcuAddressExtension::new(address_ext as i16));
         }
 
-        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element) {
-            axis_pts.display_identifier = Some(a2lfile::DisplayIdentifier::new(alias.to_string()));
+        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element, &a2l_name) {
+            axis_pts.display_identifier = Some(a2lfile::DisplayIdentifier::new(alias));
         }
 
         let base_offset = config.attributes.base_offset.unwrap_or(0);
@@ -1228,9 +1227,8 @@ impl<'a2l> Creator<'a2l> {
                 Some(a2lfile::EcuAddressExtension::new(address_ext as i16));
         }
 
-        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element) {
-            characteristic.display_identifier =
-                Some(a2lfile::DisplayIdentifier::new(alias.to_string()));
+        if let Some(alias) = choose_alias(&config.attributes.alias, instance_element, &a2l_name) {
+            characteristic.display_identifier = Some(a2lfile::DisplayIdentifier::new(alias));
         }
 
         let base_offset = config.attributes.base_offset.unwrap_or(0);
@@ -1327,14 +1325,19 @@ impl<'a2l> Creator<'a2l> {
                 &symbol_name,
                 self.new_arrays,
             ) {
-                let mut instance_element = InstanceElement {
-                    instance_name: &a2l_name,
+                // the alias is extended with the same suffix that the split appended to the a2l name
+                let split_alias = instance.alias.as_ref().map(|alias| {
+                    let suffix = split_a2l_name.strip_prefix(&a2l_name).unwrap_or_default();
+                    format!("{alias}{suffix}")
+                });
+                let split_a2l_name_copy = split_a2l_name.clone();
+                let instance_element = InstanceElement {
+                    instance_name: &split_a2l_name_copy,
+                    alias: split_alias.as_deref(),
                     struct_path,
                     instance_group: &instance.group,
                     overwrites: &instance.overwrites,
                 };
-                let split_a2l_name_copy = split_a2l_name.clone();
-                instance_element.instance_name = &split_a2l_name_copy;
                 if self.check_a2l_name(&split_a2l_name).is_ok() {
                     let result = self.create_sub_structure_items(
                         split_a2l_name,
@@ -1352,6 +1355,7 @@ impl<'a2l> Creator<'a2l> {
             // No split, instantiate objects for a single instance
             let instance_element = InstanceElement {
                 instance_name: &a2l_name,
+                alias: instance.alias.as_deref(),
                 struct_path: &[instance.structure_name],
                 instance_group: &instance.group,
                 overwrites: &instance.overwrites,
@@ -2959,17 +2963,29 @@ fn choose_conversion<'a>(
     }
 }
 
-/// choose between an alias supplied by the configuration and an alias override provided by the instance (if any)
+/// choose between an alias supplied by the configuration, an alias override provided by the
+/// instance and an alias derived from the ALIAS of the instance definition (if any)
 ///
-/// if there is an instance-specific override, it takes precedence
-fn choose_alias<'a>(
-    config: &'a Option<String>,
-    instance_element: Option<&InstanceElement<'a>>,
-) -> Option<&'a str> {
+/// if there is an instance-specific override, it takes precedence over the configuration alias;
+/// the alias derived from the instance ALIAS is only used if neither of the others is set.
+fn choose_alias(
+    config: &Option<String>,
+    instance_element: Option<&InstanceElement>,
+    a2l_name: &str,
+) -> Option<String> {
     if let Some(overwrite_alias) = get_overwrite_alias(instance_element) {
-        Some(overwrite_alias)
+        Some(overwrite_alias.to_string())
+    } else if let Some(config_alias) = config {
+        Some(config_alias.clone())
+    } else if let Some(instance_element) = instance_element
+        && let Some(instance_alias) = instance_element.alias
+    {
+        let suffix = a2l_name
+            .strip_prefix(instance_element.instance_name)
+            .unwrap_or_default();
+        Some(format!("{instance_alias}{suffix}"))
     } else {
-        config.as_deref()
+        None
     }
 }
 
@@ -3799,6 +3815,82 @@ mod tests {
         assert!(module.measurement.contains_key("var1.x"));
         assert!(module.measurement.contains_key("var1.inner2[4].z"));
         assert!(module.measurement.contains_key("var2[1].inner1.y"));
+    }
+
+    #[test]
+    fn instance_alias_separate_objects() {
+        // without --enable-structures, the ALIAS of an INSTANCE definition is extended
+        // with the same path suffix as the object names and applied to the created objects
+        let input = br#"
+        /*
+        @@ ELEMENT = x
+        @@ STRUCTURE = S
+        @@ A2L_TYPE = MEASURE
+        @@ DATA_TYPE = ULONG
+        @@ END
+        */
+        /*
+        @@ ELEMENT = y
+        @@ STRUCTURE = S
+        @@ A2L_TYPE = MEASURE
+        @@ DATA_TYPE = ULONG
+        @@ ALIAS = element_alias
+        @@ END
+        */
+        /*
+        @@ SUB_STRUCTURE = inner
+        @@ STRUCTURE = S
+        @@ END
+        */
+        /*
+        @@ ELEMENT = z
+        @@ STRUCTURE = S | inner
+        @@ A2L_TYPE = MEASURE
+        @@ DATA_TYPE = ULONG
+        @@ END
+        */
+        /*
+        @@ INSTANCE = var1
+        @@ STRUCTURE = S
+        @@ ALIAS = alias1
+        @@ OVERWRITE x ALIAS = overwrite_alias
+        @@ END
+        */
+        /*
+        @@ INSTANCE = var2
+        @@ STRUCTURE = S
+        @@ ALIAS = alias2
+        @@ DIMENSION = 2 SPLIT
+        @@ END
+        */"#;
+
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        assert_eq!(creator.errors, 0);
+
+        let get_display_name = |name: &str| {
+            creator
+                .module
+                .measurement
+                .get(name)
+                .unwrap()
+                .display_identifier
+                .as_ref()
+                .unwrap()
+                .display_name
+                .clone()
+        };
+
+        // an OVERWRITE ALIAS takes precedence over the extended instance alias
+        assert_eq!(get_display_name("var1.x"), "overwrite_alias");
+        // an ALIAS in the structure definition takes precedence over the extended instance alias
+        assert_eq!(get_display_name("var1.y"), "element_alias");
+        // the instance alias is extended with the same suffix as the object name
+        assert_eq!(get_display_name("var1.inner.z"), "alias1.inner.z");
+        // for split instances, the alias also receives the array index
+        assert_eq!(get_display_name("var2[0].x"), "alias2[0].x");
+        assert_eq!(get_display_name("var2[1].inner.z"), "alias2[1].inner.z");
     }
 
     #[test]
