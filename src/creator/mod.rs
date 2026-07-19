@@ -378,6 +378,7 @@ struct Creator<'a2l> {
     new_arrays: bool,
     enable_structures: bool,
     created_typedefs: HashSet<String>, // set of typedef names that were created by this code, to distinguish from pre-existing typedefs
+    struct_expansion_stack: Vec<String>, // stack of structure names that are currently being expanded, used to detect recursive definitions
     messages: Vec<String>,
     warnings: usize,
     errors: usize,
@@ -532,6 +533,7 @@ impl<'a2l> Creator<'a2l> {
             // TYPEDEF_STRUCTURE and INSTANCE are only usable in 1.7.1 and later
             enable_structures: enable_structures && version >= A2lVersion::V1_7_1,
             created_typedefs: HashSet::new(),
+            struct_expansion_stack: Vec::new(),
             messages: Vec::new(),
             warnings: 0,
             errors: 0,
@@ -1431,6 +1433,17 @@ impl<'a2l> Creator<'a2l> {
             ));
         };
 
+        // guard against recursive structure definitions, which would cause infinite recursion
+        if self.struct_expansion_stack.contains(&full_struct_name) {
+            return Err(format!(
+                "Recursive structure definition: '{}' directly or indirectly contains itself (path: {} -> {})",
+                full_struct_name,
+                self.struct_expansion_stack.join(" -> "),
+                full_struct_name
+            ));
+        }
+        self.struct_expansion_stack.push(full_struct_name);
+
         for struct_item in &structure.elements {
             let mut new_struct_path = struct_item.structure.clone();
             new_struct_path.push(struct_item.symbol_name.clone());
@@ -1455,6 +1468,8 @@ impl<'a2l> Creator<'a2l> {
                 ));
             }
         }
+
+        self.struct_expansion_stack.pop();
 
         Ok(())
     }
@@ -1554,10 +1569,30 @@ impl<'a2l> Creator<'a2l> {
     }
 
     /// Verify that the structure is valid according to the A2L rule for TYPEDEF_STRUCTUREs
-    /// It must not contain both measurement and parameter items (including in sub-structures)
+    /// It must not contain both measurement and parameter items (including in sub-structures),
+    /// and it must not contain itself, directly or indirectly
     fn verify_structure(&self, struct_name: &str) -> Result<(u32, u32), String> {
+        self.verify_structure_impl(struct_name, &mut Vec::new())
+    }
+
+    fn verify_structure_impl(
+        &self,
+        struct_name: &str,
+        visited: &mut Vec<String>,
+    ) -> Result<(u32, u32), String> {
         let mut measurements = 0;
         let mut characteristics = 0;
+
+        // guard against recursive structure definitions, which would cause infinite recursion
+        if visited.iter().any(|name| name == struct_name) {
+            return Err(format!(
+                "Recursive structure definition: '{}' directly or indirectly contains itself (path: {} -> {})",
+                struct_name,
+                visited.join(" -> "),
+                struct_name
+            ));
+        }
+        visited.push(struct_name.to_string());
 
         let Some(structure_def) = self.structures.get(struct_name) else {
             return Err(format!("Structure '{}' not found", struct_name));
@@ -1579,7 +1614,7 @@ impl<'a2l> Creator<'a2l> {
                         .cloned()
                         .unwrap_or_else(|| struct_path.join("."));
                     let (sub_measurements, sub_characteristics) =
-                        self.verify_structure(&sub_struct_name)?;
+                        self.verify_structure_impl(&sub_struct_name, visited)?;
                     measurements += sub_measurements;
                     characteristics += sub_characteristics;
                 }
@@ -1592,6 +1627,7 @@ impl<'a2l> Creator<'a2l> {
             ));
         }
 
+        visited.pop();
         Ok((measurements, characteristics))
     }
 
@@ -1968,6 +2004,10 @@ impl<'a2l> Creator<'a2l> {
     // and finally, it is not possible to get the axis dimensions of curve/map when the axis is a
     // reference to an external item.
     fn estimate_size(&self, structure: &Structure) -> u32 {
+        self.estimate_size_impl(structure, &mut Vec::new())
+    }
+
+    fn estimate_size_impl(&self, structure: &Structure, visited: &mut Vec<String>) -> u32 {
         let mut total_size: u32 = 0;
         for item in &structure.elements {
             match &item.config {
@@ -2005,8 +2045,14 @@ impl<'a2l> Creator<'a2l> {
                             path.push(item.symbol_name.clone());
                             path.join(".")
                         });
-                    if let Some(sub_structure) = self.structures.get(&sub_struct_name) {
-                        let sub_structure_size = self.estimate_size(sub_structure);
+                    // skip recursive structure definitions: no size can be calculated for
+                    // them, and verify_structure reports them as an error separately
+                    if !visited.iter().any(|name| name == &sub_struct_name)
+                        && let Some(sub_structure) = self.structures.get(&sub_struct_name)
+                    {
+                        visited.push(sub_struct_name);
+                        let sub_structure_size = self.estimate_size_impl(sub_structure, visited);
+                        visited.pop();
                         let dim_product =
                             sub_struct_cfg.attributes.dimension.iter().product::<u32>();
                         total_size += sub_structure_size * dim_product;
@@ -3751,6 +3797,96 @@ mod tests {
         assert!(module.measurement.contains_key("var1.x"));
         assert!(module.measurement.contains_key("var1.inner2[4].z"));
         assert!(module.measurement.contains_key("var2[1].inner1.y"));
+    }
+
+    #[test]
+    fn structure_self_recursion() {
+        // a structure that contains itself must be reported as an error,
+        // instead of crashing with unbounded recursion
+        let input = br#"
+        /*
+        @@ SUB_STRUCTURE = a
+        @@ STRUCTURE = S
+        @@ DATA_TYPE = STRUCTURE S
+        @@ END
+        */
+        /*
+        @@ INSTANCE = v
+        @@ STRUCTURE = S
+        @@ END
+        */"#;
+
+        // without --enable-structures: expansion of the INSTANCE into individual items
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        assert!(creator.errors > 0);
+        assert!(
+            creator
+                .messages
+                .iter()
+                .any(|msg| msg.contains("Recursive structure definition"))
+        );
+
+        // with --enable-structures: creation of TYPEDEF_STRUCTURE and INSTANCE
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, true, false);
+        creator.process_file(input);
+        assert!(creator.errors > 0);
+        assert!(
+            creator
+                .messages
+                .iter()
+                .any(|msg| msg.contains("Recursive structure definition"))
+        );
+    }
+
+    #[test]
+    fn structure_mutual_recursion() {
+        // two structures that contain each other must be reported as an error,
+        // instead of crashing with unbounded recursion
+        let input = br#"
+        /*
+        @@ SUB_STRUCTURE = b
+        @@ STRUCTURE = A
+        @@ DATA_TYPE = STRUCTURE B
+        @@ END
+        */
+        /*
+        @@ SUB_STRUCTURE = a
+        @@ STRUCTURE = B
+        @@ DATA_TYPE = STRUCTURE A
+        @@ END
+        */
+        /*
+        @@ INSTANCE = v
+        @@ STRUCTURE = A
+        @@ END
+        */"#;
+
+        // without --enable-structures: expansion of the INSTANCE into individual items
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        assert!(creator.errors > 0);
+        assert!(
+            creator
+                .messages
+                .iter()
+                .any(|msg| msg.contains("Recursive structure definition"))
+        );
+
+        // with --enable-structures: creation of TYPEDEF_STRUCTURE and INSTANCE
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, true, false);
+        creator.process_file(input);
+        assert!(creator.errors > 0);
+        assert!(
+            creator
+                .messages
+                .iter()
+                .any(|msg| msg.contains("Recursive structure definition"))
+        );
     }
 
     #[test]
