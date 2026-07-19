@@ -3,6 +3,7 @@ use a2lfile::{
     FncValues, Group, IndexMode, Instance, Measurement, Module, RecordLayout, RefCharacteristic,
     RefMeasurement, Root, SymbolLink,
 };
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use crate::A2lVersion;
@@ -166,7 +167,7 @@ fn insert_measurement_sym(
 ) -> Result<String, String> {
     // Abort if a MEASUREMENT for this symbol already exists. Warn if any other reference to the symbol exists
     let symbol_link_text = make_symbol_link_string(sym_info, debug_data);
-    let item_name = make_unique_measurement_name(module, sym_map, &sym_info.name, name_map)?;
+    let item_name = make_unique_measurement_name(module, sym_map, sym_info, name_map)?;
 
     let datatype = get_a2l_datatype(sym_info.typeinfo);
     let (lower_limit, upper_limit) = get_type_limits(sym_info.typeinfo, f64::MIN, f64::MAX);
@@ -232,7 +233,7 @@ fn insert_characteristic_sym(
     // the item name is based on sym_info.name, not on the user-supplied symbol string:
     // the input might use the extended syntax "var{CompileUnit:...}", which is not valid in an item name
     let symbol_link_text = make_symbol_link_string(sym_info, debug_data);
-    let item_name = make_unique_characteristic_name(module, sym_map, &sym_info.name, name_map)?;
+    let item_name = make_unique_characteristic_name(module, sym_map, sym_info, name_map)?;
 
     let mut matrix_dim = None;
     set_matrix_dim(
@@ -304,18 +305,46 @@ fn insert_characteristic_sym(
     Ok(item_name)
 }
 
+/// Make a symbol name usable as an a2l item name.
+/// Demangled C++ symbol names can contain many characters that are not permitted in a2l
+/// identifiers, e.g. "ns::var", "instance<float>" or "(anonymous namespace)::var".
+/// All forbidden characters are replaced with underscores.
+fn cleanup_symbol_name(symbol_name: &str) -> Cow<'_, str> {
+    fn is_permitted(c: char) -> bool {
+        c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '[' | ']')
+    }
+
+    if symbol_name.chars().all(is_permitted) {
+        Cow::Borrowed(symbol_name)
+    } else {
+        let mut cleaned = String::with_capacity(symbol_name.len());
+        for c in symbol_name.chars() {
+            if is_permitted(c) {
+                cleaned.push(c);
+            } else {
+                cleaned.push('_');
+            }
+        }
+        Cow::Owned(cleaned)
+    }
+}
+
 fn make_unique_measurement_name(
     module: &Module,
     sym_map: &HashMap<String, Vec<ItemType>>,
-    measure_sym: &str,
+    sym_info: &SymbolInfo,
     name_map: &HashMap<String, ItemType>,
 ) -> Result<String, String> {
     // ideally the item name is the symbol name.
-    // if the symbol is a demangled c++ symbol, then it might contain a "::", e.g. namespace::variable
-    let cleaned_sym = measure_sym.replace("::", "__");
+    // C++ symbol names may need to be cleaned up to become valid a2l item names
+    let cleaned_sym = if sym_info.is_cplusplus {
+        cleanup_symbol_name(&sym_info.name)
+    } else {
+        Cow::Borrowed(sym_info.name.as_str())
+    };
 
-    // If an object of a different type already has this name, add the prefix "CHARACTERISTIC."
-    let item_name = match sym_map.get(&cleaned_sym) {
+    // If an object of a different type already has this name, add the prefix "MEASUREMENT."
+    let item_name = match sym_map.get(sym_info.name.as_str()) {
         Some(item_vec) => {
             if let Some(ItemType::Measurement(idx)) = item_vec
                 .iter()
@@ -323,19 +352,20 @@ fn make_unique_measurement_name(
             {
                 // there is already a MEASUREMENT for this symbol, and we don't want to create duplicates
                 return Err(format!(
-                    "MEASUREMENT {} already references symbol {measure_sym}.",
-                    module.measurement[*idx].get_name()
+                    "MEASUREMENT {} already references symbol {}.",
+                    module.measurement[*idx].get_name(),
+                    sym_info.name
                 ));
             } else {
                 // there is another object for this symbol
-                if name_map.get(&cleaned_sym).is_some() {
+                if name_map.get(cleaned_sym.as_ref()).is_some() {
                     format!("MEASUREMENT.{cleaned_sym}")
                 } else {
-                    cleaned_sym
+                    cleaned_sym.into_owned()
                 }
             }
         }
-        None => cleaned_sym,
+        None => cleaned_sym.into_owned(),
     };
     // fail if the name still isn't unique
     if name_map.get(&item_name).is_some() {
@@ -347,15 +377,19 @@ fn make_unique_measurement_name(
 fn make_unique_characteristic_name(
     module: &Module,
     sym_map: &HashMap<String, Vec<ItemType>>,
-    characteristic_sym: &str,
+    sym_info: &SymbolInfo,
     name_map: &HashMap<String, ItemType>,
 ) -> Result<String, String> {
     // ideally the item name is the symbol name.
-    // if the symbol is a demangled c++ symbol, then it might contain a "::", e.g. namespace::variable
-    let cleaned_sym = characteristic_sym.replace("::", "__");
+    // C++ symbol names may need to be cleaned up to become valid a2l item names
+    let cleaned_sym = if sym_info.is_cplusplus {
+        cleanup_symbol_name(&sym_info.name)
+    } else {
+        Cow::Borrowed(sym_info.name.as_str())
+    };
 
     // If an object of a different type already has this name, add the prefix "CHARACTERISTIC."
-    let item_name = match sym_map.get(&cleaned_sym) {
+    let item_name = match sym_map.get(sym_info.name.as_str()) {
         Some(item_vec) => {
             if let Some(ItemType::Characteristic(idx)) = item_vec
                 .iter()
@@ -363,19 +397,20 @@ fn make_unique_characteristic_name(
             {
                 // there is already a CHARACTERISTIC for this symbol, and we don't want to create duplicates
                 return Err(format!(
-                    "CHARACTERISTIC {} already references symbol {characteristic_sym}.",
-                    module.characteristic[*idx].get_name()
+                    "CHARACTERISTIC {} already references symbol {}.",
+                    module.characteristic[*idx].get_name(),
+                    sym_info.name
                 ));
             } else {
                 // there is another object for this symbol
-                if name_map.get(&cleaned_sym).is_some() {
+                if name_map.get(cleaned_sym.as_ref()).is_some() {
                     format!("CHARACTERISTIC.{cleaned_sym}")
                 } else {
-                    cleaned_sym
+                    cleaned_sym.into_owned()
                 }
             }
         }
-        None => cleaned_sym,
+        None => cleaned_sym.into_owned(),
     };
     // fail if the name still isn't unique
     if name_map.get(&item_name).is_some() {
@@ -387,15 +422,19 @@ fn make_unique_characteristic_name(
 fn make_unique_instance_name(
     module: &Module,
     sym_map: &HashMap<String, Vec<ItemType>>,
-    instance_sym: &str,
+    sym_info: &SymbolInfo,
     name_map: &HashMap<String, ItemType>,
 ) -> Result<String, String> {
     // ideally the item name is the symbol name.
-    // if the symbol is a demangled c++ symbol, then it might contain a "::", e.g. namespace::variable
-    let cleaned_sym = instance_sym.replace("::", "__");
+    // C++ symbol names may need to be cleaned up to become valid a2l item names
+    let cleaned_sym = if sym_info.is_cplusplus {
+        cleanup_symbol_name(&sym_info.name)
+    } else {
+        Cow::Borrowed(sym_info.name.as_str())
+    };
 
     // If an object of a different type already has this name, add the prefix "INSTANCE."
-    let item_name = match sym_map.get(&cleaned_sym) {
+    let item_name = match sym_map.get(sym_info.name.as_str()) {
         Some(item_vec) => {
             if let Some(ItemType::Instance(idx)) = item_vec
                 .iter()
@@ -403,19 +442,20 @@ fn make_unique_instance_name(
             {
                 // there is already an INSTANCE for this symbol, and we don't want to create duplicates
                 return Err(format!(
-                    "INSTANCE {} already references symbol {instance_sym}.",
-                    module.instance[*idx].get_name()
+                    "INSTANCE {} already references symbol {}.",
+                    module.instance[*idx].get_name(),
+                    sym_info.name
                 ));
             } else {
                 // there is another object for this symbol
-                if name_map.get(&cleaned_sym).is_some() {
+                if name_map.get(cleaned_sym.as_ref()).is_some() {
                     format!("INSTANCE.{cleaned_sym}")
                 } else {
-                    cleaned_sym
+                    cleaned_sym.into_owned()
                 }
             }
         }
-        None => cleaned_sym,
+        None => cleaned_sym.into_owned(),
     };
     // fail if the name still isn't unique
     if name_map.get(&item_name).is_some() {
@@ -424,6 +464,9 @@ fn make_unique_instance_name(
     Ok(item_name)
 }
 
+/// Builds two maps for the given module:
+/// 1. A map from item names to their type and index in the module's list of items.
+/// 2. A map from symbol names in SYMBOL_LINK to a list of items that reference that symbol.
 fn build_maps(module: &Module) -> (HashMap<String, ItemType>, HashMap<String, Vec<ItemType>>) {
     let mut name_map = HashMap::<String, ItemType>::new();
     let mut sym_map = HashMap::<String, Vec<ItemType>>::new();
@@ -892,7 +935,7 @@ fn insert_instance_sym<'dbg>(
 ) -> Result<(String, &'dbg TypeInfo), String> {
     if !matches!(&sym_info.typeinfo.datatype, DbgDataType::FuncPtr(_)) {
         // Abort if a INSTANCE for this symbol already exists. Warn if any other reference to the symbol exists
-        let item_name = make_unique_instance_name(module, sym_map, &sym_info.name, name_map)?;
+        let item_name = make_unique_instance_name(module, sym_map, sym_info, name_map)?;
 
         // use "magic" names to signal to the typedef creation code which kind of typedef should be created for this INSTANCE
         let typdef_name = if is_calib {
@@ -973,6 +1016,47 @@ mod test {
             &addr_ranges,
             &name_regexes
         ));
+    }
+
+    #[test]
+    fn test_cleanup_symbol_name() {
+        // plain names and member paths are returned without an allocation
+        assert!(matches!(
+            cleanup_symbol_name("plain_name_123"),
+            Cow::Borrowed("plain_name_123")
+        ));
+        assert!(matches!(
+            cleanup_symbol_name("var.member[3]"),
+            Cow::Borrowed("var.member[3]")
+        ));
+
+        // "::" becomes "__"
+        assert_eq!(cleanup_symbol_name("ns::sub::var"), "ns__sub__var");
+        // template arguments: '<', '>', ',' and ' '
+        assert_eq!(cleanup_symbol_name("instance<float>"), "instance_float_");
+        assert_eq!(
+            cleanup_symbol_name("Matrix<3, 4>::data"),
+            "Matrix_3__4___data"
+        );
+        // anonymous namespaces: '(', ')' and ' '
+        assert_eq!(
+            cleanup_symbol_name("(anonymous namespace)::var"),
+            "_anonymous_namespace___var"
+        );
+        // pointer / reference template arguments
+        assert_eq!(cleanup_symbol_name("Traits<int*>::id"), "Traits_int____id");
+        // gcc abi tags: a single ':' becomes '_', the brackets are kept
+        assert_eq!(cleanup_symbol_name("name[abi:cxx11]"), "name[abi_cxx11]");
+        // MSVC-style names from PDB files: '`' and '\''
+        assert_eq!(
+            cleanup_symbol_name("`anonymous namespace'::var"),
+            "_anonymous_namespace___var"
+        );
+        // lambdas: '{', '}' and '#'
+        assert_eq!(
+            cleanup_symbol_name("func()::{lambda()#1}::var"),
+            "func_____lambda___1___var"
+        );
     }
 
     #[test]

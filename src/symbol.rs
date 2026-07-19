@@ -11,6 +11,8 @@ pub(crate) struct SymbolInfo<'dbg> {
     pub(crate) function_name: &'dbg Option<String>,
     pub(crate) namespaces: &'dbg [String],
     pub(crate) is_unique: bool,
+    /// the symbol is (probably) a C++ symbol
+    pub(crate) is_cplusplus: bool,
 }
 
 struct AdditionalSpec {
@@ -53,6 +55,8 @@ pub(crate) fn find_symbol<'a>(
                         mangled.to_owned() + plain_symbol.strip_prefix(components[0]).unwrap();
                     return Ok(SymbolInfo {
                         name: mangled_varname,
+                        // the name only demangles successfully if it is a C++ symbol
+                        is_cplusplus: true,
                         ..sym_info
                     });
                 }
@@ -122,6 +126,7 @@ fn find_symbol_from_components<'a>(
                     function_name: &varinfo.function,
                     namespaces: &varinfo.namespaces,
                     is_unique,
+                    is_cplusplus: !varinfo.namespaces.is_empty(),
                 },
             )
         } else {
@@ -141,6 +146,7 @@ fn find_symbol_from_components<'a>(
                     namespaces: &varinfo.namespaces,
                     function_name: &None,
                     is_unique,
+                    is_cplusplus: !varinfo.namespaces.is_empty(),
                 })
             } else {
                 Err(format!(
@@ -388,6 +394,7 @@ pub(crate) fn find_symbol_by_offset<'a>(
                 function_name: base_symbol.function_name,
                 namespaces: base_symbol.namespaces,
                 is_unique: base_symbol.is_unique,
+                is_cplusplus: base_symbol.is_cplusplus,
             });
         }
     }

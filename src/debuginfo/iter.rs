@@ -177,6 +177,7 @@ impl<'dbg> Iterator for VariablesIterator<'dbg> {
                         function_name: &varinfo.function,
                         namespaces: &varinfo.namespaces,
                         is_unique,
+                        is_cplusplus: !varinfo.namespaces.is_empty(),
                     })
                 } else if let Some((var_component_name, typeinfo, offset)) =
                     self.type_iter.as_mut().unwrap().next()
@@ -189,6 +190,7 @@ impl<'dbg> Iterator for VariablesIterator<'dbg> {
                         function_name: &varinfo.function,
                         namespaces: &varinfo.namespaces,
                         is_unique,
+                        is_cplusplus: !varinfo.namespaces.is_empty(),
                     })
                 } else {
                     // reached the end of this type_iter, try to advance to the next position within the list
