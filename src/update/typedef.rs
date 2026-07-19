@@ -623,7 +623,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
                 // TYPEDEF_AXIS / TYPEDEF_BLOB / TYPEDEF_CHARACTERISTIC
                 true
             } else {
-                // nonexistent TYPEDEF, use the "magic" refname to determine if a TYPEDEF_CHARWYCTERISTIC should be created
+                // nonexistent TYPEDEF, use the "magic" refname to determine if a TYPEDEF_CHARACTERISTIC should be created
                 // '|' is not allowed in names, so this name should only occur when it is used as a flag in the insert code.
                 refname == FLAG_CREATE_CALIB
             };

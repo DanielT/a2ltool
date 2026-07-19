@@ -830,7 +830,7 @@ fn get_base_type(
             2 => (DbgDataType::Sint16, "sint16".to_string()),
             4 => (DbgDataType::Sint32, "sint32".to_string()),
             8 => (DbgDataType::Sint64, "sint64".to_string()),
-            _ => (DbgDataType::Other(byte_size), "double".to_string()),
+            _ => (DbgDataType::Other(byte_size), "other".to_string()),
         },
         gimli::constants::DW_ATE_boolean
         | gimli::constants::DW_ATE_unsigned
