@@ -4030,7 +4030,7 @@ mod tests {
         // the creator stores the sub group information until it is needed
         assert_eq!(creator.sub_groups.len(), 1);
         assert_eq!(
-            creator.sub_groups.get("SubGroup").as_deref().unwrap(),
+            creator.sub_groups.get("SubGroup").unwrap(),
             "Sub group description"
         );
     }

@@ -1574,7 +1574,7 @@ mod tests {
         let definition_tokens_vec = comment_scanner.scan_comments(input);
         assert_eq!(definition_tokens_vec.len(), 1);
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_none());
     }
 
@@ -1607,7 +1607,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Symbol(SymbolDefinition {
@@ -1693,7 +1693,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Symbol(SymbolDefinition {
@@ -1788,7 +1788,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Symbol(SymbolDefinition {
@@ -1855,7 +1855,7 @@ mod tests {
         assert_eq!(extended_range, None);
         assert_eq!(dimension, vec![10]);
         assert_eq!(input_signal.as_deref(), Some("InputSignal"));
-        assert_eq!(input_is_instance, false);
+        assert!(!input_is_instance);
         assert!(matches!(
             conversion,
             Some(ConversionAttribute::Table { .. })
@@ -1890,7 +1890,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Symbol(SymbolDefinition {
@@ -1908,7 +1908,7 @@ mod tests {
         assert_eq!(axis_cfg.extended_range, Some((-10.0, 1000.0)));
         assert_eq!(axis_cfg.layout, "AxisLayout");
         assert_eq!(axis_cfg.input_signal.as_deref(), Some("AxisInput"));
-        assert_eq!(axis_cfg.input_is_instance, false);
+        assert!(!axis_cfg.input_is_instance);
         assert_eq!(axis_cfg.dimension, vec![3]);
         assert_eq!(axis_cfg.attributes.address, Some(0x87654321));
         assert_eq!(axis_cfg.attributes.address_ext, Some(0x20));
@@ -1969,7 +1969,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Symbol(symbol_def) = definition else {
@@ -2005,7 +2005,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::MainGroup(group_def) = definition else {
@@ -2031,7 +2031,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::SubGroup(group_def) = definition else {
@@ -2060,7 +2060,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Conversion(conversion_def) = definition else {
@@ -2103,7 +2103,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Conversion(conversion_def) = definition else {
@@ -2135,7 +2135,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Conversion(conversion_def) = definition else {
@@ -2173,7 +2173,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Element(element_def) = definition else {
@@ -2201,7 +2201,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Element(element_def) = definition else {
@@ -2241,7 +2241,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::Instance(instance_def) = definition else {
@@ -2273,7 +2273,7 @@ mod tests {
         assert_eq!(definition_tokens_vec.len(), 1);
 
         let (_offset, tokens) = &definition_tokens_vec[0];
-        let definition = parse_definition(&tokens).unwrap();
+        let definition = parse_definition(tokens).unwrap();
         assert!(definition.is_some());
         let definition = definition.unwrap();
         let Definition::VarCriterion(var_criterion_def) = definition else {
