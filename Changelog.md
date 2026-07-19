@@ -1,8 +1,83 @@
 # Changelog
 
+## Version 3.4.0
+
+- a2ltool can now be installed as a Python wheel using `pip install a2ltool` (by zariiii9003)
+
+**a2lfile**
+- update to a2lfile 3.5.0
+  - Don't crash when removing the last item from a list
+  - Don't crash during check if CHARACTERISTIC has 6 or more AXIS_DESCR
+  - Don't crash on a cycle of /include directives
+  - Don't crash on a cycle of A2ML /include directives
+  - Fix infinite loop when parsing empty TaggedStruct/TaggedUnion in IF_DATA
+  - Reject signed hex numerical constants like "-0x20" in the tokenizer
+  - Fix TYPEDEF_* and INSTANCE-related module merging bugs
+  - Fix bad error messages for CrossReferenceError during check
+  - Fix merge of FUNCTION.DEF_CHARACTERISTIC and FUNCTION.REF_CHARACTERISTIC, which were previously ignored
+  - Fix: STATUS_STRING_REF target can be deleted by cleanup
+  - Fix: off by one in CRLF detection at the end of A2ML blocks
+  - merge-includes in IF_DATA now recurses into Array/Sequence
+
+**Creator (`--from-source`)**
+- Fix: the creator no longer crashes on recursive structure definitions; these are now reported as an error, since a recursive struct definition cannot occur in a real program
+- Fix: a single comment can now contain multiple a2l creator commands
+- Fix: incorrect handling of `VAR_CHARACTERISTIC` in the creator
+- Fix: the creator no longer crashes when a `VAR_CRITERION` has no values
+- Fix: the creator no longer crashes on malformed input
+- Fix: the creator no longer creates duplicate item names
+- Fix: curve/map items could not be changed using `overwrite`
+- Fix: use the correct compu_tab for a compu_method if the target's name had to be changed to avoid a naming conflict
+- Prevent arithmetic errors while creating an axis with a fixed range
+- Improve handling of invalid split templates
+- Fix: correct the position tracking in the comment scanner, which could cause incorrect error locations
+- Prevent a `u16` overflow when creating a string object or flattening matrix dimensions during version downgrade; values are saturated instead
+- The `ALIAS` of an `INSTANCE` definition is now also applied without `--enable-structures`
+
+**Insert**
+- Fix: newly inserted characteristics no longer use the raw input string as the item name; they are now cleaned up the same way as inserted measurements
+- Complex C++ symbol names are now fully cleaned up when inserting items. Previously only `::` was removed, so characters like `<` and `>` could remain, producing invalid a2l identifiers
+- Fix: `--old-arrays` was ignored when inserting new items
+- Fix: create `REF_CHARACTERISTIC` instead of `REF_MEASUREMENT` for calibration-type `INSTANCE`s
+
+**Update**
+- Fix: the update result for `INSTANCE`s and `VAR_CHARACTERISTIC`s is now correctly counted as a strict-mode error
+- Fix: reduce unnecessary rebuilding of types while updating `INSTANCE`s and `TYPEDEF`s
+- Fix: possible record layout name conflicts when new record layouts are created during an update
+- Fix a potential crash while updating `VAR_ADDRESS`
+- Fix: the displayed update count for `VAR_CHARACTERISTIC` was always zero
+- Fix: `IF_DATA CANAPE_EXT` entries were incorrectly zeroed out during an address-only update
+- Fix: the size field in the `IF_DATA ASAP1B_CCP` block was incorrectly zeroed out during an address-only update
+- Fix a potential crash while updating typedefs
+- Fix: cleanup of unused typedefs could stop too early
+- Fix a potential crash during typedef update for 64-bit bitfields
+- Fix: typedef-nested arrays could get their inner dimension encoded twice
+- Fix: `SymbolNotFound` errors were logged twice
+
+**Remove**
+- Fix: a2ltool no longer crashes if the regex given to `--remove` is invalid
+- Fix: remove ranges are now upper-exclusive, as documented
+
+**Debug info (DWARF/PDB)**
+- Fix a crash when DWARF data contains an array of zero-sized elements
+- Fix: PDB multi-dimensional arrays had the wrong strides
+- Fix a crash on invalid PDB files; this is now reported as an error instead
+- Fix: PDB type info for global variables could be overwritten by type info of a static variable with the same name
+- Fix: derived class member types could be overwritten with base class info
+- Handle array dimensions more carefully: incomplete debug info could produce arrays without a dimension, and dimensions larger than `u16` were not handled correctly
+
+**General**
+- Fix regex matching for patterns containing `|` (alternatives), used by `--insert` and `--remove` by name. Unanchored patterns without `^`/`$` were previously extended incorrectly, so `a|b` became `^a|b$`; they are now wrapped in a group, e.g. `^(?:a|b)$`
+- Fix: allow `--target-group` to be combined with both `--from-source` and `--characteristic-section`, as intended
+- Fix the mangled-symbol fallback path when the original Symbol Link contains extra info such as `{Namespace:Global}`
+- Don't fail to set the version if the file has no existing `ASAP2_VERSION`
+- Fix: upper limits of signed bitfields were off by one
+- Fix limit calculation for linear conversions with negative factors
+- Prevent division by zero when recalculating `RAT_FUNC` limits
+
 ## Version 3.3.0
 
-- Allow the INSTANCE definition in source comments to contain multpile groups and an alias.
+- Allow the INSTANCE definition in source comments to contain multiple groups and an alias.
 - Fix: Take the symbol offset into account when using CANAPE_EXT/LINK_MAP to identify a symbol
 - Fix: specifiying an invalid file name with `--from-source` is an error. When specifiying multiple files or patterns at least one file must be valid and readable.
 - Fix: Correct some errors in the documented grammar of the comment syntax used by `--from-source`
