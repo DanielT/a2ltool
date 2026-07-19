@@ -1219,7 +1219,9 @@ impl<'a2l> Creator<'a2l> {
             255.0,
         );
         characteristic.get_layout_mut().item_location.3.1 = true; // set the "is hexadecimal" flag of the address to true
-        characteristic.number = Some(a2lfile::Number::new(config.length as u16));
+        characteristic.number = Some(a2lfile::Number::new(
+            u16::try_from(config.length).unwrap_or(u16::MAX),
+        ));
 
         if let Some(address_ext) = config.attributes.address_ext {
             characteristic.ecu_address_extension =
