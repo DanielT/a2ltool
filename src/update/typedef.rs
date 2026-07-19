@@ -1775,7 +1775,13 @@ fn make_typedef_name(debug_data: &DebugData, typeinfo: &TypeInfo, is_calib: bool
             bit_size,
         } => {
             let basename = make_typedef_name(debug_data, basetype, is_calib);
-            let mask: u64 = ((1 << bit_size) - 1) << bit_offset;
+            let mask: u64 = if *bit_offset < 64 && *bit_size < 64 {
+                ((1 << *bit_size) - 1) << *bit_offset
+            } else if *bit_offset < 64 {
+                u64::MAX << *bit_offset
+            } else {
+                0
+            };
             format!("{basename}_0x{mask:X}")
         }
     }
