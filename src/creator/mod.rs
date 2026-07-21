@@ -2383,7 +2383,7 @@ impl<'a2l> Creator<'a2l> {
     /// If the group doesn't exist yet, then it is created together with any parent groups.
     /// Newly created groups might have descriptions that were set using SUB_GROUP
     fn create_group_entry(&mut self, group_spec: &[String], item_name: &str, is_measurement: bool) {
-        if group_spec.is_empty() {
+        if group_spec.is_empty() && self.main_group.is_empty() {
             return;
         }
 
@@ -2394,6 +2394,23 @@ impl<'a2l> Creator<'a2l> {
             group.root = Some(a2lfile::Root::new());
             self.module.group.push(group);
         }
+
+        if group_spec.is_empty() {
+            let main_group = self.module.group.get_mut(&self.main_group).unwrap();
+            if is_measurement {
+                let ref_meas = main_group
+                    .ref_measurement
+                    .get_or_insert(a2lfile::RefMeasurement::new());
+                ref_meas.identifier_list.push(item_name.to_string());
+            } else {
+                let ref_char = main_group
+                    .ref_characteristic
+                    .get_or_insert(a2lfile::RefCharacteristic::new());
+                ref_char.identifier_list.push(item_name.to_string());
+            }
+            return;
+        }
+
         let main_group = self.module.group.get_mut(&self.main_group).unwrap();
         let sg_list = main_group.sub_group.get_or_insert(a2lfile::SubGroup::new());
         if !sg_list.identifier_list.contains(&group_spec[0]) {
@@ -2836,9 +2853,13 @@ impl<'a2l> Creator<'a2l> {
                 self.create_group_entry(group_spec, item_name, is_input);
             }
         } else {
-            for group_attr in group_attributes {
-                let group_spec = group_attr_spec(group_attr);
-                self.create_group_entry(group_spec, item_name, is_input);
+            if group_attributes.is_empty() {
+                self.create_group_entry(&[], item_name, is_input);
+            } else {
+                for group_attr in group_attributes {
+                    let group_spec = group_attr_spec(group_attr);
+                    self.create_group_entry(group_spec, item_name, is_input);
+                }
             }
         }
     }
@@ -4006,6 +4027,97 @@ mod tests {
         assert_eq!(
             creator.main_group_description.as_deref(),
             Some("Main group description")
+        );
+    }
+
+    #[test]
+    fn default_main_group_used_without_explicit_group_assignment() {
+        let input = br#"
+        /*
+        @@ SYMBOL = DefaultGroupMeas
+        @@ A2L_TYPE = MEASURE
+        @@ DATA_TYPE = UBYTE
+        @@ END
+        */"#;
+
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
+
+        let main_group = creator.module.group.get("CREATED").unwrap();
+        assert!(main_group.root.is_some());
+        assert!(
+            main_group
+                .ref_measurement
+                .as_ref()
+                .unwrap()
+                .identifier_list
+                .contains(&"DefaultGroupMeas".to_string())
+        );
+    }
+
+    #[test]
+    fn explicit_main_group_used_without_explicit_group_assignment() {
+        let input = br#"
+        /*
+        @@ MAIN_GROUP = MainGroup
+        @@ DESCRIPTION = "Main group description"
+        @@ END
+        */
+
+        /*
+        @@ SYMBOL = NoExplicitGroupMeas
+        @@ A2L_TYPE = MEASURE
+        @@ DATA_TYPE = UBYTE
+        @@ END
+        */"#;
+
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, None, false, false);
+        creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
+
+        let main_group = creator.module.group.get("MainGroup").unwrap();
+        assert!(main_group.root.is_some());
+        assert_eq!(main_group.long_identifier, "Main group description");
+        assert!(
+            main_group
+                .ref_measurement
+                .as_ref()
+                .unwrap()
+                .identifier_list
+                .contains(&"NoExplicitGroupMeas".to_string())
+        );
+    }
+
+    #[test]
+    fn command_line_main_group_used_without_explicit_group_assignment() {
+        let input = br#"
+        /*
+        @@ SYMBOL = CliGroupMeas
+        @@ A2L_TYPE = MEASURE
+        @@ DATA_TYPE = UBYTE
+        @@ END
+        */"#;
+
+        let mut a2l_file = a2lfile::new();
+        let mut creator = Creator::new(&mut a2l_file, Some("CliGroup".to_string()), false, false);
+        creator.process_file(input);
+        assert_eq!(creator.warnings, 0);
+        assert_eq!(creator.errors, 0);
+
+        let main_group = creator.module.group.get("CliGroup").unwrap();
+        assert!(main_group.root.is_some());
+        assert!(
+            main_group
+                .ref_measurement
+                .as_ref()
+                .unwrap()
+                .identifier_list
+                .contains(&"CliGroupMeas".to_string())
         );
     }
 
