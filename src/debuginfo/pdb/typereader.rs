@@ -217,6 +217,8 @@ fn read_type_from_typedata(
                 read_forward_referenced_type(type_index, typereader_data, pdb_data)?.unwrap_or((
                     DbgDataType::Struct {
                         size: class_type.size,
+                        is_class: is_class(class_type),
+                        inheritance: IndexMap::new(),
                         members: IndexMap::new(),
                     },
                     None,
@@ -359,66 +361,65 @@ fn read_forward_referenced_type(
     }
 }
 
+/// Both `struct` and `class` are represented as `TypeData::Class` in a PDB file;
+/// only `kind` distinguishes them, and it only affects the displayed name.
+fn is_class(class_type: &pdb2::ClassType<'_>) -> bool {
+    !matches!(class_type.kind, pdb2::ClassKind::Struct)
+}
+
 fn read_class(
     class_type: &pdb2::ClassType<'_>,
     typereader_data: &mut TypeReaderData,
     pdb_data: &PdbData<'_>,
 ) -> Result<(DbgDataType, Option<String>), String> {
     let size = class_type.size;
-    let fields_index = class_type.fields.map(|tidx| tidx.0);
-    let datatype = if let Some(fields_index) = fields_index {
-        let mut members = read_fields(fields_index, typereader_data, pdb_data)?;
-        let inheritance = read_class_inheritance(fields_index, typereader_data, pdb_data)?;
-
-        if inheritance.is_empty() {
-            DbgDataType::Struct { size, members }
-        } else {
-            // copy all inherited members from the base classes
-            // this allows the inherited members ot be accessed without naming the base class
-            for (baseclass_type, baseclass_offset) in inheritance.values() {
-                match &baseclass_type.datatype {
-                    DbgDataType::Struct {
-                        members: baseclass_members,
-                        ..
-                    }
-                    | DbgDataType::Class {
-                        members: baseclass_members,
-                        ..
-                    } => {
-                        for (name, (m_type, m_offset)) in baseclass_members {
-                            if !members.contains_key(name) {
-                                // if the derived class has a member with the same name as an inherited member, the derived class member takes precedence
-                                members.insert(
-                                    name.clone(),
-                                    (m_type.clone(), m_offset + baseclass_offset),
-                                );
-                            }
-                        }
-                    }
-                    _ => {
-                        return Err(format!(
-                            "Base class type 0x{:?} is not a struct or class",
-                            baseclass_type.datatype
-                        ));
-                    }
-                }
-            }
-
-            DbgDataType::Class {
-                size,
-                members,
-                inheritance,
-            }
-        }
-    } else {
+    let is_class = is_class(class_type);
+    let Some(fields_index) = class_type.fields.map(|tidx| tidx.0) else {
         // empty struct / class
-        DbgDataType::Struct {
-            size,
-            members: IndexMap::new(),
-        }
+        return Ok((
+            DbgDataType::Struct {
+                size,
+                is_class,
+                inheritance: IndexMap::new(),
+                members: IndexMap::new(),
+            },
+            None,
+        ));
     };
 
-    Ok((datatype, None))
+    let mut members = read_fields(fields_index, typereader_data, pdb_data)?;
+    let inheritance = read_class_inheritance(fields_index, typereader_data, pdb_data)?;
+
+    // copy all inherited members from the base classes
+    // this allows the inherited members ot be accessed without naming the base class
+    for (baseclass_type, baseclass_offset) in inheritance.values() {
+        let DbgDataType::Struct {
+            members: baseclass_members,
+            ..
+        } = &baseclass_type.datatype
+        else {
+            return Err(format!(
+                "Base class type 0x{:?} is not a struct or class",
+                baseclass_type.datatype
+            ));
+        };
+        for (name, (m_type, m_offset)) in baseclass_members {
+            if !members.contains_key(name) {
+                // if the derived class has a member with the same name as an inherited member, the derived class member takes precedence
+                members.insert(name.clone(), (m_type.clone(), m_offset + baseclass_offset));
+            }
+        }
+    }
+
+    Ok((
+        DbgDataType::Struct {
+            size,
+            is_class,
+            inheritance,
+            members,
+        },
+        None,
+    ))
 }
 
 fn read_union(
@@ -470,9 +471,7 @@ fn read_fields(
 
                 let typeinfo = if matches!(
                     member_typeinfo.datatype,
-                    DbgDataType::Struct { .. }
-                        | DbgDataType::Class { .. }
-                        | DbgDataType::Union { .. }
+                    DbgDataType::Struct { .. } | DbgDataType::Union { .. }
                 ) {
                     // create a reference to the type instead of embedding it
                     let name = member_typeinfo.name.clone();

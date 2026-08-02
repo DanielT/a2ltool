@@ -42,12 +42,11 @@ pub(crate) enum DbgDataType {
         bit_size: u16,
     },
     Pointer(u64, usize),
+    /// A struct or a class. In this code there is no practical difference
+    /// between them; `is_class` only affects the displayed name.
     Struct {
         size: u64,
-        members: IndexMap<String, (TypeInfo, u64)>,
-    },
-    Class {
-        size: u64,
+        is_class: bool,
         inheritance: IndexMap<String, (TypeInfo, u64)>,
         members: IndexMap<String, (TypeInfo, u64)>,
     },
@@ -130,7 +129,6 @@ impl TypeInfo {
             DbgDataType::Pointer(size, _)
             | DbgDataType::Other(size)
             | DbgDataType::Struct { size, .. }
-            | DbgDataType::Class { size, .. }
             | DbgDataType::Union { size, .. }
             | DbgDataType::Enum { size, .. }
             | DbgDataType::Array { size, .. }
@@ -141,9 +139,9 @@ impl TypeInfo {
 
     pub(crate) fn get_members(&self) -> Option<&IndexMap<String, (TypeInfo, u64)>> {
         match &self.datatype {
-            DbgDataType::Struct { members, .. }
-            | DbgDataType::Class { members, .. }
-            | DbgDataType::Union { members, .. } => Some(members),
+            DbgDataType::Struct { members, .. } | DbgDataType::Union { members, .. } => {
+                Some(members)
+            }
 
             _ => None,
         }
@@ -310,12 +308,25 @@ impl TypeInfo {
                             && basetype.compare_internal(basetype2, types, depth + 1)
                     }
                     (
-                        DbgDataType::Struct { size, members },
+                        DbgDataType::Struct {
+                            size,
+                            members,
+                            inheritance,
+                            ..
+                        },
                         DbgDataType::Struct {
                             size: size2,
                             members: members2,
+                            inheritance: inheritance2,
+                            ..
                         },
-                    ) => size == size2 && Self::compare_members(members, members2, types, depth),
+                    ) => {
+                        // is_class is deliberately not compared: a struct and a class with
+                        // identical layout are interchangeable
+                        size == size2
+                            && Self::compare_members(members, members2, types, depth)
+                            && Self::compare_members(inheritance, inheritance2, types, depth)
+                    }
                     (
                         DbgDataType::Union { size, members },
                         DbgDataType::Union {
@@ -323,22 +334,6 @@ impl TypeInfo {
                             members: members2,
                         },
                     ) => size == size2 && Self::compare_members(members, members2, types, depth),
-                    (
-                        DbgDataType::Class {
-                            size,
-                            members,
-                            inheritance,
-                        },
-                        DbgDataType::Class {
-                            size: size2,
-                            members: members2,
-                            inheritance: inheritance2,
-                        },
-                    ) => {
-                        size == size2
-                            && Self::compare_members(members, members2, types, depth)
-                            && Self::compare_members(inheritance, inheritance2, types, depth)
-                    }
                     (DbgDataType::FuncPtr(size1), DbgDataType::FuncPtr(size2)) => size1 == size2,
                     _ => false,
                 })
@@ -396,18 +391,14 @@ impl Display for TypeInfo {
             DbgDataType::Pointer(_, _) => write!(f, "Pointer(...)"),
             DbgDataType::Other(osize) => write!(f, "Other({osize})"),
             DbgDataType::FuncPtr(osize) => write!(f, "function pointer({osize})"),
-            DbgDataType::Struct { members, .. } => {
+            DbgDataType::Struct {
+                members, is_class, ..
+            } => {
+                let kind = if *is_class { "Class" } else { "Struct" };
                 if let Some(name) = &self.name {
-                    write!(f, "Struct {name}({} members)", members.len())
+                    write!(f, "{kind} {name}({} members)", members.len())
                 } else {
-                    write!(f, "Struct <anonymous>({} members)", members.len())
-                }
-            }
-            DbgDataType::Class { members, .. } => {
-                if let Some(name) = &self.name {
-                    write!(f, "Class {name}({} members)", members.len())
-                } else {
-                    write!(f, "Class <anonymous>({} members)", members.len())
+                    write!(f, "{kind} <anonymous>({} members)", members.len())
                 }
             }
             DbgDataType::Union { members, .. } => {

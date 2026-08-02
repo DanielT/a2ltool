@@ -249,7 +249,7 @@ fn find_membertype<'a>(
         Ok((address, typeinfo))
     } else {
         match &typeinfo.datatype {
-            DbgDataType::Class {
+            DbgDataType::Struct {
                 members,
                 inheritance,
                 ..
@@ -285,7 +285,7 @@ fn find_membertype<'a>(
                     ))
                 }
             }
-            DbgDataType::Struct { members, .. } | DbgDataType::Union { members, .. } => {
+            DbgDataType::Union { members, .. } => {
                 if let Some((membertype, offset)) = members.get(components[component_index]) {
                     let membertype = membertype.get_reference(&debug_data.types);
                     find_membertype(
@@ -540,6 +540,8 @@ mod test {
             TypeInfo {
                 datatype: DbgDataType::Struct {
                     members: structmembers,
+                    is_class: false,
+                    inheritance: IndexMap::new(),
                     size: 4,
                 },
                 unit_idx: 0,
