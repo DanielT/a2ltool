@@ -467,6 +467,10 @@ mod test {
                         _
                     ))
                 ));
+                // "static unsigned long class_static" has no storage inside the class.
+                // Dwarf 3 describes it as a DW_TAG_member with DW_AT_declaration and no
+                // location; it must not be treated as a member of the class.
+                assert!(members.get("class_static").is_none());
             }
 
             let varinfo = debugdata.variables.get("class2").unwrap();
@@ -518,6 +522,17 @@ mod test {
                     ..
                 }
             ));
+            if let TypeInfo {
+                datatype: DbgDataType::Struct { members, .. },
+                ..
+            } = typeinfo
+            {
+                // val2 and val3 are members of an anonymous union, so they are transferred
+                // into the containing struct. Some compilers omit DW_AT_data_member_location
+                // for union members, because all of them are at offset zero.
+                assert!(matches!(members.get("val2"), Some((_, 4))));
+                assert!(matches!(members.get("val3"), Some((_, 4))));
+            }
 
             let varinfo = debugdata.variables.get("bitfield").unwrap();
             let typeinfo = debugdata.types.get(&varinfo[0].typeref).unwrap();

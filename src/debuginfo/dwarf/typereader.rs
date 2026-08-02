@@ -570,10 +570,18 @@ impl DebugDataReader<'_> {
         while let Ok(Some(child_node)) = iter.next() {
             let child_entry = child_node.entry();
             if child_entry.tag() == gimli::constants::DW_TAG_member {
-                // the name can be missing if this struct/union contains an anonymous struct/union
-                let opt_name = get_name_attribute(child_entry, &self.dwarf, unit)
-                    .map_err(|_| "missing struct/union member name".to_string());
+                // Static and constexpr data members are only declared inside the struct: they have
+                // no storage of their own and are not part of the struct's layout, so skip them.
+                if get_declaration_attribute(child_entry).unwrap_or(false) {
+                    continue;
+                }
 
+                // the name can be missing if this struct/union contains an anonymous struct/union
+                let opt_name = get_name_attribute(child_entry, &self.dwarf, unit).ok();
+
+                // Union members and Dwarf 4/5 bitfields have no DW_AT_data_member_location.
+                // Zero is the correct default for union members; for bitfields the byte offset is
+                // derived from DW_AT_data_bit_offset in get_bitfield_entry() below.
                 let mut offset = get_data_member_location_attribute(
                     self,
                     child_entry,
@@ -598,7 +606,7 @@ impl DebugDataReader<'_> {
                             membertype,
                         );
                     }
-                    if let Ok(name) = opt_name {
+                    if let Some(name) = opt_name {
                         // in bitfields it's actually possible for the name to be empty!
                         // "int :31;" is valid C!
                         if !name.is_empty() {
