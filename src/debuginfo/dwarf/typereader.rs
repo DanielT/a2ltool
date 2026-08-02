@@ -6,6 +6,10 @@ use object::Endianness;
 use std::collections::HashMap;
 use std::num::Wrapping;
 
+/// maps the name of a struct member or base class to its type and its offset
+/// inside the containing type
+type MemberMap = IndexMap<String, (TypeInfo, u64)>;
+
 #[derive(Debug)]
 struct WipItemInfo {
     offset: usize,
@@ -198,24 +202,18 @@ impl DebugDataReader<'_> {
                 self.get_enumeration_type(current_unit, offset, typereader_data)?,
                 None,
             ),
-            gimli::constants::DW_TAG_structure_type => {
-                let size = get_byte_size_attribute(entry)
-                    .ok_or_else(|| "missing struct byte size attribute".to_string())?;
-                let members = self.get_struct_or_union_members(
-                    entries_tree_node,
-                    current_unit,
-                    typereader_data,
-                )?;
-                (DbgDataType::Struct { size, members }, None)
-            }
+            gimli::constants::DW_TAG_structure_type => (
+                self.get_struct_or_class_type(false, current_unit, offset, typereader_data)?,
+                None,
+            ),
             gimli::constants::DW_TAG_class_type => (
-                self.get_class_type(current_unit, offset, typereader_data)?,
+                self.get_struct_or_class_type(true, current_unit, offset, typereader_data)?,
                 None,
             ),
             gimli::constants::DW_TAG_union_type => {
                 let size = get_byte_size_attribute(entry)
                     .ok_or_else(|| "missing union byte size attribute".to_string())?;
-                let members = self.get_struct_or_union_members(
+                let (members, _) = self.get_struct_or_union_members(
                     entries_tree_node,
                     current_unit,
                     typereader_data,
@@ -506,12 +504,18 @@ impl DebugDataReader<'_> {
         })
     }
 
-    fn get_class_type(
+    /// Read a struct or class type.
+    /// Structs and classes are handled identically: in C++ both can have base classes
+    /// and members, and the debug info describes them in the same way. Only the wording
+    /// of messages differs, which is what `is_class` is used for.
+    fn get_struct_or_class_type(
         &self,
+        is_class: bool,
         current_unit: usize,
         offset: UnitOffset,
         typereader_data: &mut TypeReaderData,
     ) -> Result<DbgDataType, String> {
+        let kind = if is_class { "class" } else { "struct" };
         let (unit, abbrev) = &self.units[current_unit];
         let mut entries_tree = unit
             .entries_tree(abbrev, Some(offset))
@@ -520,21 +524,13 @@ impl DebugDataReader<'_> {
         let entry = entries_tree_node.entry();
 
         let size = get_byte_size_attribute(entry)
-            .ok_or_else(|| "missing class byte size attribute".to_string())?;
-        let (unit, abbrev) = &self.units[current_unit];
-        let mut entries_tree2 = unit
-            .entries_tree(abbrev, Some(entries_tree_node.entry().offset()))
-            .unwrap();
-        let entries_tree_node2 = entries_tree2.root().unwrap();
-        let inheritance = self
-            .get_class_inheritance(entries_tree_node2, current_unit, typereader_data)
-            .unwrap_or_default();
-        let mut members =
+            .ok_or_else(|| format!("missing {kind} byte size attribute"))?;
+        let (mut members, inheritance) =
             self.get_struct_or_union_members(entries_tree_node, current_unit, typereader_data)?;
         // copy all inherited members from the base classes
         // this allows the inherited members ot be accessed without naming the base class
         for (baseclass_type, baseclass_offset) in inheritance.values() {
-            if let DbgDataType::Class {
+            if let DbgDataType::Struct {
                 members: baseclass_members,
                 ..
             } = &baseclass_type.datatype
@@ -550,26 +546,37 @@ impl DebugDataReader<'_> {
                 }
             }
         }
-        Ok(DbgDataType::Class {
+        Ok(DbgDataType::Struct {
             size,
+            is_class,
             inheritance,
             members,
         })
     }
 
-    // get all the members of a struct or union or class
+    /// get all the members and base classes of a struct or union or class
+    /// Unions never have base classes, so the returned inheritance map is empty for them.
     fn get_struct_or_union_members(
         &self,
         entries_tree: EntriesTreeNode<EndianSlice<RunTimeEndian>>,
         current_unit: usize,
         typereader_data: &mut TypeReaderData,
-    ) -> Result<IndexMap<String, (TypeInfo, u64)>, String> {
+    ) -> Result<(MemberMap, MemberMap), String> {
         let (unit, _) = &self.units[current_unit];
-        let mut members = IndexMap::<String, (TypeInfo, u64)>::new();
+        let mut members = MemberMap::new();
+        let mut inheritance = MemberMap::new();
         let mut iter = entries_tree.children();
         while let Ok(Some(child_node)) = iter.next() {
             let child_entry = child_node.entry();
-            if child_entry.tag() == gimli::constants::DW_TAG_member {
+            if child_entry.tag() == gimli::constants::DW_TAG_inheritance {
+                // failing to read one base class should not make the whole type unusable,
+                // so errors are silently ignored here
+                if let Ok((name, baseclass_type, baseclass_offset)) =
+                    self.get_inherited_class(child_entry, current_unit, typereader_data)
+                {
+                    inheritance.insert(name, (baseclass_type, baseclass_offset));
+                }
+            } else if child_entry.tag() == gimli::constants::DW_TAG_member {
                 // Static and constexpr data members are only declared inside the struct: they have
                 // no storage of their own and are not part of the struct's layout, so skip them.
                 if get_declaration_attribute(child_entry).unwrap_or(false) {
@@ -611,10 +618,10 @@ impl DebugDataReader<'_> {
                         // "int :31;" is valid C!
                         if !name.is_empty() {
                             // refer to the loaded type instead of duplicating it in the members
-                            if matches!(membertype.datatype, DbgDataType::Struct { .. })
-                                || matches!(membertype.datatype, DbgDataType::Union { .. })
-                                || matches!(membertype.datatype, DbgDataType::Class { .. })
-                            {
+                            if matches!(
+                                membertype.datatype,
+                                DbgDataType::Struct { .. } | DbgDataType::Union { .. }
+                            ) {
                                 membertype.datatype = DbgDataType::TypeRef(
                                     new_dbginfo_offset.0,
                                     membertype.get_size(),
@@ -626,11 +633,7 @@ impl DebugDataReader<'_> {
                         // no name: the member is an anon struct / union
                         // In this case, the contained members are transferred
                         match membertype.datatype {
-                            DbgDataType::Class {
-                                members: anon_members,
-                                ..
-                            }
-                            | DbgDataType::Struct {
+                            DbgDataType::Struct {
                                 members: anon_members,
                                 ..
                             }
@@ -648,7 +651,7 @@ impl DebugDataReader<'_> {
                 }
             }
         }
-        Ok(members)
+        Ok((members, inheritance))
     }
 
     fn get_bitfield_entry(
@@ -726,55 +729,43 @@ impl DebugDataReader<'_> {
         }
     }
 
-    // get all the members of a struct or union or class
-    fn get_class_inheritance(
+    /// read one `DW_TAG_inheritance` entry, i.e. one base class of a struct or class,
+    /// and return its name, type and offset inside the derived type
+    fn get_inherited_class(
         &self,
-        entries_tree: EntriesTreeNode<EndianSlice<RunTimeEndian>>,
+        child_entry: &gimli::DebuggingInformationEntry<EndianSlice<RunTimeEndian>, usize>,
         current_unit: usize,
         typereader_data: &mut TypeReaderData,
-    ) -> Result<IndexMap<String, (TypeInfo, u64)>, String> {
+    ) -> Result<(String, TypeInfo, u64), String> {
         let (unit, _) = &self.units[current_unit];
-        let mut inheritance = IndexMap::<String, (TypeInfo, u64)>::new();
-        let mut iter = entries_tree.children();
-        while let Ok(Some(child_node)) = iter.next() {
-            let child_entry = child_node.entry();
-            if child_entry.tag() == gimli::constants::DW_TAG_inheritance {
-                let data_location = get_data_member_location_attribute(
-                    self,
-                    child_entry,
-                    unit.encoding(),
-                    current_unit,
-                )
+        let data_location =
+            get_data_member_location_attribute(self, child_entry, unit.encoding(), current_unit)
                 .ok_or_else(|| "missing byte offset for inherited class".to_string())?;
 
-                let Some((new_cur_unit, new_dbginfo_offset)) =
-                    get_type_attribute(child_entry, &self.units, current_unit)?
-                else {
-                    // a member whose type is "nothing"? Skip it
-                    continue;
-                };
+        let Some((new_cur_unit, new_dbginfo_offset)) =
+            get_type_attribute(child_entry, &self.units, current_unit)?
+        else {
+            // a base class whose type is "nothing"?
+            return Err("missing type for inherited class".to_string());
+        };
 
-                let (unit, abbrev) = &self.units[new_cur_unit];
-                let new_unit_offset = new_dbginfo_offset.to_unit_offset(unit).ok_or_else(|| {
-                    format!(
-                        "invalid type offset 0x{:X} for unit {}",
-                        new_dbginfo_offset.0, new_cur_unit
-                    )
-                })?;
-                let mut baseclass_tree = unit
-                    .entries_tree(abbrev, Some(new_unit_offset))
-                    .map_err(|err| err.to_string())?;
-                let baseclass_tree_node = baseclass_tree.root().map_err(|err| err.to_string())?;
-                let baseclass_entry = baseclass_tree_node.entry();
-                let baseclass_name = get_name_attribute(baseclass_entry, &self.dwarf, unit)?;
+        let (unit, abbrev) = &self.units[new_cur_unit];
+        let new_unit_offset = new_dbginfo_offset.to_unit_offset(unit).ok_or_else(|| {
+            format!(
+                "invalid type offset 0x{:X} for unit {}",
+                new_dbginfo_offset.0, new_cur_unit
+            )
+        })?;
+        let mut baseclass_tree = unit
+            .entries_tree(abbrev, Some(new_unit_offset))
+            .map_err(|err| err.to_string())?;
+        let baseclass_tree_node = baseclass_tree.root().map_err(|err| err.to_string())?;
+        let baseclass_entry = baseclass_tree_node.entry();
+        let baseclass_name = get_name_attribute(baseclass_entry, &self.dwarf, unit)?;
 
-                let baseclass_type =
-                    self.get_type(new_cur_unit, new_dbginfo_offset, typereader_data)?;
+        let baseclass_type = self.get_type(new_cur_unit, new_dbginfo_offset, typereader_data)?;
 
-                inheritance.insert(baseclass_name, (baseclass_type, data_location));
-            }
-        }
-        Ok(inheritance)
+        Ok((baseclass_name, baseclass_type, data_location))
     }
 }
 

@@ -421,13 +421,13 @@ mod test {
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
-                    datatype: DbgDataType::Class { .. },
+                    datatype: DbgDataType::Struct { is_class: true, .. },
                     ..
                 }
             ));
             if let TypeInfo {
                 datatype:
-                    DbgDataType::Class {
+                    DbgDataType::Struct {
                         inheritance,
                         members,
                         ..
@@ -478,7 +478,7 @@ mod test {
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
-                    datatype: DbgDataType::Class { .. },
+                    datatype: DbgDataType::Struct { is_class: true, .. },
                     ..
                 }
             ));
@@ -488,7 +488,7 @@ mod test {
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
-                    datatype: DbgDataType::Class { .. },
+                    datatype: DbgDataType::Struct { is_class: true, .. },
                     ..
                 }
             ));
@@ -498,7 +498,7 @@ mod test {
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
-                    datatype: DbgDataType::Class { .. },
+                    datatype: DbgDataType::Struct { is_class: true, .. },
                     ..
                 }
             ));
@@ -518,7 +518,7 @@ mod test {
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
-                    datatype: DbgDataType::Struct { .. },
+                    datatype: DbgDataType::Struct { is_class: false, .. },
                     ..
                 }
             ));
@@ -539,7 +539,7 @@ mod test {
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
-                    datatype: DbgDataType::Struct { .. },
+                    datatype: DbgDataType::Struct { is_class: false, .. },
                     ..
                 }
             ));

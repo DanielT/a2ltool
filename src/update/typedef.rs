@@ -1246,9 +1246,7 @@ impl<'dbg, 'a2l, 'rl, 'log> TypedefUpdater<'dbg, 'a2l, 'rl, 'log> {
             .map_or(typeinfo, |(_, t)| t);
 
         match &typeinfo.datatype {
-            DbgDataType::Struct { members, .. }
-            | DbgDataType::Union { members, .. }
-            | DbgDataType::Class { members, .. } => {
+            DbgDataType::Struct { members, .. } | DbgDataType::Union { members, .. } => {
                 // typical case: the data type of the typedef struct is "structlike" and has a list of members
                 self.update_typedef_struct_content(td_struct, members, enum_convlist, is_calib);
             }
@@ -1605,10 +1603,7 @@ fn is_structure_typeinfo(typeinfo: &TypeInfo, types: &HashMap<usize, TypeInfo>) 
                 false
             }
         }
-        DbgDataType::Struct { .. }
-        | DbgDataType::Class { .. }
-        | DbgDataType::Union { .. }
-        | DbgDataType::Array { .. } => true,
+        DbgDataType::Struct { .. } | DbgDataType::Union { .. } | DbgDataType::Array { .. } => true,
         _ => false,
     }
 }
@@ -1643,7 +1638,6 @@ fn is_measurement_typeinfo(typeinfo: &TypeInfo, types: &HashMap<usize, TypeInfo>
         }
         DbgDataType::Other(_)
         | DbgDataType::Struct { .. }
-        | DbgDataType::Class { .. }
         | DbgDataType::Union { .. }
         | DbgDataType::Array { .. }
         | DbgDataType::TypeRef(_, _) => false,
@@ -1735,14 +1729,13 @@ fn make_typedef_name(debug_data: &DebugData, typeinfo: &TypeInfo, is_calib: bool
             outstr.push_str(&basename);
             outstr
         }
-        DbgDataType::Struct { .. } => typeinfo
-            .name
-            .as_deref()
-            .unwrap_or("_unnamed_struct_")
-            .to_string(),
-        DbgDataType::Class { .. } => {
-            // there is no such thing as an unnamed class
-            typeinfo.name.clone().unwrap()
+        DbgDataType::Struct { is_class, .. } => {
+            let fallback = if *is_class {
+                "_unnamed_class_"
+            } else {
+                "_unnamed_struct_"
+            };
+            typeinfo.name.as_deref().unwrap_or(fallback).to_string()
         }
         DbgDataType::Union { .. } => typeinfo
             .name

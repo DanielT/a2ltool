@@ -52,9 +52,7 @@ impl<'dbg> TypeInfoIter<'dbg> {
 
     fn next_core(&mut self) -> Option<(String, &'dbg TypeInfo, u64)> {
         match &self.type_stack.last()?.datatype {
-            DbgDataType::Class { members, .. }
-            | DbgDataType::Struct { members, .. }
-            | DbgDataType::Union { members, .. } => {
+            DbgDataType::Struct { members, .. } | DbgDataType::Union { members, .. } => {
                 let depth = self.type_stack.len() - 1;
                 let position = self.position_stack[depth];
                 let base = self.offset_stack[depth];
@@ -289,6 +287,8 @@ mod test {
         let typeinfo_inner_1 = TypeInfo {
             datatype: DbgDataType::Struct {
                 size: 64,
+                is_class: false,
+                inheritance: IndexMap::new(),
                 members: structmembers_a,
             },
             ..DEFAULT_TYPEINFO.clone()
@@ -300,6 +300,8 @@ mod test {
         let typeinfo_inner_2 = TypeInfo {
             datatype: DbgDataType::Struct {
                 size: 64,
+                is_class: false,
+                inheritance: IndexMap::new(),
                 members: structmembers_b,
             },
             ..DEFAULT_TYPEINFO.clone()
@@ -320,6 +322,8 @@ mod test {
         let typeinfo = TypeInfo {
             datatype: DbgDataType::Struct {
                 size: 64,
+                is_class: false,
+                inheritance: IndexMap::new(),
                 members: structmembers,
             },
             ..DEFAULT_TYPEINFO.clone()
@@ -392,6 +396,8 @@ mod test {
         let structtype = TypeInfo {
             datatype: DbgDataType::Struct {
                 size: 64,
+                is_class: false,
+                inheritance: IndexMap::new(),
                 members: structmembers,
             },
             ..DEFAULT_TYPEINFO.clone()

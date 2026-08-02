@@ -601,7 +601,6 @@ pub(crate) fn insert_many<'param>(
             DbgDataType::Other(_)
             | DbgDataType::Pointer(_, _)
             | DbgDataType::Struct { .. }
-            | DbgDataType::Class { .. }
             | DbgDataType::Union { .. } => {
                 if enable_structures && check_and_insert_instance(&mut isupp, &sym_info, log_msgs) {
                     skip_children = true;
