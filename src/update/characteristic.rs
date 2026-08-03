@@ -170,7 +170,8 @@ fn update_characteristic_datatype<'enumlist, 'typeinfo: 'enumlist>(
     use_new_matrix_dim: bool,
 ) {
     let member_id = get_fnc_values_memberid(data.module, &characteristic.deposit);
-    if let Some(inner_typeinfo) = get_inner_type(typeinfo, member_id) {
+    let opt_inner_typeinfo = get_inner_type(typeinfo, member_id);
+    if let Some(inner_typeinfo) = opt_inner_typeinfo {
         if let DbgDataType::Enum { enumerators, .. } = &inner_typeinfo.datatype {
             let enum_name = inner_typeinfo
                 .name
@@ -213,7 +214,12 @@ fn update_characteristic_datatype<'enumlist, 'typeinfo: 'enumlist>(
     if characteristic.characteristic_type == CharacteristicType::Value
         || characteristic.characteristic_type == CharacteristicType::ValBlk
     {
-        set_matrix_dim(&mut characteristic.matrix_dim, typeinfo, use_new_matrix_dim);
+        // set_matrix_dim must use the inner type; only fall back to the unindexed type if get_inner_type failed.
+        set_matrix_dim(
+            &mut characteristic.matrix_dim,
+            opt_inner_typeinfo.unwrap_or(typeinfo),
+            use_new_matrix_dim,
+        );
         // arrays of values should have the type ValBlk, while single values should NOT have the type ValBlk
         if characteristic.characteristic_type == CharacteristicType::Value
             && characteristic.matrix_dim.is_some()
