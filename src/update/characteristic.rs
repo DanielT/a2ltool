@@ -338,6 +338,9 @@ fn verify_characteristic_datatype(
 
         let mut dummy_bitmask = characteristic.bit_mask.clone();
         set_bitmask(&mut dummy_bitmask, inner_typeinfo);
+        if dummy_bitmask != characteristic.bit_mask {
+            bad_characteristic = true;
+        }
 
         let mut dummy_matrix_dim = characteristic.matrix_dim.clone();
         match characteristic.characteristic_type {
