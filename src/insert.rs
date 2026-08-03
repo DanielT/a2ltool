@@ -681,6 +681,7 @@ fn is_simple_type(typeinfo: &TypeInfo) -> bool {
             | DbgDataType::Uint16
             | DbgDataType::Uint32
             | DbgDataType::Uint64
+            | DbgDataType::Bitfield { .. }
     )
 }
 
