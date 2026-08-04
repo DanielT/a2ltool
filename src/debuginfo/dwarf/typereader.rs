@@ -450,7 +450,7 @@ impl DebugDataReader<'_> {
 
         // The enumeration type entry may have a DW_AT_type attribute which refers to the underlying
         // data type used to implement the enumeration
-        let (mut signed, opt_ut_size) = if let Ok(Some((utype_unit, utype_dbginfo_offset))) =
+        let (signed, opt_ut_size) = if let Ok(Some((utype_unit, utype_dbginfo_offset))) =
             get_type_attribute(entry, &self.units, current_unit)
             && let Ok(utype) = self.get_type(utype_unit, utype_dbginfo_offset, typereader_data)
         {
@@ -488,14 +488,7 @@ impl DebugDataReader<'_> {
             }
         }
 
-        // some compilers will claim that an enum is unsigned, but then have negative values in it
-        let min_val = enumerators.iter().map(|(_, val)| *val).min().unwrap_or(0);
-        let max_val = enumerators.iter().map(|(_, val)| *val).max().unwrap_or(0);
-        let signed_limit = 1i64.checked_shl(size as u32 * 8 - 1).unwrap_or(i64::MAX);
-        // if there is a negative value and the largest value is still valid in a signed type of this size, treat the enum as signed
-        if !signed && min_val < 0 && max_val < signed_limit {
-            signed = true;
-        }
+        let signed = enum_is_signed(signed, size, &enumerators);
 
         Ok(DbgDataType::Enum {
             size,
@@ -802,6 +795,24 @@ fn fix_bitfield_container_type(
     }
 }
 
+/// Decide whether an enum should be treated as signed.
+///
+/// Some compilers claim that an enum is unsigned, but then put negative values in it.
+/// Such an enum is treated as signed, as long as every value still fits into a signed
+/// integer of the enum's size.
+fn enum_is_signed(underlying_signed: bool, size: u64, enumerators: &[(String, i64)]) -> bool {
+    if underlying_signed {
+        return true;
+    }
+
+    let min_val = enumerators.iter().map(|(_, val)| *val).min().unwrap_or(0);
+    let max_val = enumerators.iter().map(|(_, val)| *val).max().unwrap_or(0);
+    // i128 is required here: for size == 8 the bound is 2^63, which does not fit in an i64
+    let signed_limit = 1i128 << (size.clamp(1, 8) * 8 - 1);
+
+    min_val < 0 && i128::from(max_val) < signed_limit
+}
+
 fn get_base_type(
     entry: &gimli::DebuggingInformationEntry<EndianSlice<RunTimeEndian>, usize>,
     unit: &gimli::UnitHeader<EndianSlice<RunTimeEndian>>,
@@ -874,5 +885,51 @@ impl TypeReaderData {
             nameidx += 1;
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn enumerators(values: &[i64]) -> Vec<(String, i64)> {
+        values
+            .iter()
+            .map(|val| (format!("item_{val}"), *val))
+            .collect()
+    }
+
+    #[test]
+    fn test_enum_is_signed() {
+        // a signed underlying type always wins, even for an enum with no negative values
+        assert!(enum_is_signed(true, 4, &enumerators(&[0, 1, 2])));
+
+        // no negative values: the enum stays unsigned
+        assert!(!enum_is_signed(false, 1, &enumerators(&[0, 255])));
+        assert!(!enum_is_signed(false, 8, &enumerators(&[0, 1])));
+        assert!(!enum_is_signed(false, 4, &[]));
+
+        // negative values in an "unsigned" enum: treat it as signed for every size.
+        // Previously this failed for size == 8, because the limit 2^63 was computed in an
+        // i64 and overflowed to i64::MIN, making the comparison always false.
+        for size in 1..=8 {
+            assert!(
+                enum_is_signed(false, size, &enumerators(&[-1, 5])),
+                "size {size} was not detected as signed"
+            );
+        }
+        assert!(enum_is_signed(
+            false,
+            8,
+            &enumerators(&[i64::MIN, 0, i64::MAX])
+        ));
+
+        // negative values, but the largest value does not fit into a signed type of this
+        // size, so the enum cannot be represented as signed and stays unsigned
+        assert!(!enum_is_signed(false, 1, &enumerators(&[-1, 200])));
+        assert!(!enum_is_signed(false, 2, &enumerators(&[-1, 40000])));
+        // the value exactly at the limit is out of range, the one below it is not
+        assert!(!enum_is_signed(false, 1, &enumerators(&[-1, 128])));
+        assert!(enum_is_signed(false, 1, &enumerators(&[-1, 127])));
     }
 }

@@ -195,7 +195,9 @@ fn downgrade_matrix_dim(matrix_dim: &mut MatrixDim) {
     }
     if matrix_dim.dim_list.len() > 3 {
         // flatten all extra dimensions, e.g. [2, 3, 4, 5, 6] -> [2, 3, (4 * 5 * 6)]
-        let last_dim = matrix_dim.dim_list[2..].iter().fold(1u16, |acc, &x| acc.saturating_mul(x));
+        let last_dim = matrix_dim.dim_list[2..]
+            .iter()
+            .fold(1u16, |acc, &x| acc.saturating_mul(x));
         matrix_dim.dim_list.truncate(2);
         matrix_dim.dim_list.push(last_dim);
     }

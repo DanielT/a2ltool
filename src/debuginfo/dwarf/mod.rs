@@ -518,7 +518,10 @@ mod test {
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
-                    datatype: DbgDataType::Struct { is_class: false, .. },
+                    datatype: DbgDataType::Struct {
+                        is_class: false,
+                        ..
+                    },
                     ..
                 }
             ));
@@ -539,7 +542,10 @@ mod test {
             assert!(matches!(
                 typeinfo,
                 TypeInfo {
-                    datatype: DbgDataType::Struct { is_class: false, .. },
+                    datatype: DbgDataType::Struct {
+                        is_class: false,
+                        ..
+                    },
                     ..
                 }
             ));
