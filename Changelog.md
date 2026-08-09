@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 3.4.1
+
+- Allow insertion of bitfield values using `--measurement`  / ` --characteristic` . It was already possible to insert them using regexes; this change restores parity.
+- Fix: when creating items with ` --from-source`, `MAIN_GROUP` is now used as the default group for any items if there is no `GROUP` statement (@lennart24)
+- Fix: ignore constexpr members in C++ classes/structs while loading debug info instead of pretending they're at offset 0
+- Fix: C++ allows inheritance on structs too; the dwarf debug reader now handles this case
+- Fix: correctly update `MATRIX_DIM` of a `CHARACTERISTIC` that represents a struct member selected by `FNC_VALUES`
+- Fix: Verify `CHARACTERISTIC` bit masks in strict update mode
+- Fix: 64-bit enums with negative values were not detected as signed
+
 ## Version 3.4.0
 
 - a2ltool can now be installed as a Python wheel using `pip install a2ltool` (by zariiii9003)
