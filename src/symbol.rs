@@ -356,8 +356,9 @@ fn find_membertype<'a>(
 // before ASAP2 1.7 array indices in symbol names could not written as [x], but only as _x_
 // this function will get the numerical index for either representation
 fn get_index(idxstr: &str) -> Option<usize> {
-    if (idxstr.starts_with('_') && idxstr.ends_with('_'))
-        || (idxstr.starts_with('[') && idxstr.ends_with(']'))
+    if idxstr.len() >= 2
+        && ((idxstr.starts_with('_') && idxstr.ends_with('_'))
+            || (idxstr.starts_with('[') && idxstr.ends_with(']')))
     {
         let idxstrlen = idxstr.len();
         idxstr[1..(idxstrlen - 1)].parse().ok()
