@@ -1,0 +1,56 @@
+ASAP2_VERSION 1 71
+/begin PROJECT test ""
+  /begin MODULE mod ""
+
+    /begin CHARACTERISTIC Characteristic_Value ""
+      VALUE 0x1000 uint32_RecordLayout 0 NO_COMPU_METHOD 0 10000000
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Characteristic_Value" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Characteristic_Value" 0
+    /end CHARACTERISTIC
+
+    /begin AXIS_PTS Axis_0 ""
+      0x2000 NO_INPUT_QUANTITY Axis_0_RecordLayout 0 NO_COMPU_METHOD 5 0 4294967295
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Axis_0" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Axis_0" 0
+    /end AXIS_PTS
+
+    /begin MEASUREMENT Measurement_Value ""
+      UWORD NO_COMPU_METHOD 0 0 0 2
+      ECU_ADDRESS 0x3000
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Value" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Value" 0
+    /end MEASUREMENT
+
+    /begin INSTANCE INSTANCE.Map_InternalAxis ""
+      UpdateTest_Map_InternalAxis 0x4000
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Map_InternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Map_InternalAxis" 0
+    /end INSTANCE
+
+    /begin BLOB Blob_1 ""
+      0x5000 128
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Blob_1" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Blob_1" 0
+    /end BLOB
+
+    /begin RECORD_LAYOUT Axis_0_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 5
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT uint32_RecordLayout
+      FNC_VALUES 1 ULONG ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+  /end MODULE
+/end PROJECT

@@ -493,6 +493,37 @@ pub(crate) fn create_items_from_sources<'a>(
     }
 }
 
+/// Create items in the given A2lFile from in-memory source data.
+///
+/// Used by the fuzz harness.
+///
+/// Returns either Ok(warnings_count, log_messages) or Err(error_messages)
+pub(crate) fn create_items_from_data(
+    a2l_file: &mut A2lFile,
+    data: &[u8],
+    target_group: Option<String>,
+    enable_structures: bool,
+    force_old_arrays: bool,
+) -> Result<(usize, Vec<String>), Vec<String>> {
+    let mut creator = Creator::new(a2l_file, target_group, enable_structures, force_old_arrays);
+    creator.process_file(data);
+    creator.report_missing_var_criteria();
+
+    if creator.errors > 0 {
+        Err(creator.messages)
+    } else {
+        Ok((creator.warnings, creator.messages))
+    }
+}
+
+/// Run only the comment scanner over source data, without building any A2L items.
+/// Used by the fuzz harness to target the scanner in isolation.
+pub(crate) fn scan_comments_only(data: &[u8]) -> usize {
+    scanner::CommentScanner::new(COMMENT_PREFIX)
+        .scan_comments(data)
+        .len()
+}
+
 fn deftokens_to_string(definition_tokens: &[&[u8]]) -> String {
     definition_tokens
         .iter()

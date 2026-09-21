@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Add fuzz testing for A2L text parsing, parse/write round-tripping, the operation pipeline, the
+  `--from-source` comment scanner and parser, the ELF/DWARF and PDB readers, and symbol-name resolution.
+- The crate is now a library and a thin binary (`src/lib.rs` + `src/main.rs`) so the fuzz targets
+  can link against it. CLI behaviour is unchanged.
+- Fix: `--characteristic`/`--measurement` with a symbol name ending in a `.` followed by a single
+  `_` (e.g. `arr._`) panicked instead of reporting that `_` is not a valid array index (found by fuzzing).
+- Fix: an A2L file whose `PROJECT` contains no `MODULE` caused an index-out-of-bounds panic instead
+  of reporting the problem. Both the main input file and `--merge` source files are now checked
+  (found by fuzzing).
+
 ## Version 3.4.1
 
 - Allow insertion of bitfield values using `--measurement`  / ` --characteristic` . It was already possible to insert them using regexes; this change restores parity.

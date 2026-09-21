@@ -1,0 +1,39 @@
+ASAP2_VERSION 1 71
+/begin PROJECT p ""
+  /begin MODULE m ""
+    /begin MEASUREMENT M ""
+      UWORD NO_COMPU_METHOD 0 0 0 2
+      ADDRESS_TYPE PWORD
+      /begin ANNOTATION
+        ANNOTATION_LABEL "A"
+        ANNOTATION_ORIGIN "A"
+        /begin ANNOTATION_TEXT
+          "A"
+        /end ANNOTATION_TEXT
+      /end ANNOTATION
+      BIT_MASK 1
+      DISCRETE
+      DISPLAY_IDENTIFIER A
+      ECU_ADDRESS 0x1
+      ECU_ADDRESS_EXTENSION 0x1
+      ERROR_MASK 0x1
+      FORMAT "A"
+      /begin FUNCTION_LIST
+        IDENT
+      /end FUNCTION_LIST
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Y" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      LAYOUT ROW_DIR
+      MATRIX_DIM 1 1 1
+      MAX_REFRESH 1 1
+      MODEL_LINK "A"
+      PHYS_UNIT "A"
+      READ_WRITE
+      REF_MEMORY_SEGMENT A
+      SYMBOL_LINK "Y" 0
+      /begin VIRTUAL
+      /end VIRTUAL
+    /end MEASUREMENT
+  /end MODULE
+/end PROJECT

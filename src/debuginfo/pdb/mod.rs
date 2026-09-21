@@ -13,9 +13,31 @@ struct ModuleVars {
     unit_list: Vec<Option<String>>,
 }
 
-pub(crate) fn load_pdb(filename: &OsStr, _verbose: bool) -> Result<DebugData, String> {
+pub(crate) fn load_pdb(filename: &OsStr, verbose: bool) -> Result<DebugData, String> {
     let file = File::open(filename).map_err(|ioerr| ioerr.to_string())?;
-    let pdb = match PDB::open(file) {
+    load_pdb_from_source(&filename.to_string_lossy(), file, verbose)
+}
+
+// load the debug info from pdb file data in a u8 slice
+pub(crate) fn load_pdb_from_slice(
+    display_name: &str,
+    data: &[u8],
+    verbose: bool,
+) -> Result<DebugData, String> {
+    load_pdb_from_source(display_name, std::io::Cursor::new(data), verbose)
+}
+
+// load the debug info from any pdb2::Source
+// `display_name` is only used in error messages
+fn load_pdb_from_source<'s, S>(
+    display_name: &str,
+    source: S,
+    _verbose: bool,
+) -> Result<DebugData, String>
+where
+    S: pdb2::Source<'s> + Send + 's,
+{
+    let pdb = match PDB::open(source) {
         Ok(pdb) => pdb,
         Err(pdb2::Error::UnimplementedFeature(feat)) => {
             return Err(format!("PDB feature not implemented: {feat}"));
@@ -24,21 +46,14 @@ pub(crate) fn load_pdb(filename: &OsStr, _verbose: bool) -> Result<DebugData, St
             return Err(ioerr.to_string());
         }
         Err(pdb2::Error::UnrecognizedFileFormat) => {
-            return Err(format!(
-                "Input file {} is not in PDB format",
-                filename.to_string_lossy()
-            ));
+            return Err(format!("Input file {display_name} is not in PDB format"));
         }
         Err(pdb2::Error::PageReferenceOutOfRange(_) | pdb2::Error::InvalidPageSize(_)) => {
-            return Err(format!(
-                "Input file {} is corrupted",
-                filename.to_string_lossy()
-            ));
+            return Err(format!("Input file {display_name} is corrupted"));
         }
         Err(err) => {
             return Err(format!(
-                "Unknown error reading PDB file {}: {err}",
-                filename.to_string_lossy()
+                "Unknown error reading PDB file {display_name}: {err}"
             ));
         }
     };
@@ -46,7 +61,7 @@ pub(crate) fn load_pdb(filename: &OsStr, _verbose: bool) -> Result<DebugData, St
     read_pdb(pdb).map_err(|pdberr| format!("PDB error: {pdberr:?}"))
 }
 
-fn read_pdb(mut pdb: PDB<'_, File>) -> Result<DebugData, pdb2::Error> {
+fn read_pdb<'s, S: pdb2::Source<'s> + 's>(mut pdb: PDB<'s, S>) -> Result<DebugData, pdb2::Error> {
     let address_map = pdb.address_map()?;
     let global_variables = read_global_variables(&mut pdb, &address_map)?;
     let ModuleVars {
@@ -95,8 +110,8 @@ fn read_pdb(mut pdb: PDB<'_, File>) -> Result<DebugData, pdb2::Error> {
     })
 }
 
-fn read_global_variables(
-    pdb: &mut PDB<'_, File>,
+fn read_global_variables<'s, S: pdb2::Source<'s> + 's>(
+    pdb: &mut PDB<'s, S>,
     address_map: &AddressMap<'_>,
 ) -> Result<IndexMap<String, Vec<VarInfo>>, pdb2::Error> {
     let mut global_variables: IndexMap<String, Vec<VarInfo>> = IndexMap::new();
@@ -130,8 +145,8 @@ fn read_global_variables(
     Ok(global_variables)
 }
 
-fn read_static_variables(
-    pdb: &mut PDB<'_, File>,
+fn read_static_variables<'s, S: pdb2::Source<'s> + 's>(
+    pdb: &mut PDB<'s, S>,
     address_map: &AddressMap<'_>,
 ) -> Result<ModuleVars, pdb2::Error> {
     let mut modvars = ModuleVars {

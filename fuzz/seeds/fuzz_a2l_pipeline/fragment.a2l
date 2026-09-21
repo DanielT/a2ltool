@@ -1,0 +1,3 @@
+  /begin CHARACTERISTIC c ""
+    VALUE 0x0 rl 0 cm 0 100
+  /end CHARACTERISTIC

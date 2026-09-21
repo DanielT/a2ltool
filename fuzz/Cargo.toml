@@ -1,0 +1,88 @@
+[package]
+name = "a2ltool-fuzz"
+version = "0.0.0"
+publish = false
+# edition 2021 deliberately: libfuzzer-sys 0.4 historically expanded a bare
+# #[no_mangle] inside fuzz_target!, which is a hard error under edition 2024.
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.a2ltool]
+path = ".."
+
+# Important: This makes fuzz/ its own workspace root, so the root Cargo.toml's
+# [profile.release] (panic = "abort", strip = "debuginfo", lto = "fat") does NOT
+# apply here.
+[workspace]
+members = ["."]
+
+# The [[bin]] names below are snake_case, matching the a2ltool::fuzz::* function names.
+# Suppress the "kebab-case" warning this would otherwise trigger.
+[lints.cargo]
+non_kebab_case_bins = "allow"
+
+[profile.release]
+debug = 1
+
+# NOTE: the [[bin]] names are also used as the names of the seeds/artifacts/corpus directories.
+
+[[bin]]
+name = "fuzz_a2l_parse"
+path = "fuzz_targets/fuzz_a2l_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_a2l_roundtrip"
+path = "fuzz_targets/fuzz_a2l_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_a2l_pipeline"
+path = "fuzz_targets/fuzz_a2l_pipeline.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_creator_scan"
+path = "fuzz_targets/fuzz_creator_scan.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_creator_source"
+path = "fuzz_targets/fuzz_creator_source.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_dwarf"
+path = "fuzz_targets/fuzz_dwarf.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_pdb"
+path = "fuzz_targets/fuzz_pdb.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_symbol_lookup"
+path = "fuzz_targets/fuzz_symbol_lookup.rs"
+test = false
+doc = false
+bench = false

@@ -1,0 +1,5 @@
+/begin MEASUREMENT Measurement_Value ""
+  UWORD NO_COMPU_METHOD 0 0 0 2
+  ECU_ADDRESS 0x0
+  SYMBOL_LINK "Measurement_Value" 0
+/end MEASUREMENT

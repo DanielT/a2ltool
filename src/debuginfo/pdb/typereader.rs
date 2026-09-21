@@ -1,7 +1,7 @@
 use crate::debuginfo::{DbgDataType, TypeInfo, VarInfo};
 use indexmap::IndexMap;
 use pdb2::{FallibleIterator, ItemIter, PDB, TypeData, TypeIndex};
-use std::{collections::HashMap, fs::File};
+use std::collections::HashMap;
 
 mod builtin_types;
 
@@ -111,8 +111,8 @@ impl<'t> PdbData<'t> {
     }
 }
 
-pub(crate) fn read_all_types(
-    pdb: &mut PDB<'_, File>,
+pub(crate) fn read_all_types<'s, S: pdb2::Source<'s> + 's>(
+    pdb: &mut PDB<'s, S>,
     variables: &IndexMap<String, Vec<VarInfo>>,
 ) -> Result<TypeReaderData, pdb2::Error> {
     let mut typereader_data = TypeReaderData {

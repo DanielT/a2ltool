@@ -90,6 +90,24 @@ impl DebugData {
         pdb::load_pdb(filename, verbose)
     }
 
+    // load DWARF debug info from an in-memory elf/pe image (used by the fuzz harness)
+    pub(crate) fn load_dwarf_from_slice(
+        display_name: &str,
+        data: &[u8],
+        verbose: bool,
+    ) -> Result<Self, String> {
+        dwarf::load_dwarf_from_slice(display_name, data, verbose)
+    }
+
+    // load PDB debug info from memory (used by the fuzz harness)
+    pub(crate) fn load_pdb_from_slice(
+        display_name: &str,
+        data: &[u8],
+        verbose: bool,
+    ) -> Result<Self, String> {
+        pdb::load_pdb_from_slice(display_name, data, verbose)
+    }
+
     pub(crate) fn iter<'dbg>(&'dbg self, use_new_arrays: bool) -> iter::VariablesIterator<'dbg> {
         iter::VariablesIterator::new(self, use_new_arrays)
     }

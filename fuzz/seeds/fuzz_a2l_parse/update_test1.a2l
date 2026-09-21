@@ -1,0 +1,288 @@
+ASAP2_VERSION 1 71
+/begin PROJECT test ""
+  /begin MODULE mod ""
+
+    /begin COMPU_METHOD uint16_Compu ""
+      RAT_FUNC "%.0" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
+
+    /begin COMPU_METHOD uint32_Compu ""
+      RAT_FUNC "%.0" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
+
+    /begin COMPU_METHOD float_Compu ""
+      RAT_FUNC "%.3" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
+
+    /begin COMPU_METHOD enumeration "Conversion table for enum enumeration"
+      TAB_VERB "%.4" ""
+      COMPU_TAB_REF enumeration
+    /end COMPU_METHOD
+
+    /begin CHARACTERISTIC Curve_ExternalAxis ""
+      CURVE 0x0 Curve_ExternalAxis_RecordLayout 0 float_Compu -10000000 10000000
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY uint32_Compu 5 0 4294967295
+        AXIS_PTS_REF Axis_0
+      /end AXIS_DESCR
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Curve_ExternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Curve_ExternalAxis" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC Curve_InternalAxis ""
+      CURVE 0x0 Curve_InternalAxis_RecordLayout 0 float_Compu -10000000 10000000
+      /begin AXIS_DESCR
+        STD_AXIS NO_INPUT_QUANTITY uint16_Compu 4 0 65535
+      /end AXIS_DESCR
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Curve_InternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Curve_InternalAxis" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC Map_ExternalAxis ""
+      MAP 0x0 Map_ExternalAxis_RecordLayout 0 float_Compu -10000000 10000000
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY uint32_Compu 3 0 4294967295
+        AXIS_PTS_REF Axis_1
+      /end AXIS_DESCR
+      /begin AXIS_DESCR
+        COM_AXIS NO_INPUT_QUANTITY uint32_Compu 2 0 4294967295
+        AXIS_PTS_REF Axis_2
+      /end AXIS_DESCR
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Map_ExternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Map_ExternalAxis" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC Map_InternalAxis ""
+      MAP 0x0 Map_InternalAxis_RecordLayout 0 uint32_Compu 0 4294967295
+      /begin AXIS_DESCR
+        STD_AXIS NO_INPUT_QUANTITY uint16_Compu 4 0 65535
+      /end AXIS_DESCR
+      /begin AXIS_DESCR
+        STD_AXIS NO_INPUT_QUANTITY uint16_Compu 3 0 65535
+      /end AXIS_DESCR
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Map_InternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Map_InternalAxis" 0
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC Characteristic_ValBlk ""
+      VAL_BLK 0x0 float32_RecordLayout 0 float_Compu -10000000 10000000
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Characteristic_ValBlk" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Characteristic_ValBlk" 0
+      MATRIX_DIM 5
+    /end CHARACTERISTIC
+
+    /begin CHARACTERISTIC Characteristic_Value ""
+      VALUE 0x0 uint32_RecordLayout 0 float_Compu 0 10000000
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Characteristic_Value" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Characteristic_Value" 0
+    /end CHARACTERISTIC
+
+    /begin AXIS_PTS Axis_0 ""
+      0x0 NO_INPUT_QUANTITY Axis_0_RecordLayout 0 uint32_Compu 5 0 4294967295
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Axis_0" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Axis_0" 0
+    /end AXIS_PTS
+
+    /begin AXIS_PTS Axis_1 ""
+      0x0 NO_INPUT_QUANTITY Axis_1_RecordLayout 0 uint32_Compu 3 0 4294967295
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Axis_1" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Axis_1" 0
+    /end AXIS_PTS
+
+    /begin AXIS_PTS Axis_2 ""
+      0x0 NO_INPUT_QUANTITY Axis_2_RecordLayout 0 uint32_Compu 2 0 4294967295
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Axis_2" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Axis_2" 0
+    /end AXIS_PTS
+    
+    /begin BLOB Blob_1 ""
+      0x0 128
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Blob_1" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Blob_1" 0
+    /end BLOB
+    
+    /begin BLOB Blob_2 ""
+      0x0 256
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Blob_2" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Blob_2" 0
+    /end BLOB
+
+    /begin MEASUREMENT Measurement_Matrix ""
+      UBYTE NO_COMPU_METHOD 0 0 0 2
+      MATRIX_DIM 5 4
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Matrix" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Matrix" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT Measurement_Value ""
+      UWORD NO_COMPU_METHOD 0 0 0 2
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Value" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Value" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT Measurement_Bitfield_bits1 ""
+      ULONG NO_COMPU_METHOD 0 0 0 2
+      BIT_MASK 0x1F
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Bitfield.bits_1" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Bitfield.bits_1" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT Measurement_Bitfield_bits2 ""
+      ULONG NO_COMPU_METHOD 0 0 0 2
+      BIT_MASK 0xFFFE0
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Bitfield.bits_2" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Bitfield.bits_2" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT Measurement_Bitfield_bits3 ""
+      ULONG NO_COMPU_METHOD 0 0 0 2
+      BIT_MASK 0xFF00000
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Measurement_Bitfield.bits_3" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Measurement_Bitfield.bits_3" 0
+    /end MEASUREMENT
+
+    /begin MEASUREMENT Measurement_Enum ""
+      UBYTE enumeration 0 0 0 2
+      ECU_ADDRESS 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Enum_Value" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Enum_Value" 0
+    /end MEASUREMENT
+
+    /begin INSTANCE INSTANCE.Map_InternalAxis "instance for symbol Map_InternalAxis"
+      UpdateTest_Map_InternalAxis 0x0
+      /begin IF_DATA CANAPE_EXT 0x64
+        LINK_MAP "Map_InternalAxis" 0x0 0x0 0 0x0 0 0x0 0x0
+      /end IF_DATA
+      SYMBOL_LINK "Map_InternalAxis" 0
+    /end INSTANCE
+
+    /begin TYPEDEF_MEASUREMENT Measurement_ULong ""
+      ULONG NO_COMPU_METHOD 0 0 0 4294967295
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_MEASUREMENT Measurement_UWord ""
+      UWORD NO_COMPU_METHOD 0 0 0 65535
+    /end TYPEDEF_MEASUREMENT
+
+    /begin TYPEDEF_STRUCTURE UpdateTest_Map_InternalAxis ""
+      0x40
+      /begin STRUCTURE_COMPONENT
+        x Measurement_UWord
+        0
+        MATRIX_DIM 4
+        SYMBOL_TYPE_LINK "x"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        y Measurement_UWord
+        8
+        MATRIX_DIM 3
+        SYMBOL_TYPE_LINK "y"
+      /end STRUCTURE_COMPONENT
+      /begin STRUCTURE_COMPONENT
+        value Measurement_ULong
+        16
+        MATRIX_DIM 3 4
+        SYMBOL_TYPE_LINK "value"
+      /end STRUCTURE_COMPONENT
+      SYMBOL_TYPE_LINK "UpdateTest_Map_InternalAxis"
+    /end TYPEDEF_STRUCTURE
+
+    /begin RECORD_LAYOUT Axis_2_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 2
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Axis_1_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 3
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Axis_0_RecordLayout
+      AXIS_PTS_X 1 ULONG INDEX_INCR DIRECT
+      FIX_NO_AXIS_PTS_X 5
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Curve_ExternalAxis_RecordLayout
+      FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Curve_InternalAxis_RecordLayout
+      AXIS_PTS_X 1 UWORD INDEX_INCR DIRECT
+      FNC_VALUES 2 FLOAT32_IEEE ROW_DIR DIRECT
+      FIX_NO_AXIS_PTS_X 4
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Map_ExternalAxis_RecordLayout
+      FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT Map_InternalAxis_RecordLayout
+      AXIS_PTS_X 1 UWORD INDEX_INCR DIRECT
+      AXIS_PTS_Y 2 UWORD INDEX_INCR DIRECT
+      FNC_VALUES 3 ULONG ROW_DIR DIRECT
+      FIX_NO_AXIS_PTS_X 4
+      FIX_NO_AXIS_PTS_Y 3
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT uint32_RecordLayout
+      FNC_VALUES 1 ULONG ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin RECORD_LAYOUT float32_RecordLayout
+      FNC_VALUES 1 FLOAT32_IEEE ROW_DIR DIRECT
+    /end RECORD_LAYOUT
+
+    /begin COMPU_VTAB enumeration "Conversion table for enum enumeration"
+      TAB_VERB 6
+      0 "FIRST_VALUE"
+      1 "SECOND_VALUE"
+      2 "THIRD_VALUE"
+      3 "FOURTH_VALUE"
+      4 "FIFTH_VALUE"
+      5 "SIXTH_VALUE"
+    /end COMPU_VTAB
+
+  /end MODULE
+/end PROJECT

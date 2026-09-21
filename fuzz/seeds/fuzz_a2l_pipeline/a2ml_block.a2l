@@ -1,0 +1,10 @@
+ASAP2_VERSION 1 71
+/begin PROJECT p ""
+  /begin MODULE m ""
+    /begin A2ML
+      block "IF_DATA" taggedunion {
+        "X" struct { uint; };
+      };
+    /end A2ML
+  /end MODULE
+/end PROJECT

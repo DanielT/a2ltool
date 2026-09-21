@@ -1,0 +1,5 @@
+ASAP2_VERSION 1 71
+/begin PROJECT p ""
+  /begin MODULE m ""
+  /end MODULE
+/end PROJECT

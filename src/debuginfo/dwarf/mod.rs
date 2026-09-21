@@ -33,15 +33,24 @@ struct DebugDataReader<'elffile> {
 // load the debug info from an elf file
 pub(crate) fn load_dwarf(filename: &OsStr, verbose: bool) -> Result<DebugData, String> {
     let filedata = load_filedata(filename)?;
-    let elffile = load_elf_file(&filename.to_string_lossy(), &filedata)?;
+    load_dwarf_from_slice(&filename.to_string_lossy(), &filedata, verbose)
+}
+
+// load the debug info from elf file data in a u8 slice
+// `display_name` is only used in error messages
+pub(crate) fn load_dwarf_from_slice(
+    display_name: &str,
+    filedata: &[u8],
+    verbose: bool,
+) -> Result<DebugData, String> {
+    let elffile = load_elf_file(display_name, filedata)?;
 
     if !elffile
         .sections()
         .any(|section| section.name() == Ok(".debug_info"))
     {
         return Err(format!(
-            "Error: {} does not contain DWARF2+ debug info. The section .debug_info is missing.",
-            filename.to_string_lossy()
+            "Error: {display_name} does not contain DWARF2+ debug info. The section .debug_info is missing."
         ));
     }
 
@@ -49,8 +58,7 @@ pub(crate) fn load_dwarf(filename: &OsStr, verbose: bool) -> Result<DebugData, S
 
     if !verify_dwarf_compile_units(&dwarf) {
         return Err(format!(
-            "Error: {} does not contain DWARF2+ debug info - zero compile units contain debug info.",
-            filename.to_string_lossy()
+            "Error: {display_name} does not contain DWARF2+ debug info - zero compile units contain debug info."
         ));
     }
 
