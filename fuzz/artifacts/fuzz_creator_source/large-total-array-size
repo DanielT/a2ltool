@@ -1,0 +1,13 @@
+/*
+@@ ELEMENT = x
+@@ STRUCTURE = s
+@@ A2L_TYPE = MEASURE
+@@ DATA_TYPE = UBYTE
+@@ END
+*/
+/*
+@@ INSTANCE = i
+@@ STRUCTURE = s
+@@ DIMENSION = 4 237 237
+@@ END
+*/

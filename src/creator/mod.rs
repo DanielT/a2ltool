@@ -3100,7 +3100,9 @@ impl<'a> SplitIterator<'a> {
         symbol_name: &'a str,
         use_new_arrays: bool,
     ) -> Self {
-        let limit = dimensions.iter().product::<u32>();
+        // use saturating multiplication rather than allowing a panic if tha array dimensions
+        // multiply to more than u32::MAX. This case can be hit by fuzzing.
+        let limit = dimensions.iter().fold(1u32, |a, b| a.saturating_mul(*b));
         SplitIterator {
             dimensions,
             split,

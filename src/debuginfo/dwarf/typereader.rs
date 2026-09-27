@@ -13,7 +13,7 @@ type MemberMap = IndexMap<String, (TypeInfo, u64)>;
 const MAX_BITFIELD_CONTAINER_SIZE: u64 = 8;
 
 /// The maximum nesting depth of types while reading debug info.
-/// 
+///
 /// The largest seen in any real (non-fuzzing) debug info was 59 levels.
 const MAX_TYPE_NESTING: usize = 200;
 
@@ -442,7 +442,8 @@ impl DebugDataReader<'_> {
         {
             dim[0] = count;
         }
-        let size = maybe_size.unwrap_or_else(|| dim.iter().fold(stride, |acc, num| acc * num));
+        let size = maybe_size
+            .unwrap_or_else(|| dim.iter().fold(stride, |acc, num| acc.saturating_mul(*num)));
         // other code will fail with divide by zero if stride is zero, so set it to 1 in that case
         let stride = stride.max(1);
         Ok((
