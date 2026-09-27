@@ -371,7 +371,7 @@ struct Creator<'a2l> {
     main_group_description: Option<String>,
     sub_groups: HashMap<String, String>, // map: group name to description
     structures: HashMap<String, Structure>, // map: structure name to structure definition
-    names: Vec<String>,                  // list of all used A2L names to check for duplicates
+    names: HashSet<String>,              // list of all used A2L names to check for duplicates
     version: A2lVersion,
     deferred_var_characteristic: Vec<(String, String, u32)>, // (a2l name, VAR_CRITERION name, address)
     var_criterion: HashMap<String, VarCriterionDefinition>,
@@ -544,7 +544,11 @@ impl<'a2l> Creator<'a2l> {
         let version = A2lVersion::from(&*a2l_file);
 
         let module = &mut a2l_file.project.module[0];
-        let mut names = module.characteristic.keys().cloned().collect::<Vec<_>>();
+        let mut names = module
+            .characteristic
+            .keys()
+            .cloned()
+            .collect::<HashSet<_>>();
         names.extend(module.measurement.keys().cloned());
         names.extend(module.axis_pts.keys().cloned());
         names.extend(module.blob.keys().cloned());
@@ -649,7 +653,7 @@ impl<'a2l> Creator<'a2l> {
         instance_element: Option<&InstanceElement>,
     ) -> Result<(), String> {
         // Dispatch based on the item config
-        self.check_a2l_name(&a2l_name)?;
+        self.check_a2l_name_collision(&a2l_name)?;
         match config {
             ItemConfig::Measure(measure_cfg) => {
                 self.create_measure_objects(a2l_name, symbol_name, measure_cfg, instance_element);
@@ -684,8 +688,8 @@ impl<'a2l> Creator<'a2l> {
         }
     }
 
-    fn check_a2l_name(&self, a2l_name: &str) -> Result<(), String> {
-        if self.names.contains(&a2l_name.to_string()) {
+    fn check_a2l_name_collision(&self, a2l_name: &str) -> Result<(), String> {
+        if self.names.contains(a2l_name) {
             Err(format!("A2L name '{}' already exists", a2l_name))
         } else {
             Ok(())
@@ -714,7 +718,7 @@ impl<'a2l> Creator<'a2l> {
                 &symbol_name,
                 self.new_arrays,
             ) {
-                if self.check_a2l_name(&split_a2l_name).is_ok() {
+                if self.check_a2l_name_collision(&split_a2l_name).is_ok() {
                     self.create_measure_object(
                         split_a2l_name,
                         split_symbol_name,
@@ -835,7 +839,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.measurement.push(meas);
-        self.names.push(a2l_name);
+        self.names.insert(a2l_name);
     }
 
     /// Create parameter objects from the configuration
@@ -860,7 +864,7 @@ impl<'a2l> Creator<'a2l> {
                 &symbol_name,
                 self.new_arrays,
             ) {
-                if self.check_a2l_name(&split_a2l_name).is_ok() {
+                if self.check_a2l_name_collision(&split_a2l_name).is_ok() {
                     self.create_parameter_object(
                         split_a2l_name,
                         split_symbol_name,
@@ -983,7 +987,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.characteristic.push(characteristic);
-        self.names.push(a2l_name.clone());
+        self.names.insert(a2l_name.clone());
 
         // create a VAR_CHARACTERISTIC that references the named VAR_CRITERION
         if let Some(var_criterion_name) = &config.attributes.var_criterion {
@@ -1094,7 +1098,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.characteristic.push(characteristic);
-        self.names.push(a2l_name.clone());
+        self.names.insert(a2l_name.clone());
 
         // create a VAR_CHARACTERISTIC that references the named VAR_CRITERION
         if let Some(var_criterion_name) = &config.attributes.var_criterion {
@@ -1182,7 +1186,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.axis_pts.push(axis_pts);
-        self.names.push(a2l_name.clone());
+        self.names.insert(a2l_name.clone());
 
         // create a VAR_CHARACTERISTIC that references the named VAR_CRITERION
         if let Some(var_criterion_name) = &config.attributes.var_criterion {
@@ -1208,7 +1212,7 @@ impl<'a2l> Creator<'a2l> {
                 &symbol_name,
                 self.new_arrays,
             ) {
-                if self.check_a2l_name(&split_a2l_name).is_ok() {
+                if self.check_a2l_name_collision(&split_a2l_name).is_ok() {
                     self.create_string_object(
                         split_a2l_name,
                         split_symbol_name,
@@ -1289,7 +1293,7 @@ impl<'a2l> Creator<'a2l> {
         );
 
         self.module.characteristic.push(characteristic);
-        self.names.push(a2l_name.clone());
+        self.names.insert(a2l_name.clone());
 
         // create a VAR_CHARACTERISTIC that references the named VAR_CRITERION
         if let Some(var_criterion_name) = &config.attributes.var_criterion {
@@ -1369,7 +1373,7 @@ impl<'a2l> Creator<'a2l> {
                     instance_group: &instance.group,
                     overwrites: &instance.overwrites,
                 };
-                if self.check_a2l_name(&split_a2l_name).is_ok() {
+                if self.check_a2l_name_collision(&split_a2l_name).is_ok() {
                     let result = self.create_sub_structure_items(
                         split_a2l_name,
                         split_symbol_name,
@@ -1420,7 +1424,7 @@ impl<'a2l> Creator<'a2l> {
                 &symbol_name,
                 self.new_arrays,
             ) {
-                if self.check_a2l_name(&split_a2l_name).is_ok() {
+                if self.check_a2l_name_collision(&split_a2l_name).is_ok() {
                     let result = self.create_sub_structure_items(
                         split_a2l_name,
                         split_symbol_name,
@@ -1526,7 +1530,7 @@ impl<'a2l> Creator<'a2l> {
 
         // if the a2l name is not set explicitly then it is identical to the symbol name
         let a2l_name = instance.a2l_name.clone().unwrap_or(instance.name.clone());
-        self.check_a2l_name(&a2l_name)?;
+        self.check_a2l_name_collision(&a2l_name)?;
 
         let symbol_name = instance.name.clone();
         let address = instance.address.unwrap_or(0);
@@ -1583,7 +1587,7 @@ impl<'a2l> Creator<'a2l> {
         }
 
         self.module.instance.push(instance_obj);
-        self.names.push(a2l_name);
+        self.names.insert(a2l_name);
 
         // create TYPEDEF_STRUCTURE for the INSTANCE if it does not already exist
         if !self
@@ -1783,7 +1787,7 @@ impl<'a2l> Creator<'a2l> {
             return Err(format!("TYPEDEF_MEASUREMENT '{full_name}' already exists"));
         }
 
-        self.check_a2l_name(full_name)?;
+        self.check_a2l_name_collision(full_name)?;
 
         let description = config.attributes.description.as_deref().unwrap_or("");
         let (conversion_name, unit, format) =
@@ -1835,7 +1839,7 @@ impl<'a2l> Creator<'a2l> {
             ));
         }
 
-        self.check_a2l_name(full_name)?;
+        self.check_a2l_name_collision(full_name)?;
 
         let description = config.attributes.description.as_deref().unwrap_or("");
         let (conversion_name, unit, format) =
@@ -1897,7 +1901,7 @@ impl<'a2l> Creator<'a2l> {
             ));
         }
 
-        self.check_a2l_name(full_name)?;
+        self.check_a2l_name_collision(full_name)?;
 
         let description = config.attributes.description.as_deref().unwrap_or("");
         let (conversion_name, unit, format) =
@@ -1961,7 +1965,7 @@ impl<'a2l> Creator<'a2l> {
             ));
         }
 
-        self.check_a2l_name(full_name)?;
+        self.check_a2l_name_collision(full_name)?;
 
         let description = config.attributes.description.as_deref().unwrap_or("");
         let record_layout = self.create_default_record_layout(&DataType::Ubyte);
@@ -1998,7 +2002,7 @@ impl<'a2l> Creator<'a2l> {
             return Err(format!("TYPEDEF_AXIS '{a2l_name}' already exists"));
         }
 
-        self.check_a2l_name(a2l_name)?;
+        self.check_a2l_name_collision(a2l_name)?;
 
         let description = config.attributes.description.as_deref().unwrap_or("");
         let (conversion_name, unit, format) =
