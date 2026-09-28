@@ -16,7 +16,7 @@ name = "a2ltool"
 path = "src/main.rs"
 
 [dependencies]
-a2lfile = "3.5.0"
+a2lfile = "3.5.1"
 object = { version = "0.39", default-features = false, features = ["read"] }
 gimli = { version = "0.34", default-features = false, features = ["read"] }
 memmap2 = "0.9"
