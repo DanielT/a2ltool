@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 a2lfile = "3.5.1"
-object = { version = "0.39", default-features = false, features = ["read"] }
+object = { version = "0.40", default-features = false, features = ["read"] }
 gimli = { version = "0.34", default-features = false, features = ["read"] }
 memmap2 = "0.9"
 clap = { version = "4.5", features = ["wrap_help"]}
