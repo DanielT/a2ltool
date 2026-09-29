@@ -6,6 +6,38 @@ struct Parser<'tokens, 'text> {
     position: usize,
 }
 
+/// Verify that `name` is a valid a2l identifier.
+///
+/// Every character in an identifier must be alphanumeric, `.`, `[`, `]` or `_`, and the name
+/// must start with a letter or `_`.
+fn check_a2l_identifier(name: &str, context: &str) -> Result<(), String> {
+    const fn is_identchar(c: char) -> bool {
+        c.is_ascii_alphanumeric() || c == '.' || c == '[' || c == ']' || c == '_'
+    }
+
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return Err(format!("Invalid empty {context} name"));
+    };
+    if let Some(bad) = name.chars().find(|c| !is_identchar(*c)) {
+        let hint = if bad == char::REPLACEMENT_CHARACTER {
+            " (the source file is not valid UTF-8 at this position)"
+        } else {
+            ""
+        };
+        return Err(format!(
+            "Invalid {context} name \"{name}\": the character {bad:?} is not allowed{hint}. \
+             An a2l name may only contain letters, digits, '_', '.', '[' and ']'"
+        ));
+    }
+    if !first.is_ascii_alphabetic() && first != '_' {
+        return Err(format!(
+            "Invalid {context} name \"{name}\": an a2l name must start with a letter or '_'"
+        ));
+    }
+    Ok(())
+}
+
 /// Parse all definitions contained in one definition comment.
 ///
 /// A block comment (or a sequence of merged single-line comments) may contain any
@@ -89,13 +121,16 @@ impl<'text> Parser<'_, 'text> {
     }
 
     fn get_identifier(&mut self, context: &str) -> Result<String, String> {
-        // the token can't be a quoted string or start with a digit
+        // the token can't be empty, a quoted string, or start with a digit
         if let Some(t) = self.tokens.get(self.position)
+            && !t.is_empty()
             && !t.starts_with(b"\"")
             && !t[0].is_ascii_digit()
         {
+            let name = String::from_utf8_lossy(t).into_owned();
+            check_a2l_identifier(&name, context)?;
             self.position += 1;
-            Ok(String::from_utf8_lossy(t).into_owned())
+            Ok(name)
         } else {
             Err(format!("Expected identifier in {} definition", context))
         }
@@ -215,7 +250,7 @@ impl<'text> Parser<'_, 'text> {
     fn parse_measure_config(&mut self) -> Result<(ItemConfig, Option<String>), String> {
         // Parse the MEASURE config
         let write_access = self.parse_write_access();
-        let a2l_name = self.parse_a2l_name(&[b"DATA_TYPE"]);
+        let a2l_name = self.parse_a2l_name(&[b"DATA_TYPE"])?;
         let (datatype, bitmask) = self.parse_data_type()?;
         let range = self.parse_opt_range()?;
         let _extended_range = self.parse_opt_range()?;
@@ -235,7 +270,7 @@ impl<'text> Parser<'_, 'text> {
     fn parse_parameter_config(&mut self) -> Result<(ItemConfig, Option<String>), String> {
         // Parse the PARAMETER config
         let write_access = self.parse_write_access();
-        let a2l_name = self.parse_a2l_name(&[b"DATA_TYPE"]);
+        let a2l_name = self.parse_a2l_name(&[b"DATA_TYPE"])?;
         let (datatype, bitmask) = self.parse_data_type()?;
         let range = self.parse_opt_range()?;
         let extended_range = self.parse_opt_range()?;
@@ -260,7 +295,7 @@ impl<'text> Parser<'_, 'text> {
         // Parse the CURVE or MAP config
         let context = if is_map { "MAP" } else { "CURVE" };
         let write_access = self.parse_write_access();
-        let a2l_name = self.parse_a2l_name(&[b"DATA_TYPE"]);
+        let a2l_name = self.parse_a2l_name(&[b"DATA_TYPE"])?;
         let (datatype, bitmask) = self.parse_data_type()?;
         let range = self.parse_opt_range()?;
         let extended_range = self.parse_opt_range()?;
@@ -293,7 +328,7 @@ impl<'text> Parser<'_, 'text> {
     fn parse_axis_config(&mut self) -> Result<(ItemConfig, Option<String>), String> {
         // Parse the AXIS config
         let write_access = self.parse_write_access();
-        let a2l_name = self.parse_a2l_name(&[b"DATA_TYPE"]);
+        let a2l_name = self.parse_a2l_name(&[b"DATA_TYPE"])?;
         let (datatype, _bitmask) = self.parse_data_type()?;
         let (range, extended_range) = (self.parse_opt_range()?, self.parse_opt_range()?);
         let layout = self.parse_layout()?;
@@ -332,7 +367,7 @@ impl<'text> Parser<'_, 'text> {
             b"END",
             b"GROUP",
             b"VAR_CRITERION",
-        ]);
+        ])?;
         let attributes = self.parse_string_attributes()?;
         self.require_token("SYMBOL", b"END")?;
 
@@ -485,7 +520,7 @@ impl<'text> Parser<'_, 'text> {
         // Parse the INSTANCE definition
         self.require_token("INSTANCE", b"=")?;
         let name = self.get_identifier("INSTANCE")?;
-        let a2l_name = self.parse_a2l_name(&[b"STRUCTURE"]);
+        let a2l_name = self.parse_a2l_name(&[b"STRUCTURE"])?;
         self.require_token("INSTANCE", b"STRUCTURE")?;
         self.require_token("INSTANCE", b"=")?;
         let structure_name = self.get_identifier("INSTANCE structure")?;
@@ -542,7 +577,7 @@ impl<'text> Parser<'_, 'text> {
         // Parse the SUB_STRUCTURE definition
         self.require_token("SUB_STRUCTURE", b"=")?;
         let name = self.get_identifier("SUB_STRUCTURE")?;
-        let a2l_name = self.parse_a2l_name(&[b"STRUCTURE"]);
+        let a2l_name = self.parse_a2l_name(&[b"STRUCTURE"])?;
         let a2l_name = a2l_name.unwrap_or(name.clone());
         self.require_token("SYMBOL", b"STRUCTURE")?;
         let structure = self.parse_identifier_list("SUB_STRUCTURE structure")?;
@@ -648,15 +683,17 @@ impl<'text> Parser<'_, 'text> {
     ///
     /// The A2L name is expected to be the next token unless it is a stop word, i.e. a valid
     /// keyword that indicates the start of another definition.
-    fn parse_a2l_name(&mut self, stop_words: &[&[u8]]) -> Option<String> {
+    fn parse_a2l_name(&mut self, stop_words: &[&[u8]]) -> Result<Option<String>, String> {
         // If the next token is not a stop word (e.g., "DATA_TYPE"), we assume it is the "a2l name"
         if let Some(token) = self.peek_token()
             && !stop_words.contains(&token)
         {
-            let token = self.get_token("").ok()?;
-            Some(String::from_utf8_lossy(token).to_string())
+            let token = self.get_token("a2l name")?;
+            let name = String::from_utf8_lossy(token).into_owned();
+            check_a2l_identifier(&name, "a2l")?;
+            Ok(Some(name))
         } else {
-            None
+            Ok(None)
         }
     }
 
@@ -1151,6 +1188,7 @@ impl<'text> Parser<'_, 'text> {
             name => {
                 // reference to named conversion
                 let name = String::from_utf8_lossy(name).to_string();
+                check_a2l_identifier(&name, "CONVERSION")?;
                 // optional args: length and number of digits. If the name is followed by only one numerical arg, this is always the number of digits.
                 // If both exist, the first is the length and the second is the number of digits.
                 let (length, digits) = self.parse_conversion_length_digits();
@@ -1557,6 +1595,107 @@ mod tests {
             assert_eq!(definitions.len(), 1);
             Ok(Some(definitions.swap_remove(0)))
         }
+    }
+
+    #[test]
+    fn a2l_name_validation() {
+        // ordinary names, and the struct-member paths a2ltool generates itself
+        for good in [
+            "my_param",
+            "_leading_underscore",
+            "with1digits2",
+            "parameter_instance[0].Fork.y",
+            "a.b[1][2]_c",
+        ] {
+            assert!(
+                check_a2l_identifier(good, "TEST").is_ok(),
+                "{good} should be accepted"
+            );
+        }
+
+        // a byte that is not valid UTF-8 becomes U+FFFD via from_utf8_lossy; writing it
+        // out produced an a2l file that a2ltool could not read back
+        let lossy = String::from_utf8_lossy(b"\xd8BadLayout").into_owned();
+        let err = check_a2l_identifier(&lossy, "LAYOUT").unwrap_err();
+        assert!(err.contains("LAYOUT"), "{err}");
+        assert!(err.contains("not valid UTF-8"), "{err}");
+
+        for bad in [
+            "with space",
+            "with-dash",
+            "with:colon",
+            "with\"quote",
+            "naïve",
+        ] {
+            assert!(
+                check_a2l_identifier(bad, "TEST").is_err(),
+                "{bad} should be rejected"
+            );
+        }
+
+        // a name has to start with a letter or underscore
+        assert!(check_a2l_identifier("", "TEST").is_err());
+        assert!(check_a2l_identifier("1st", "TEST").is_err());
+        assert!(check_a2l_identifier(".leading_dot", "TEST").is_err());
+        assert!(check_a2l_identifier("[0]", "TEST").is_err());
+    }
+
+    /// Run a source comment through the scanner the same way `process_file` does.
+    fn parse_source(input: &[u8]) -> Result<Option<Definition>, String> {
+        let comment_scanner = scanner::CommentScanner::new(COMMENT_PREFIX);
+        let definition_tokens_vec = comment_scanner.scan_comments(input);
+        assert_eq!(definition_tokens_vec.len(), 1);
+        let (_offset, tokens) = &definition_tokens_vec[0];
+        parse_definition(tokens)
+    }
+
+    #[test]
+    fn invalid_name_is_rejected() {
+        // LAYOUT: the position that produced the original fuzzing finding. The 0xd8 byte
+        // is not valid UTF-8, so from_utf8_lossy turns it into U+FFFD.
+        let mut input: Vec<u8> = br#"
+        /*
+        @@ SYMBOL = p
+        @@ A2L_TYPE = PARAMETER VALUE
+        @@ DATA_TYPE = UWORD
+        @@ LAYOUT = "#
+            .to_vec();
+        input.push(0xd8);
+        input.extend_from_slice(b"Bad\n        @@ END\n        */");
+        let err = parse_source(&input).unwrap_err();
+        assert!(err.contains("Invalid LAYOUT name"), "{err}");
+        assert!(err.contains("not valid UTF-8"), "{err}");
+
+        // the optional "a2l name" that may follow the type is validated too
+        let mut input: Vec<u8> = br#"
+        /*
+        @@ SYMBOL = p
+        @@ A2L_TYPE = MEASURE
+        @@ "#
+            .to_vec();
+        input.push(0xff);
+        input.extend_from_slice(b"name\n        @@ DATA_TYPE = UWORD\n        @@ END\n        */");
+        let err = parse_source(&input).unwrap_err();
+        assert!(err.contains("Invalid a2l name"), "{err}");
+
+        // a valid definition in the same shape still parses
+        let good = br#"
+        /*
+        @@ SYMBOL = p
+        @@ A2L_TYPE = PARAMETER VALUE
+        @@ DATA_TYPE = UWORD
+        @@ LAYOUT = GoodLayout
+        @@ END
+        */"#;
+        assert!(parse_source(good).unwrap().is_some());
+    }
+
+    #[test]
+    fn empty_token_does_not_panic() {
+        // get_identifier used to index token[0] without first checking for an empty token
+        let tokens: &[&[u8]] = &[b"SYMBOL", b"=", b"", b"END"];
+        let (_, error) = parse_definitions(tokens);
+        assert!(error.is_some());
     }
 
     #[test]

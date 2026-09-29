@@ -201,6 +201,8 @@ Within the special comments each line must begin with the marker `@@`.
 
 After stripping the `@@` marker, the remaining text is parsed as a `<definition>` according to the following grammar:
 
+An `<identifier>` may contain letters, digits, `_`, `.`, `[` and `]`, and must start with a letter or `_`.
+
 #### Definition
     
     <definition> ::=   <symbol>
