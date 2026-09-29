@@ -4,11 +4,13 @@ use gimli::{DebugInfoOffset, DwTag, EndianSlice, EntriesTreeNode, RunTimeEndian,
 use indexmap::IndexMap;
 use object::Endianness;
 use std::collections::HashMap;
-use std::num::Wrapping;
 
 /// maps the name of a struct member or base class to its type and its offset
 /// inside the containing type
 type MemberMap = IndexMap<String, (TypeInfo, u64)>;
+
+/// The largest type (in bytes) that can contain a bitfield.
+const MAX_BITFIELD_CONTAINER_SIZE: u64 = 8;
 
 #[derive(Debug)]
 struct WipItemInfo {
@@ -656,10 +658,18 @@ impl DebugDataReader<'_> {
         mut membertype: TypeInfo,
     ) -> TypeInfo {
         let type_size = membertype.get_size();
-        let type_size_bits = type_size * 8;
         let dbginfo_offset = child_entry.offset().to_debug_info_offset(unit).unwrap().0;
 
-        if type_size == 0 || bit_size == 0 || bit_size > type_size_bits {
+        // The containing type of a bitfield is always an integer type, so it is at most 8
+        // bytes. Larger values only occur for garbage input, where DW_AT_byte_size is
+        // unconstrained; rejecting them here also keeps type_size * 8 from overflowing.
+        if type_size == 0 || type_size > MAX_BITFIELD_CONTAINER_SIZE {
+            // invalid bitfield container - return the member type as-is
+            return membertype;
+        }
+        let mut type_size_bits = type_size * 8;
+
+        if bit_size == 0 || bit_size > type_size_bits {
             // invalid bitfield size - return the member type as-is
             // this case doesn't happen with sane input, but is easily triggered by fuzzing
             return membertype;
@@ -672,12 +682,19 @@ impl DebugDataReader<'_> {
             && (bit_offset != 0 || type_size_bits != bit_size)
         {
             // Dwarf 2 / 3
-            let bit_offset_le =
-                (Wrapping(type_size_bits) - Wrapping(bit_offset) - Wrapping(bit_size)).0;
+            let Some(bit_offset_le) = bitfield_offset_le(type_size_bits, bit_offset, bit_size)
+            else {
+                // invalid bitfield position - return the member type as-is
+                return membertype;
+            };
 
             // bit_offset can be negative(!) so it is not guaranteed that the bitfield is fully inside the containing type
             // in this case we'll try to increase the containing type's size
-            fix_bitfield_container_type(&mut membertype, *offset, bit_size, bit_offset_le);
+            if !fix_bitfield_container_type(&mut membertype, *offset, bit_size, bit_offset_le) {
+                // the containing type is too small and could not be enlarged, so any
+                // BIT_MASK derived from these values would be wrong
+                return membertype;
+            }
 
             TypeInfo {
                 name: membertype.name.clone(),
@@ -697,8 +714,25 @@ impl DebugDataReader<'_> {
             // this means the bitfield member may have type uint32, but have an offset > 32 bits
             if data_bit_offset >= type_size_bits {
                 // Dwarf 4 / 5: re-calculate offset
-                *offset += (data_bit_offset / type_size_bits) * type_size;
+                // (data_bit_offset / type_size_bits) * type_size is at most
+                // data_bit_offset / 8, so only the addition can overflow
+                let Some(new_offset) =
+                    offset.checked_add((data_bit_offset / type_size_bits) * type_size)
+                else {
+                    // garbage input: the position of the bitfield is not representable
+                    return membertype;
+                };
+                *offset = new_offset;
                 data_bit_offset %= type_size_bits;
+            }
+            if data_bit_offset + bit_size > type_size_bits {
+                // the bitfield crosses the end of the containing type; try to grow the
+                // container, exactly as in the Dwarf 2 / 3 case above
+                if !fix_bitfield_container_type(&mut membertype, *offset, bit_size, data_bit_offset)
+                {
+                    return membertype;
+                }
+                type_size_bits = membertype.get_size() * 8;
             }
             if self.endian == Endianness::Big {
                 // reverse the mask for big endian. Example
@@ -762,37 +796,71 @@ impl DebugDataReader<'_> {
     }
 }
 
+/// Compute the little-endian bit offset of a DWARF 2/3 bitfield: the offset of the bitfield's
+/// least significant bit from the least significant bit of the containing type.
+///
+/// `DW_AT_bit_offset` counts from the most significant bit of the containing type and can even be
+/// negative: compilers emit a negative value when the bitfield extends past the end of the
+/// containing type. `get_bit_offset_attribute` sign-extends such a value into a `u64`, so we
+/// reinterpret the `u64` as an `i64` and perform the subtraction in `i128`. This both produces the
+/// correct result for valid input and lets us detect invalid input.
+///
+/// Returns `None` if the values do not describe a bitfield that [`fix_bitfield_container_type`]
+/// could place inside a containing type: either it starts before the beginning of the containing
+/// type, or it extends more than one size step past the end. Compilers never produce such input.
+fn bitfield_offset_le(type_size_bits: u64, bit_offset: u64, bit_size: u64) -> Option<u64> {
+    // The caller has limited type_size_bits to MAX_BITFIELD_CONTAINER_SIZE * 8
+    // and bit_size to type_size_bits, so only bit_offset can be out of range here.
+    let bit_offset_le =
+        i128::from(type_size_bits) - i128::from(bit_offset as i64) - i128::from(bit_size);
+    let bit_offset_le = u64::try_from(bit_offset_le).ok()?;
+    (bit_offset_le + bit_size <= type_size_bits * 2).then_some(bit_offset_le)
+}
+
+/// Ensure the bitfield described by `bit_offset` and `bit_size` fits inside `membertype`, growing
+/// `membertype` by one size step if it does not.
+///
+/// Returns `false` if the bitfield does not fit and the containing type cannot be grown. The
+/// caller must not build a `Bitfield` from these values in that case, because the resulting
+/// BIT_MASK would refer to bits outside of the item.
 fn fix_bitfield_container_type(
     membertype: &mut TypeInfo,
     offset: u64,
     bit_size: u64,
     bit_offset: u64,
-) {
+) -> bool {
     let type_size = membertype.get_size();
-    if bit_offset + bit_size > type_size * 8 {
-        let adjusted_type_size = type_size * 2;
-
-        let unaligned_bytes = offset % adjusted_type_size;
-        // changing the containing data type won't work if that creates unaligned access
-        if unaligned_bytes == 0 {
-            // increase any integer datatype by one step
-            match membertype.datatype {
-                DbgDataType::Uint8 => membertype.datatype = DbgDataType::Uint16,
-                DbgDataType::Uint16 => membertype.datatype = DbgDataType::Uint32,
-                DbgDataType::Uint32 => membertype.datatype = DbgDataType::Uint64,
-                DbgDataType::Sint8 => membertype.datatype = DbgDataType::Sint16,
-                DbgDataType::Sint16 => membertype.datatype = DbgDataType::Sint32,
-                DbgDataType::Sint32 => membertype.datatype = DbgDataType::Sint64,
-                _ => {
-                    // unsupported type - this case probably can't happen
-                }
-            }
-        }
-        // Theoretically we could also try to handle cases where the containing data type becomes unaligned.
-        // In this case it would be required to increase the bit size of the
-        // containing type by several steps, extending both forward and backward.
-        // It's not clear that any compiler would generate such code, though.
+    if bit_offset + bit_size <= type_size * 8 {
+        // The bitfield is fully inside the containing type – nothing to do.
+        return true;
     }
+    let adjusted_type_size = type_size * 2;
+
+    let unaligned_bytes = offset % adjusted_type_size;
+    // Growing the containing type won't work if it would create unaligned access.
+    if unaligned_bytes != 0 {
+        return false;
+    }
+    // Increase any integer data type by one step. Both callers have verified that the bitfield
+    // ends within twice the size of the containing type, so one step is enough.
+    match membertype.datatype {
+        DbgDataType::Uint8 => membertype.datatype = DbgDataType::Uint16,
+        DbgDataType::Uint16 => membertype.datatype = DbgDataType::Uint32,
+        DbgDataType::Uint32 => membertype.datatype = DbgDataType::Uint64,
+        DbgDataType::Sint8 => membertype.datatype = DbgDataType::Sint16,
+        DbgDataType::Sint16 => membertype.datatype = DbgDataType::Sint32,
+        DbgDataType::Sint32 => membertype.datatype = DbgDataType::Sint64,
+        _ => {
+            // Either there is no larger integer type, or the containing type is not an integer
+            // type at all. Compilers never emit a bitfield in either of these situations.
+            return false;
+        }
+    }
+    // We could theoretically also handle cases where the containing type
+    // would become unaligned, but that would require increasing the size of
+    // the containing type by several steps, extending it both forward and
+    // backward. It is unclear whether any compiler would generate such code.
+    true
 }
 
 /// Decide whether an enum should be treated as signed.
@@ -931,5 +999,78 @@ mod test {
         // the value exactly at the limit is out of range, the one below it is not
         assert!(!enum_is_signed(false, 1, &enumerators(&[-1, 128])));
         assert!(enum_is_signed(false, 1, &enumerators(&[-1, 127])));
+    }
+
+    /// imitate `get_bit_offset_attribute()` by casting `DW_AT_bit_offset`s to u64
+    fn bit_offset(value: i64) -> u64 {
+        value as u64
+    }
+
+    /// Test Dwarf 2/3 bitfield handling. The details of the encoding are different from
+    /// version 4 onward.
+    #[test]
+    fn test_bitfield_offset_le() {
+        // an ordinary bitfield: 5 bits at the top of a 32 bit container are the bits
+        // 27..32 counted from the least significant bit
+        assert_eq!(bitfield_offset_le(32, bit_offset(0), 5), Some(27));
+        assert_eq!(bitfield_offset_le(32, bit_offset(27), 5), Some(0));
+        assert_eq!(bitfield_offset_le(8, bit_offset(3), 5), Some(0));
+
+        // a negative bit offset: the bitfield extends past the end of its containing
+        // type and fix_bitfield_container_type() expands it
+        assert_eq!(bitfield_offset_le(8, bit_offset(-2), 5), Some(5));
+        assert_eq!(bitfield_offset_le(32, bit_offset(-5), 30), Some(7));
+
+        // the bitfield starts before the beginning of the containing type
+        assert_eq!(bitfield_offset_le(8, bit_offset(27), 5), None);
+        assert_eq!(bitfield_offset_le(8, bit_offset(8), 1), None);
+
+        // the bitfield ends more than one size step past the end of the containing type,
+        // so growing that type once would not be enough
+        assert_eq!(bitfield_offset_le(8, bit_offset(-3), 2), Some(9));
+        assert_eq!(bitfield_offset_le(8, bit_offset(-25), 2), None);
+
+        // extreme values must not panic or wrap around.
+        // DW_AT_bit_offset of -1 becomes u64::MAX, so it is accepted.
+        assert_eq!(bitfield_offset_le(8, u64::MAX, 1), Some(8));
+        assert_eq!(bitfield_offset_le(8, bit_offset(i64::MIN), 1), None);
+        assert_eq!(bitfield_offset_le(8, bit_offset(i64::MAX), 1), None);
+    }
+
+    fn typeinfo(datatype: DbgDataType) -> TypeInfo {
+        TypeInfo {
+            name: None,
+            unit_idx: 0,
+            dbginfo_offset: 0,
+            datatype,
+        }
+    }
+
+    #[test]
+    fn test_fix_bitfield_container_type() {
+        // the bitfield fits: the containing type is left alone
+        let mut membertype = typeinfo(DbgDataType::Uint8);
+        assert!(fix_bitfield_container_type(&mut membertype, 0, 5, 3));
+        assert!(matches!(membertype.datatype, DbgDataType::Uint8));
+
+        // the bitfield extends past the end, so the containing type grows by one step
+        let mut membertype = typeinfo(DbgDataType::Uint8);
+        assert!(fix_bitfield_container_type(&mut membertype, 0, 5, 5));
+        assert!(matches!(membertype.datatype, DbgDataType::Uint16));
+
+        let mut membertype = typeinfo(DbgDataType::Sint32);
+        assert!(fix_bitfield_container_type(&mut membertype, 8, 30, 7));
+        assert!(matches!(membertype.datatype, DbgDataType::Sint64));
+
+        // growing the containing type would make the access unaligned
+        let mut membertype = typeinfo(DbgDataType::Uint8);
+        assert!(!fix_bitfield_container_type(&mut membertype, 1, 5, 5));
+        assert!(matches!(membertype.datatype, DbgDataType::Uint8));
+
+        // there is no next size step for a 64 bit type or for a type that isn't an integer
+        let mut membertype = typeinfo(DbgDataType::Uint64);
+        assert!(!fix_bitfield_container_type(&mut membertype, 0, 5, 60));
+        let mut membertype = typeinfo(DbgDataType::Float);
+        assert!(!fix_bitfield_container_type(&mut membertype, 0, 5, 30));
     }
 }
