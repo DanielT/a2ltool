@@ -12,6 +12,11 @@ type MemberMap = IndexMap<String, (TypeInfo, u64)>;
 /// The largest type (in bytes) that can contain a bitfield.
 const MAX_BITFIELD_CONTAINER_SIZE: u64 = 8;
 
+/// The maximum nesting depth of types while reading debug info.
+/// 
+/// The largest seen in any real (non-fuzzing) debug info was 59 levels.
+const MAX_TYPE_NESTING: usize = 200;
+
 #[derive(Debug)]
 struct WipItemInfo {
     offset: usize,
@@ -73,13 +78,7 @@ impl DebugDataReader<'_> {
             Err(errmsg) => {
                 // try to print a readable error message
                 println!("Failed to read type: {errmsg}");
-                for (idx, wip) in typereader_data.wip_items.iter().enumerate() {
-                    print!("  {:indent$}{}", "", wip.tag, indent = idx * 2);
-                    if let Some(name) = &wip.name {
-                        print!(" {name}");
-                    }
-                    println!(" @0x{:X}", wip.offset);
-                }
+                print_wip_items(&typereader_data.wip_items);
 
                 // create a dummy typeinfo using DwarfDataType::Other, rather than propagate the error
                 // this allows the caller to continue, which is more useful
@@ -128,10 +127,13 @@ impl DebugDataReader<'_> {
         let typename = get_name_attribute(entry, &self.dwarf, unit).ok();
         let is_declaration = get_declaration_attribute(entry).unwrap_or(false);
 
-        if is_declaration {
-            // This is a declaration, not a definition. This happens when a type is declared but not defined
-            // e.g. "struct foo;" in a header file.
+        if is_declaration || typereader_data.wip_items.len() >= MAX_TYPE_NESTING {
+            // is_declaration: This is a declaration, not a definition. This happens when a type is
+            // declared but not defined e.g. "struct foo;" in a header file.
             // We can't do anything with this - return a dummy type, and don't store it in the types map.
+            // len > MAX_TYPE_NESTING: A chain of types can be arbitrarily long without ever
+            // repeating an offset. Real debug info never nests anywhere near this deeply, so this
+            // is only expected to trigger while fuzzing.
             return Ok(TypeInfo {
                 datatype: DbgDataType::Other(0),
                 name: typename,
@@ -159,10 +161,8 @@ impl DebugDataReader<'_> {
                 if let Ok(Some((new_cur_unit, ptype_offset))) =
                     get_type_attribute(entry, &self.units, current_unit)
                 {
-                    if let Some(idx) = typereader_data
-                        .wip_items
-                        .iter()
-                        .position(|item| item.offset == ptype_offset.0)
+                    if let Some(idx) =
+                        self.find_wip_type(new_cur_unit, ptype_offset, typereader_data)
                     {
                         // this is a linked list or similar self-referential data structure, and one of the callers
                         // of this function is already working to get this type
@@ -304,6 +304,58 @@ impl DebugDataReader<'_> {
             .insert(dbginfo_offset.0, typeinfo.clone());
 
         Ok(typeinfo)
+    }
+
+    /// Find the type that a pointer refers to in the list of types that are currently being
+    /// read, and return its index in `wip_items`.
+    ///
+    /// Typedefs and type modifiers (const, volatile, ...) are transparent here: a pointer to
+    /// `const struct foo` refers to `struct foo`, only wrapped in a `DW_TAG_const_type` entry.
+    /// Real debug info contains such pointers, e.g. for
+    ///     struct A { const struct B *b; };  struct B { const struct A *a; };
+    /// so the wrappers have to be followed - otherwise the recursion would only be broken
+    /// one level deeper, where it produces a much less useful result.
+    fn find_wip_type(
+        &self,
+        unit_idx: usize,
+        dbginfo_offset: DebugInfoOffset,
+        typereader_data: &TypeReaderData,
+    ) -> Option<usize> {
+        let mut unit_idx = unit_idx;
+        let mut dbginfo_offset = dbginfo_offset;
+        // the iteration count is limited, because damaged debug info could contain a loop
+        // of typedefs that never reaches anything else
+        for _ in 0..MAX_TYPE_NESTING {
+            if let Some(idx) = typereader_data
+                .wip_items
+                .iter()
+                .position(|item| item.offset == dbginfo_offset.0)
+            {
+                return Some(idx);
+            }
+
+            let (unit, abbrev) = &self.units[unit_idx];
+            let offset = dbginfo_offset.to_unit_offset(unit)?;
+            let mut entries_tree = unit.entries_tree(abbrev, Some(offset)).ok()?;
+            let entry = entries_tree.root().ok()?.entry().clone();
+            if !matches!(
+                entry.tag(),
+                gimli::constants::DW_TAG_typedef
+                    | gimli::constants::DW_TAG_const_type
+                    | gimli::constants::DW_TAG_volatile_type
+                    | gimli::constants::DW_TAG_packed_type
+                    | gimli::constants::DW_TAG_restrict_type
+                    | gimli::constants::DW_TAG_immutable_type
+                    | gimli::constants::DW_TAG_atomic_type
+            ) {
+                // not a transparent type: whatever it is, it is not one of the types that
+                // are currently being read
+                return None;
+            }
+            (unit_idx, dbginfo_offset) =
+                get_type_attribute(&entry, &self.units, unit_idx).ok()??;
+        }
+        None
     }
 
     fn get_array_type(
@@ -926,6 +978,31 @@ fn get_base_type(
 impl WipItemInfo {
     fn new(offset: usize, name: Option<String>, tag: DwTag) -> Self {
         Self { offset, name, tag }
+    }
+}
+
+/// Print the stack of types that were being read when an error occurred.
+/// Damaged debug info can nest types up to `MAX_TYPE_NESTING` deep, so only the
+/// outermost and innermost entries are printed for a deep stack.
+fn print_wip_items(wip_items: &[WipItemInfo]) {
+    const HEAD: usize = 10;
+    const TAIL: usize = 5;
+    let count = wip_items.len();
+    for (idx, wip) in wip_items.iter().enumerate() {
+        if count > HEAD + TAIL + 1 && (HEAD..count - TAIL).contains(&idx) {
+            if idx == HEAD {
+                let skipped = count - HEAD - TAIL;
+                println!("  {:indent$}... {skipped} more ...", "", indent = idx * 2);
+            }
+            continue;
+        }
+        // items after the gap keep the indentation of the gap, so that lines stay short
+        let indent = idx.min(HEAD) * 2;
+        print!("  {:indent$}{}", "", wip.tag);
+        if let Some(name) = &wip.name {
+            print!(" {name}");
+        }
+        println!(" @0x{:X}", wip.offset);
     }
 }
 

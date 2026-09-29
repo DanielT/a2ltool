@@ -301,7 +301,25 @@ mod replay {
         files
     }
 
+    /// Replay all inputs of one target on a thread with a known stack size.
+    ///
+    /// libtest gives each test thread a smaller stack than the main thread that a2ltool
+    /// itself runs on, so without this the replay would report stack exhaustion for inputs
+    /// that the real program handles. 8 MB matches the usual main thread stack.
     fn replay(target: &str, harness: Harness) {
+        let target = target.to_string();
+        let handle = std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .name(format!("replay_{target}"))
+            .spawn(move || replay_on_current_thread(&target, harness))
+            .expect("failed to spawn the replay thread");
+        if let Err(payload) = handle.join() {
+            // propagate an assertion failure from the replay thread, so that the test fails
+            panic::resume_unwind(payload);
+        }
+    }
+
+    fn replay_on_current_thread(target: &str, harness: Harness) {
         let mut failures: Vec<String> = Vec::new();
         let mut count = 0usize;
         for path in inputs_for(target) {
