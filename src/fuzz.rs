@@ -208,12 +208,110 @@ pub fn fuzz_dwarf(data: &[u8]) {
     let _ = DebugData::load_dwarf_from_slice("<fuzz>", data, false);
 }
 
-/// Target: the PDB reader, fed raw bytes.
+/// Magic at the start of every MSF 7.00 ("big MSF") file, i.e. every modern PDB.
+const MSF_MAGIC: &[u8; 32] = b"Microsoft C/C++ MSF 7.00\r\n\x1a\x44\x53\x00\x00\x00";
+
+/// Separates the streams in a structured `fuzz_pdb` input. Also listed in
+/// `fuzz/dictionaries/pdb.dict` so that libFuzzer can insert it.
+const PDB_STREAM_SEP: &[u8] = b"\xffMSF";
+
+const MSF_PAGE_SIZE: usize = 4096;
+
+/// Target: the PDB reader.
+///
+/// A PDB is an MSF container: a paged file whose streams are scattered across pages
+/// listed in a directory. Random mutations of a real PDB almost always break the
+/// page bookkeeping, so the fuzzer never gets past `PDB::open`. Therefore the input
+/// is normally a list of stream contents separated by `PDB_STREAM_SEP` (segment `i`
+/// becomes stream `i`), and a valid container is built around them. This lets the
+/// mutations reach the TPI/DBI/symbol parsers. `fuzz/pdb_to_seed.py` converts a real
+/// PDB into this format.
+///
+/// Inputs that start with the MSF magic are passed through unchanged, so the container
+/// parser itself is still covered.
 pub fn fuzz_pdb(data: &[u8]) {
     if data.len() > MAX_BIN_LEN {
         return;
     }
-    let _ = DebugData::load_pdb_from_slice("<fuzz>", data, false);
+    if data.starts_with(MSF_MAGIC) {
+        let _ = DebugData::load_pdb_from_slice("<fuzz>", data, false);
+    } else {
+        let streams: Vec<&[u8]> = split_on(data, PDB_STREAM_SEP).collect();
+        let msf = build_msf(&streams);
+        let _ = DebugData::load_pdb_from_slice("<fuzz>", &msf, false);
+    }
+}
+
+fn split_on<'a>(data: &'a [u8], sep: &'a [u8]) -> impl Iterator<Item = &'a [u8]> {
+    let mut rest = Some(data);
+    std::iter::from_fn(move || {
+        let cur = rest?;
+        match cur.windows(sep.len()).position(|w| w == sep) {
+            Some(pos) => {
+                rest = Some(&cur[pos + sep.len()..]);
+                Some(&cur[..pos])
+            }
+            None => {
+                rest = None;
+                Some(cur)
+            }
+        }
+    })
+}
+
+/// Build a valid MSF 7.00 file containing `streams`.
+///
+/// Layout: page 0 holds the header and the list of directory map pages, followed by
+/// the pages of each stream in order, then the directory, then the directory map.
+fn build_msf(streams: &[&[u8]]) -> Vec<u8> {
+    let pages_for = |len: usize| len.div_ceil(MSF_PAGE_SIZE);
+    let push_u32 =
+        |out: &mut Vec<u8>, val: usize| out.extend_from_slice(&(val as u32).to_le_bytes());
+
+    // page 0 is the header, so stream data starts at page 1
+    let mut next_page = 1;
+    let mut directory = Vec::new();
+    push_u32(&mut directory, streams.len());
+    for stream in streams {
+        push_u32(&mut directory, stream.len());
+    }
+    for stream in streams {
+        for _ in 0..pages_for(stream.len()) {
+            push_u32(&mut directory, next_page);
+            next_page += 1;
+        }
+    }
+
+    let first_dir_page = next_page;
+    let dir_pages = pages_for(directory.len());
+    let first_map_page = first_dir_page + dir_pages;
+    let map_pages = pages_for(dir_pages * 4);
+    let total_pages = first_map_page + map_pages;
+
+    let mut out = Vec::with_capacity(total_pages * MSF_PAGE_SIZE);
+    out.extend_from_slice(MSF_MAGIC);
+    push_u32(&mut out, MSF_PAGE_SIZE); // page size
+    push_u32(&mut out, 1); // free page map (unused by pdb2)
+    push_u32(&mut out, total_pages); // number of pages
+    push_u32(&mut out, directory.len()); // directory size in bytes
+    push_u32(&mut out, 0); // reserved
+    for page in first_map_page..total_pages {
+        push_u32(&mut out, page);
+    }
+    // the map page list always fits: MAX_BIN_LEN limits the directory to a few pages
+    out.resize(MSF_PAGE_SIZE, 0);
+
+    for stream in streams {
+        out.extend_from_slice(stream);
+        out.resize(out.len().next_multiple_of(MSF_PAGE_SIZE), 0);
+    }
+    out.extend_from_slice(&directory);
+    out.resize(out.len().next_multiple_of(MSF_PAGE_SIZE), 0);
+    for page in first_dir_page..first_map_page {
+        push_u32(&mut out, page);
+    }
+    out.resize(out.len().next_multiple_of(MSF_PAGE_SIZE), 0);
+    out
 }
 
 /// A small ELF containing arrays, nested arrays, and a struct. It is embedded so that
@@ -418,6 +516,23 @@ mod replay {
                 TARGETS.iter().any(|(name, _)| *name == stem),
                 "fuzz target '{stem}' has no entry in the TARGETS table in src/fuzz.rs"
             );
+        }
+    }
+
+    /// The structured PDB seed must produce a valid container, otherwise the fuzzer is
+    /// back to being stuck in `PDB::open`.
+    #[test]
+    fn pdb_seed_builds_valid_msf() {
+        let path = fuzz_dir().join("seeds/fuzz_pdb/clang_cpp_pdb");
+        let Ok(data) = fs::read(&path) else {
+            return;
+        };
+        let streams: Vec<&[u8]> = super::split_on(&data, super::PDB_STREAM_SEP).collect();
+        let msf = super::build_msf(&streams);
+        let dbg = crate::debuginfo::DebugData::load_pdb_from_slice("<seed>", &msf, false)
+            .expect("the seed should load");
+        for name in ["g_outer", "g_cal", "s_val", "counter", "clsvar"] {
+            assert!(dbg.variables.contains_key(name), "missing variable {name}");
         }
     }
 

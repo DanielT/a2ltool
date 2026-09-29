@@ -7,7 +7,8 @@ Fuzz targets run under [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) (li
 | path | checked in | purpose |
 |---|---|---|
 | `fuzz_targets/*.rs` | yes | one-line wrappers around `a2ltool::fuzz::*` |
-| `dictionaries/*.dict` | yes | A2L and `@@`-directive keyword dictionaries |
+| `dictionaries/*.dict` | yes | A2L and `@@`-directive keyword dictionaries, PDB stream separator |
+| `pdb_to_seed.py`, `pdb_seed.cpp` | yes | tooling for `fuzz_pdb` seeds, see below |
 | `seeds/<target>/` | yes | hand-curated starting inputs |
 | `artifacts/<target>/` | yes | crash reproducers, replayed as regression tests |
 | `artifacts/<target>/known_*/` | yes | reproducers for bugs not yet fixed |
@@ -31,12 +32,39 @@ Recommended `-max_len` and dictionary per target:
 |---|---|---|
 | `fuzz_a2l_parse`, `fuzz_a2l_roundtrip`, `fuzz_a2l_pipeline` | 16384 | `fuzz/dictionaries/a2l.dict` |
 | `fuzz_creator_scan`, `fuzz_creator_source` | 8192 | `fuzz/dictionaries/creator.dict` |
-| `fuzz_dwarf`, `fuzz_pdb` | 65536 | - |
+| `fuzz_dwarf` | 65536 | - |
+| `fuzz_pdb` | 65536 | `fuzz/dictionaries/pdb.dict` |
 | `fuzz_symbol_lookup` | 256 | - |
 
 Always pass `-rss_limit_mb` and `-malloc_limit_mb`: `pdb2` allocates based on a length read directly from the input, so a corrupt PDB triggers a huge allocation before the read that would have failed. Without these limits, such cases appear as unhelpful OOM kills.
 
 `-close_fd_mask=3` silences the per-type `println!`s in the PDB reader. It helps throughput but hides panic messages, so leave it off while triaging.
+
+## PDB inputs
+
+A PDB is an MSF container whose streams are scattered across pages listed in a directory.
+Byte-level mutations almost never preserve that bookkeeping, so a naive fuzzer never gets past
+`PDB::open`. Additionally, `pdb2` always reads a 4096-byte header page, so small inputs are
+rejected outright. Hence `fuzz_pdb` is structure-aware: its input is the content of each stream,
+separated by `\xffMSF` (stream *i* is segment *i*), and the harness builds a valid container
+around them. Inputs that begin with the MSF magic are passed through raw, so the container parser
+still gets some coverage.
+
+`pdb_to_seed.py` converts a real PDB into this format. The seed `seeds/fuzz_pdb/clang_cpp_pdb` was produced from `pdb_seed.cpp`:
+
+```
+sh
+clang-cl /c /Z7 /GS- /GR- /Od pdb_seed.cpp /Fopdb_seed.obj
+lld-link /debug /nodefaultlib /entry:mainCRTStartup /subsystem:console \
+    /out:pdb_seed.exe /pdb:pdb_seed.pdb pdb_seed.obj
+python3 fuzz/pdb_to_seed.py pdb_seed.pdb fuzz/seeds/fuzz_pdb/clang_cpp_pdb
+```
+
+The fixture PDBs in `fixtures/bin` convert as well, but at ~5.8 MB they exceed `MAX_BIN_LEN`.
+
+`pdb2` has several panics that the fuzzer finds quickly. Two only trigger under debug assertions
+or overflow checks, so pass `-O` to `cargo fuzz run` to build in release mode (matching a2ltool).
+To fuzz past the remaining one, add `-fork=<jobs> -ignore_crashes=1`.
 
 ## Bootstrapping a bigger corpus
 

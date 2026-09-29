@@ -1,0 +1,2 @@
+# fuzz_pdb: stream separator (PDB_STREAM_SEP in src/fuzz.rs)
+"\xffMSF"
