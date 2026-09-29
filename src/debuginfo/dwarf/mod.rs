@@ -228,7 +228,13 @@ impl DebugDataReader<'_> {
             let mut context: Vec<(gimli::DwTag, Option<String>)> = Vec::new();
             while let Ok(Some(entry)) = entries_cursor.next_dfs() {
                 let depth = entry.depth();
-                debug_assert!(depth >= 1);
+                if depth < 1 {
+                    // corrupt input, easily produced by fuzzing, but never seen in any real file
+                    println!(
+                        "Error: DWARF input is corrupt. It has invalid nesting of entries. The input cannot be used."
+                    );
+                    return IndexMap::new();
+                }
                 context.truncate((depth - 1) as usize);
                 let tag = entry.tag();
                 // It's essential to only get those names that might actually be needed.
