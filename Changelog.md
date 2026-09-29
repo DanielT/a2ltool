@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## Version 3.4.2
 
 - Add fuzz testing for A2L text parsing, parse/write round-tripping, the operation pipeline, the
-  `--from-source` comment scanner and parser, the ELF/DWARF and PDB readers, and symbol-name resolution.
-- The crate is now a library and a thin binary (`src/lib.rs` + `src/main.rs`) so the fuzz targets
-  can link against it. CLI behaviour is unchanged.
-- Fix: `--characteristic`/`--measurement` with a symbol name ending in a `.` followed by a single
-  `_` (e.g. `arr._`) panicked instead of reporting that `_` is not a valid array index (found by fuzzing).
-- Fix: an A2L file whose `PROJECT` contains no `MODULE` caused an index-out-of-bounds panic instead
-  of reporting the problem. Both the main input file and `--merge` source files are now checked
-  (found by fuzzing).
+  `--from-source` comment scanner and parser, the ELF/DWARF and PDB readers, and symbol-name resolution
+- Split the crate into a library (`src/lib.rs`) and a thin binary (`src/main.rs`) so fuzz targets can link against it; CLI behaviour is unchanged
+- Fix: `--characteristic`/`--measurement` with a symbol name ending in `.` followed by a single `_` (e.g. `arr._`) panicked instead of reporting an invalid array index
+- Fix: an A2L file whose `PROJECT` contains no `MODULE` caused an index-out-of-bounds panic; both the main input and `--merge` files are now checked
+- Fix: `--from-source` now rejects names that are not valid A2L identifiers, including the optional "a2l name", which was unchecked before
+- Fix: reject DWARF input with invalid nesting of entries (apparent depth 0 or negative)
+- Fix: integer overflows while reading DWARF bitfield members; a bitfield whose position cannot be expressed relative to its containing
+  type, or whose containing type is too small, is now skipped instead of getting a `BIT_MASK` covering bits outside the containing type
+- Fix: a type that (indirectly) contains itself in DWARF debug info made the type reader recurse until stack overflow
+- Fix quadratic runtime while checking for name collisions in `--from-source` mode
+- Fix potential integer overflow while determining the total size of multi-dimensional arrays
+- Fix: a PDB type reference pointing at a nested-only type record (e.g. a field list) panicked instead of reporting an error
+- Fix: return an err instead of panicing in the pdb reader when an invalid type structure is found
 
 ## Version 3.4.1
 
