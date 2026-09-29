@@ -266,12 +266,13 @@ fn read_type_from_typedata(
         | TypeData::VirtualBaseClass(_)
         | TypeData::VirtualFunctionTablePointer(_)
         | TypeData::FieldList(_)
-        | TypeData::ArgumentList(_) => {
+        | TypeData::ArgumentList(_)
+        | TypeData::MethodList(_) => {
             // all of these types should only appear in the context of other types
             // e.g. a field list is nested inside a class type, and an enumerate is nested inside an enumeration type
-            unreachable!("Type {type_data:?} should not be encountered here");
+            // A reference to one of them can only occur in a corrupt PDB file.
+            return Err(format!("Type {type_data:?} should not be encountered here"));
         }
-        TypeData::MethodList(_) => todo!(),
         _ => {
             return Err(format!("Could not read unknown type: {type_data:?}"));
         }
